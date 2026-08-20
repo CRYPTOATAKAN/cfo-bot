@@ -93,17 +93,29 @@ def get_spreadsheet():
 def bugununTarihiniAl():
     return datetime.datetime.now().strftime("%d.%m.%Y")
 
-def trKarakterCoz(metin: str) -> str:
-    if not metin: return ""
-    tr_map = str.maketrans("iıüöçşğ", "IIÜÖÇŞĞ")
-    return metin.strip().translate(tr_map).upper()
+def normalize_text(text: str) -> str:
+    """Türkçe harf duyarlılığını ve büyük/küçük harf farklarını (TİGER, tiger, Tiger, TIGER) %100 kusursuz eşitler."""
+    if not text: return ""
+    t = str(text).strip()
+    tr_map = {
+        "i": "I", "ı": "I", "İ": "I", "I": "I", "î": "I", "Î": "I",
+        "ş": "S", "Ş": "S",
+        "ğ": "G", "Ğ": "G",
+        "ü": "U", "Ü": "U",
+        "ö": "O", "Ö": "O",
+        "ç": "C", "Ç": "C"
+    }
+    for k, v in tr_map.items():
+        t = t.replace(k, v)
+    t = t.upper()
+    return re.sub(r"[^A-Z0-9]", "", t)
 
 def grupEmojisiBul(grupAdi: str) -> str:
-    temiz = trKarakterCoz(grupAdi)
-    if "TİGER" in temiz or "TIGER" in temiz: return "🐅"
+    temiz = normalize_text(grupAdi)
+    if "TIGER" in temiz: return "🐅"
     if "BSM" in temiz: return "⚡"
-    if "GENEL TOPLAM" in temiz: return "🏆"
-    if "MASRAF" in temiz or "GİDER" in temiz: return "📉"
+    if "GENELTOPLAM" in temiz: return "🏆"
+    if "MASRAF" in temiz or "GIDER" in temiz: return "📉"
     if "KARGO" in temiz: return "📦"
     return "🔹"
 
@@ -239,7 +251,7 @@ def menuKlavyesiOlustur(isGroup: bool):
             if len(r) >= 2:
                 gAd = r[1].strip()
                 if gAd and gAd != "*" and "GENEL TOPLAM" not in gAd.upper():
-                    uAd = gAd.upper()
+                    uAd = normalize_text(gAd)
                     if uAd not in eklenen:
                         eklenen.add(uAd)
                         emoji = grupEmojisiBul(gAd)
@@ -253,7 +265,7 @@ def rehber_metni():
     return (
         "📚 <b>SİSTEM KOMUT REHBERİ</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
         "🏢 <b>KASA VE OPERASYON</b>\n"
-        "• <code>/kasa TİGER 1500</code> : Kasaya para ekler.\n"
+        "• <code>/kasa TİGER 1500</code> : Kasaya para ekler (büyük/küçük harf farketmez).\n"
         "• <code>/kasasil TİGER 500</code> : Kasadan siler.\n"
         "• <code>/odeme TİGER 1000</code> : Ödenen tutarı girer.\n"
         "• <code>/odemesil TİGER 200</code> : Ödenen tutardan siler.\n"
@@ -304,14 +316,14 @@ def parse_grup_ve_tutar(parametreler: List[str]) -> Tuple[str, float]:
 def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int) -> str:
     parcalar = komut_metni.strip().split()[1:]
     grup_ham, tutar = parse_grup_ve_tutar(parcalar)
-    grup = trKarakterCoz(grup_ham)
+    hedef_norm = normalize_text(grup_ham)
     
     sh = get_spreadsheet()
     sayfa = sh.worksheet(bugununTarihiniAl())
     tum_veriler = sayfa.get_all_values()
     
     for i, row in enumerate(tum_veriler[1:], start=2):
-        if len(row) >= 2 and trKarakterCoz(row[1]) == grup:
+        if len(row) >= 2 and normalize_text(row[1]) == hedef_norm:
             mevcut_val = guvenliSayi(row[sutun_idx - 1]) if len(row) >= sutun_idx else 0.0
             yeni_val = mevcut_val + (tutar * carp)
             sayfa.update_cell(i, sutun_idx, yeni_val)
@@ -343,7 +355,7 @@ def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int) 
 def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
     parcalar = komut_metni.strip().split()[1:]
     masraf_ham, tutar = parse_grup_ve_tutar(parcalar)
-    masraf = trKarakterCoz(masraf_ham)
+    hedef_norm = normalize_text(masraf_ham)
     
     sh = get_spreadsheet()
     sayfa = sh.worksheet(bugununTarihiniAl())
@@ -352,13 +364,13 @@ def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
     for i, row in enumerate(tum_veriler[1:], start=2):
         col_i = row[8] if len(row) > 8 else ""
         col_j = row[9] if len(row) > 9 else ""
-        if trKarakterCoz(col_i) == masraf:
+        if normalize_text(col_i) == hedef_norm:
             mevcut = guvenliSayi(col_j)
             yeni = mevcut + (tutar * carp)
             sayfa.update_cell(i, 10, yeni)
-            app_state["SON_ISLEM"] = {"sayfa": bugununTarihiniAl(), "satir": i, "sutun": 10, "eskiDeger": mevcut, "grupAdi": masraf, "islemTuru": isim}
-            sistemeLogYaz(isim, f"{masraf} | {paraFormatla(tutar * carp)}")
-            return f"✅ <b>{isim} Başarılı!</b>\n📉 Masraf Kalemi: <b>{masraf}</b>\n💵 İşlem Tutarı: <b>{paraFormatla(tutar * carp)}</b>\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
+            app_state["SON_ISLEM"] = {"sayfa": bugununTarihiniAl(), "satir": i, "sutun": 10, "eskiDeger": mevcut, "grupAdi": col_i, "islemTuru": isim}
+            sistemeLogYaz(isim, f"{col_i} | {paraFormatla(tutar * carp)}")
+            return f"✅ <b>{isim} Başarılı!</b>\n📉 Masraf Kalemi: <b>{col_i}</b>\n💵 İşlem Tutarı: <b>{paraFormatla(tutar * carp)}</b>\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
             
     bos_satir = len(tum_veriler) + 1
     for i, row in enumerate(tum_veriler[1:], start=2):
@@ -366,11 +378,11 @@ def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
         if not col_i.strip():
             bos_satir = i
             break
-    sayfa.update_cell(bos_satir, 9, masraf)
+    sayfa.update_cell(bos_satir, 9, masraf_ham.upper())
     sayfa.update_cell(bos_satir, 10, tutar)
-    app_state["SON_ISLEM"] = {"sayfa": bugununTarihiniAl(), "satir": bos_satir, "sutun": 10, "eskiDeger": 0, "grupAdi": masraf, "islemTuru": "Yeni Masraf Ekleme"}
-    sistemeLogYaz("Yeni Masraf Ekleme", f"{masraf} | {paraFormatla(tutar)}")
-    return f"✅ <b>Yeni Masraf Oluşturuldu!</b>\n📉 Masraf Kalemi: <b>{masraf}</b>\n💵 Tutar: <b>{paraFormatla(tutar)}</b>\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
+    app_state["SON_ISLEM"] = {"sayfa": bugununTarihiniAl(), "satir": bos_satir, "sutun": 10, "eskiDeger": 0, "grupAdi": masraf_ham, "islemTuru": "Yeni Masraf Ekleme"}
+    sistemeLogYaz("Yeni Masraf Ekleme", f"{masraf_ham} | {paraFormatla(tutar)}")
+    return f"✅ <b>Yeni Masraf Oluşturuldu!</b>\n📉 Masraf Kalemi: <b>{masraf_ham.upper()}</b>\n💵 Tutar: <b>{paraFormatla(tutar)}</b>\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
 
 def tablodan_finans_ozeti_hesapla(veriler: List[List[str]]) -> Dict[str, Any]:
     """Excel tablosundaki tüm grupları ve varsa Excel GENEL TOPLAM satırını %100 uyumlu hesaplar."""
@@ -400,21 +412,18 @@ def tablodan_finans_ozeti_hesapla(veriler: List[List[str]]) -> Dict[str, Any]:
                 while len(vals) < 6: vals.append(0.0)
                 devir, kasa, odenen, kom, kalan = vals[1], vals[2], vals[3], vals[4], vals[5]
                 
-                # Tüm tanımlı grupların toplamlarını eksiksiz al
                 toplamDevir += devir
                 toplamKasa += kasa
                 toplamOdenen += odenen
                 toplamKomisyon += kom
                 toplamKalan += kalan
                 
-                # Sadece hareket gören veya bakiyesi olan grupları listele
                 if any(abs(x) > 0.001 for x in [devir, kasa, odenen, kom, kalan]):
                     aktif_gruplar.append({
                         "ad": grup_adi, "devir": devir, "kasa": kasa,
                         "odenen": odenen, "komisyon": kom, "kalan": kalan
                     })
                     
-    # Eğer Excel'de GENEL TOPLAM formül satırı varsa ve sıfırdan farklıysa onu esas al
     if excel_toplam_satiri and any(abs(v) > 0.001 for v in excel_toplam_satiri.values()):
         toplamDevir = excel_toplam_satiri["devir"]
         toplamKasa = excel_toplam_satiri["kasa"]
@@ -581,6 +590,7 @@ def hesapMakinesi_impl(orijinalMetin: str) -> str:
     kurStr = args.pop()
     komisyonStr = args.pop()
     arananGrup = " ".join(args[1:]).strip()
+    hedef_norm = normalize_text(arananGrup)
     
     kur = float(kurStr.replace(",", "."))
     komisyonOrani = float(komisyonStr.replace(",", "."))
@@ -593,10 +603,9 @@ def hesapMakinesi_impl(orijinalMetin: str) -> str:
     devirBorc = 0.0
     guncelKasa = 0.0
     gercekGrupAdi = arananGrup
-    arananTemiz = trKarakterCoz(arananGrup)
     
     for row in veriler[1:]:
-        if len(row) >= 2 and trKarakterCoz(row[1]) == arananTemiz:
+        if len(row) >= 2 and normalize_text(row[1]) == hedef_norm:
             gercekGrupAdi = row[1]
             devirBorc = guvenliSayi(row[2]) if len(row) > 2 else 0.0
             guncelKasa = guvenliSayi(row[3]) if len(row) > 3 else 0.0
@@ -846,12 +855,13 @@ def process_telegram_update(update: dict):
             telegramMesajGonder(chat_id, "❌ Yeni gün devir işlemi iptal edildi.")
         elif data.startswith("rapor_"):
             grup = data.replace("rapor_", "")
+            hedef_norm = normalize_text(grup)
             def tek_grup_rapor(grup_adi):
                 sh = get_spreadsheet()
                 sayfa = sh.worksheet(bugununTarihiniAl())
                 veriler = sayfa.get_all_values()
                 for row in veriler[1:]:
-                    if len(row) >= 2 and trKarakterCoz(row[1]) == trKarakterCoz(grup_adi):
+                    if len(row) >= 2 and normalize_text(row[1]) == hedef_norm:
                         vals = [guvenliSayi(x) for x in row[1:7]]
                         while len(vals) < 6: vals.append(0.0)
                         devir, kasa, odenen, kom, kalan = vals[1], vals[2], vals[3], vals[4], vals[5]
@@ -878,13 +888,15 @@ def process_telegram_update(update: dict):
         chat_id = msg["chat"]["id"]
         user_id = msg["from"]["id"]
         text = msg["text"].strip()
-        text_lower = text.lower()
         is_group = chat_id < 0
 
         if not text.startswith("/"):
             return
 
-        if text_lower in ["/id", "/myid", "/bilgi"] or text_lower.startswith("/id@"):
+        komut_parcalari = text.split()
+        ana_komut = komut_parcalari[0].lower().split("@")[0]
+
+        if ana_komut in ["/id", "/myid", "/bilgi"]:
             telegramMesajGonder(
                 chat_id,
                 f"👤 <b>Telegram Kullanıcı Bilginiz:</b>\n"
@@ -902,11 +914,11 @@ def process_telegram_update(update: dict):
             )
             return
 
-        if text_lower in ["/start", "/menu", "/menü"] or text_lower.startswith("/start@") or text_lower.startswith("/menu@"):
+        if ana_komut in ["/start", "/menu", "/menü"]:
             telegramMesajGonder(chat_id, "👋 <b>CFO ve Finans Yönetim Botu</b>\nLütfen bir işlem seçin:\n\n👨💻 <i>Yazılım: @CRYPTOATAKAN © 2026</i>", menuKlavyesiOlustur(is_group))
-        elif text_lower in ["/rehber", "/komutlar", "/yardim", "/yardım"] or text_lower.startswith("/rehber@"):
+        elif ana_komut in ["/rehber", "/komutlar", "/yardim", "/yardım"]:
             telegramMesajGonder(chat_id, rehber_metni())
-        elif text_lower == "/panel" or text_lower.startswith("/panel@"):
+        elif ana_komut == "/panel":
             panel_btn = {"inline_keyboard": [[{"text": "🚀 Canlı CFO Panelini Aç", "url": WEB_APP_URL}]]}
             telegramMesajGonder(
                 chat_id,
@@ -915,48 +927,48 @@ def process_telegram_update(update: dict):
                 f"🔗 <b>Panel Linki:</b>\n{WEB_APP_URL}",
                 panel_btn
             )
-        elif text_lower == "/ozet" or text_lower.startswith("/ozet@"):
+        elif ana_komut == "/ozet":
             islemi_analiz_bildirimiyle_yap(chat_id, hizliOzetUret_impl)
-        elif text_lower == "/rapor" or text_lower.startswith("/rapor@"):
+        elif ana_komut == "/rapor":
             islemi_analiz_bildirimiyle_yap(chat_id, tumGruplarRaporu_impl)
-        elif text_lower in ["/masraf", "/gider"] or text_lower.startswith("/masraf@"):
+        elif ana_komut in ["/masraf", "/gider"]:
             islemi_analiz_bildirimiyle_yap(chat_id, masrafRaporuUret_impl)
-        elif text_lower == "/canlikur" or text_lower.startswith("/canlikur@"):
+        elif ana_komut == "/canlikur":
             islemi_analiz_bildirimiyle_yap(chat_id, canliKurSorgula_impl)
-        elif text_lower == "/kur" or text_lower.startswith("/kur@"):
+        elif ana_komut == "/kur":
             islemi_analiz_bildirimiyle_yap(chat_id, kurRaporuUret_impl)
-        elif text_lower == "/iban" or text_lower.startswith("/iban@"):
+        elif ana_komut == "/iban":
             islemi_analiz_bildirimiyle_yap(chat_id, ibanListesiGetir_impl)
-        elif text_lower.startswith("/hesap"):
+        elif ana_komut == "/hesap":
             islemi_analiz_bildirimiyle_yap(chat_id, hesapMakinesi_impl, text)
-        elif text_lower.startswith("/çeviri") or text_lower.startswith("/ceviri"):
+        elif ana_komut in ["/çeviri", "/ceviri"]:
             islemi_analiz_bildirimiyle_yap(chat_id, metinCevir_impl, text)
-        elif text_lower == "/yenigun" or text_lower.startswith("/yenigun@"):
+        elif ana_komut == "/yenigun":
             metin, klavye = yenigun_baslat_mesaji()
             telegramMesajGonder(chat_id, metin, klavye)
-        elif text_lower.startswith("/kasa "):
+        elif ana_komut == "/kasa":
             islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 4, "Kasa Ekleme", 1)
-        elif text_lower.startswith("/kasasil "):
+        elif ana_komut == "/kasasil":
             islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 4, "Kasa Silme", -1)
-        elif text_lower.startswith("/odeme "):
+        elif ana_komut == "/odeme":
             islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 5, "Ödenen Ekleme", 1)
-        elif text_lower.startswith("/odemesil "):
+        elif ana_komut == "/odemesil":
             islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 5, "Ödenen Silme", -1)
-        elif text_lower.startswith("/devir "):
+        elif ana_komut == "/devir":
             islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 3, "Devir Ekleme", 1)
-        elif text_lower.startswith("/devirsil "):
+        elif ana_komut == "/devirsil":
             islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 3, "Devir Silme", -1)
-        elif text_lower.startswith("/masrafekle "):
+        elif ana_komut == "/masrafekle":
             islemi_analiz_bildirimiyle_yap(chat_id, masrafVerisiYaz_impl, text, "Masraf Ekleme", 1)
-        elif text_lower.startswith("/masrafsil "):
+        elif ana_komut == "/masrafsil":
             islemi_analiz_bildirimiyle_yap(chat_id, masrafVerisiYaz_impl, text, "Masraf Silme", -1)
-        elif text_lower.startswith("/adminekle"):
+        elif ana_komut == "/adminekle":
             islemi_analiz_bildirimiyle_yap(chat_id, admin_ekle_impl, text, user_id)
-        elif text_lower.startswith("/adminsil"):
+        elif ana_komut == "/adminsil":
             islemi_analiz_bildirimiyle_yap(chat_id, admin_sil_impl, text, user_id)
-        elif text_lower in ["/adminler", "/yoneticiler"] or text_lower.startswith("/adminler@"):
+        elif ana_komut in ["/adminler", "/yoneticiler"]:
             islemi_analiz_bildirimiyle_yap(chat_id, admin_listesi_impl)
-        elif text_lower == "/gerial":
+        elif ana_komut == "/gerial":
             def gerial_impl():
                 if not app_state["SON_ISLEM"]:
                     return "Hafıza Boş: Geri alınacak işlem yok."
@@ -968,9 +980,9 @@ def process_telegram_update(update: dict):
                 sistemeLogYaz("İptal Edilen İşlem", f"{last['grupAdi']} ({last['islemTuru']})")
                 return f"⏪ <b>ZAMAN GERİYE SARILDI!</b>\nHedef: <b>{last['grupAdi']}</b>\nEski haline döndürüldü."
             islemi_analiz_bildirimiyle_yap(chat_id, gerial_impl)
-        elif text_lower.startswith("/not ") and not text_lower.startswith("/notlar"):
+        elif ana_komut == "/not":
             def not_ekle_impl():
-                not_metni = text[5:].strip()
+                not_metni = text[4:].strip()
                 sh = get_spreadsheet()
                 try: not_sayfasi = sh.worksheet("NOTLAR")
                 except: not_sayfasi = sh.add_worksheet(title="NOTLAR", rows=500, cols=3)
@@ -978,7 +990,7 @@ def process_telegram_update(update: dict):
                 not_sayfasi.append_row([now_str, not_metni])
                 return f"📓 <b>NOT KAYDEDİLDİ</b>\n🕒 {now_str}\n📝 <i>{not_metni}</i>"
             islemi_analiz_bildirimiyle_yap(chat_id, not_ekle_impl)
-        elif text_lower == "/notlar" or text_lower.startswith("/notlar@"):
+        elif ana_komut == "/notlar":
             def notlari_getir_impl():
                 sh = get_spreadsheet()
                 not_sayfasi = sh.worksheet("NOTLAR")
@@ -1137,7 +1149,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                             <span>${fmt(g.odenen)}</span>
                         </div>
                         <div class="row-item">
-                            <span>✂️ Komisyon/Kesinti:</span>
+                            <span>✂️ Kesinti/Masraf:</span>
                             <span>${fmt(g.komisyon)}</span>
                         </div>
                     </div>
