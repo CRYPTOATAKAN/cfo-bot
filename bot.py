@@ -2,26 +2,16 @@ import os
 import re
 import io
 import json
-import logging
+import time
 import datetime
 import threading
+import urllib.request
+import urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Optional, Dict, Any, List
 
-import requests
 import gspread
 from google.oauth2.service_account import Credentials
-
-from telegram import (
-    Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
-)
-from telegram.constants import ParseMode
-from telegram.ext import (
-    ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
-)
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("CFO_BOT")
 
 # --- AYARLAR & SABİTLER ---
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8629756462:AAHSn66-SVOZzWp_UrBj36bHjF1hpts5bco")
@@ -44,8 +34,33 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive"
 ]
 
+def http_get_json(url: str, headers: dict = None) -> dict:
+    req = urllib.request.Request(url, headers=headers or {"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=10) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+def telegram_api(method: str, payload: dict) -> dict:
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/{method}"
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except Exception as e:
+        print(f"Telegram API Error ({method}): {e}")
+        return {"ok": False, "error": str(e)}
+
+def telegramMesajGonder(chat_id, metin: str, reply_markup=None):
+    payload = {"chat_id": chat_id, "text": metin, "parse_mode": "HTML"}
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+    return telegram_api("sendMessage", payload)
+
+def telegramMesajSil(chat_id, message_id):
+    return telegram_api("deleteMessage", {"chat_id": chat_id, "message_id": message_id})
+
 def get_gspread_client():
-    # 1. Environment variable kontrolü
+    # 1. Environment variable
     json_env = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
     if json_env and json_env.strip():
         try:
@@ -53,9 +68,9 @@ def get_gspread_client():
             creds = Credentials.from_service_account_info(info, scopes=SCOPES)
             return gspread.authorize(creds)
         except Exception as e:
-            logger.error(f"GOOGLE_SERVICE_ACCOUNT_JSON okunamadı: {e}")
+            print(f"GOOGLE_SERVICE_ACCOUNT_JSON parse error: {e}")
 
-    # 2. Dosya yolları kontrolü
+    # 2. File locations
     for path in [
         os.path.join(os.path.dirname(__file__), "service_account.json"),
         "./service_account.json",
@@ -68,17 +83,16 @@ def get_gspread_client():
                 creds = Credentials.from_service_account_file(path, scopes=SCOPES)
                 return gspread.authorize(creds)
             except Exception as e:
-                logger.error(f"{path} okunamadı: {e}")
+                print(f"File {path} load error: {e}")
 
-    raise FileNotFoundError("Google Service Account anahtarı bulunamadı! Lütfen Environment değişkenlerine GOOGLE_SERVICE_ACCOUNT_JSON ekleyin.")
+    raise FileNotFoundError("Google Service Account anahtarı bulunamadı!")
 
 def get_spreadsheet():
     gc = get_gspread_client()
     return gc.open_by_key(SPREADSHEET_ID)
 
 def bugununTarihiniAl():
-    now = datetime.datetime.now()
-    return now.strftime("%d.%m.%Y")
+    return datetime.datetime.now().strftime("%d.%m.%Y")
 
 def trKarakterCoz(metin: str) -> str:
     if not metin: return ""
@@ -138,7 +152,7 @@ def sistemeLogYaz(islemAdi: str, detay: str):
         tarihSaat = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
         logSayfasi.append_row([tarihSaat, islemAdi, detay])
     except Exception as e:
-        logger.error(f"Log hatası: {e}")
+        print(f"Log hatası: {e}")
 
 def yetkili_mi(user_id: int) -> bool:
     if user_id == KURUCU_ID: return True
@@ -146,16 +160,16 @@ def yetkili_mi(user_id: int) -> bool:
 
 def menuKlavyesiOlustur(isGroup: bool):
     panel_button = (
-        InlineKeyboardButton("🌐 Canlı CFO Paneli (Tarayıcıda Aç)", url=WEB_APP_URL)
+        {"text": "🌐 Canlı CFO Paneli (Tarayıcıda Aç)", "url": WEB_APP_URL}
         if (isGroup or not WEB_APP_URL) else
-        InlineKeyboardButton("🌐 Canlı CFO Paneli (Mini-App)", web_app=WebAppInfo(url=WEB_APP_URL))
+        {"text": "🌐 Canlı CFO Paneli (Mini-App)", "web_app": {"url": WEB_APP_URL}}
     )
     keyboard = [
         [panel_button],
-        [InlineKeyboardButton("📊 Tüm Gruplar", callback_data="rapor_tumu")],
-        [InlineKeyboardButton("📉 Masraf Raporu", callback_data="rapor_masraf")],
-        [InlineKeyboardButton("💼 Hızlı Finans Özeti", callback_data="rapor_ozet")],
-        [InlineKeyboardButton("🎯 Ciro Hedefi İbresi", callback_data="menu_hedef")]
+        [{"text": "📊 Tüm Gruplar", "callback_data": "rapor_tumu"}],
+        [{"text": "📉 Masraf Raporu", "callback_data": "rapor_masraf"}],
+        [{"text": "💼 Hızlı Finans Özeti", "callback_data": "rapor_ozet"}],
+        [{"text": "🎯 Ciro Hedefi İbresi", "callback_data": "menu_hedef"}]
     ]
     try:
         sh = get_spreadsheet()
@@ -170,11 +184,11 @@ def menuKlavyesiOlustur(isGroup: bool):
                     if uAd not in eklenen:
                         eklenen.add(uAd)
                         emoji = grupEmojisiBul(gAd)
-                        keyboard.append([InlineKeyboardButton(f"{emoji} {gAd}", callback_data=f"rapor_{gAd}")])
+                        keyboard.append([{"text": f"{emoji} {gAd}", "callback_data": f"rapor_{gAd}"}])
     except:
         pass
-    keyboard.append([InlineKeyboardButton("🛠️ Komut Rehberi", callback_data="rehber")])
-    return InlineKeyboardMarkup(keyboard)
+    keyboard.append([{"text": "🛠️ Komut Rehberi", "callback_data": "rehber"}])
+    return {"inline_keyboard": keyboard}
 
 def rehber_metni():
     return (
@@ -344,25 +358,25 @@ def masrafRaporuUret_impl():
 def kurRaporuUret_impl():
     yanit = "📊 <b>GÜNCEL KURLAR</b>\n\n"
     try:
-        r = requests.get("https://data-api.binance.vision/api/v3/ticker/24hr?symbol=USDTTRY", timeout=5).json()
+        r = http_get_json("https://data-api.binance.vision/api/v3/ticker/24hr?symbol=USDTTRY")
         yanit += f"🟡 <b>BİNANCE USDT/TRY</b>\n💵 Anlık Kur: {float(r['lastPrice']):.2f} ₺\n🔺 24s Yüksek: {float(r['highPrice']):.2f} ₺\n🔻 24s Düşük: {float(r['lowPrice']):.2f} ₺\n\n"
     except: yanit += "🟡 <b>BİNANCE USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
     try:
-        r = requests.get("https://www.paribu.com/ticker", timeout=5).json()["USDT_TL"]
+        r = http_get_json("https://www.paribu.com/ticker")["USDT_TL"]
         yanit += f"🔵 <b>PARİBU USDT/TRY</b>\n💵 Anlık Kur: {float(r['last']):.2f} ₺\n🔺 24s Yüksek: {float(r['high24hr']):.2f} ₺\n🔻 24s Düşük: {float(r['low24hr']):.2f} ₺\n\n"
     except: yanit += "🔵 <b>PARİBU USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
     try:
-        r = requests.get("https://api.btcturk.com/api/v2/ticker?pairSymbol=USDT_TRY", timeout=5).json()["data"][0]
+        r = http_get_json("https://api.btcturk.com/api/v2/ticker?pairSymbol=USDT_TRY")["data"][0]
         yanit += f"🟢 <b>BTCTÜRK USDT/TRY</b>\n💵 Anlık Kur: {float(r['last']):.2f} ₺\n🔺 24s Yüksek: {float(r['high']):.2f} ₺\n🔻 24s Düşük: {float(r['low']):.2f} ₺\n\n"
     except: yanit += "🟢 <b>BTCTÜRK USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
     return yanit.strip()
 
 def canliKurSorgula_impl():
     try:
-        b_usdt = requests.get("https://data-api.binance.vision/api/v3/ticker/price?symbol=USDTTRY", timeout=5).json()
-        b_btc = requests.get("https://data-api.binance.vision/api/v3/ticker/price?symbol=BTCUSDT", timeout=5).json()
-        b_eth = requests.get("https://data-api.binance.vision/api/v3/ticker/price?symbol=ETHUSDT", timeout=5).json()
-        fiat = requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=5).json()["rates"]
+        b_usdt = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=USDTTRY")
+        b_btc = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=BTCUSDT")
+        b_eth = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=ETHUSDT")
+        fiat = http_get_json("https://api.exchangerate-api.com/v4/latest/USD")["rates"]
         try_rate = fiat.get("TRY", 0)
         return (
             "🌍 <b>CANLI PİYASA & DÜNYA KURLARI</b>\n━━━━━━━━━━━━━━━━━━━\n\n"
@@ -466,185 +480,180 @@ def metinCevir_impl(gelenMetin: str):
     if not cevrilecek:
         return "⚠️ Lütfen çevrilmesini istediğiniz metni yazın.\nÖrnek: <code>/çeviri Merhaba</code>"
     try:
-        url = "https://translate.googleapis.com/translate_a/single"
-        params = {"client": "gtx", "sl": "auto", "tl": "tr", "dt": "t", "q": cevrilecek}
-        res = requests.get(url, params=params, timeout=5).json()
+        q = urllib.parse.quote(cevrilecek)
+        url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=tr&dt=t&q={q}"
+        res = http_get_json(url)
         turkce = "".join([x[0] for x in res[0] if x[0]])
         son_ceviri = turkce
         etiket = "🌍 Yabancı Dil ➔ 🇹🇷 Türkçe"
         if turkce.lower() == cevrilecek.lower():
-            params["tl"] = "en"
-            res_en = requests.get(url, params=params, timeout=5).json()
+            url_en = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q={q}"
+            res_en = http_get_json(url_en)
             son_ceviri = "".join([x[0] for x in res_en[0] if x[0]])
             etiket = "🇹🇷 Türkçe ➔ 🇺🇸 İngilizce"
         return f"🌐 <b>YAPAY ZEKA ÇEVİRİSİ</b>\n━━━━━━━━━━━━━━━━━━━\n\n📝 <b>Orijinal Metin:</b>\n<i>{cevrilecek}</i>\n\n🎯 <b>{etiket}:</b>\n<code>{son_ceviri}</code>"
     except Exception as e:
         return f"❌ <b>Çeviri Hatası:</b> {e}"
 
-# --- TELEGRAM HANDLERS ---
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if not yetkili_mi(user_id):
-        await update.message.reply_text("⛔ <b>Erişim Reddedildi!</b>\nSistem seni taradı... VIP yetkisi gereklidir.", parse_mode=ParseMode.HTML)
-        return
-    is_group = update.effective_chat.type in ["group", "supergroup"]
-    await update.message.reply_text(
-        "👋 <b>CFO ve Finans Yönetim Botu</b>\nLütfen bir işlem seçin:\n\n👨💻 <i>Yazılım: @CRYPTOATAKAN © 2026</i>",
-        reply_markup=menuKlavyesiOlustur(is_group),
-        parse_mode=ParseMode.HTML
-    )
-
-async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    data = query.data
-    user_id = update.effective_user.id
-    
-    if not yetkili_mi(user_id):
-        await query.message.reply_text("⛔ <b>Erişim Reddedildi!</b>", parse_mode=ParseMode.HTML)
-        return
+# --- UPDATE DISPATCHER ---
+def process_telegram_update(update: dict):
+    # Callback Queries (Buton Tıklamaları)
+    if "callback_query" in update:
+        cq = update["callback_query"]
+        data = cq.get("data", "")
+        chat_id = cq["message"]["chat"]["id"]
+        user_id = cq["from"]["id"]
+        msg_id = cq["message"]["message_id"]
         
-    try:
-        if data == "rehber":
-            await query.message.reply_text(rehber_metni(), parse_mode=ParseMode.HTML)
-        elif data == "rapor_ozet":
-            await query.message.reply_text(hizliOzetUret_impl(), parse_mode=ParseMode.HTML)
-        elif data == "rapor_masraf":
-            await query.message.reply_text(masrafRaporuUret_impl(), parse_mode=ParseMode.HTML)
-        elif data == "rapor_tumu":
-            await query.message.reply_text(hizliOzetUret_impl(), parse_mode=ParseMode.HTML)
-        elif data.startswith("rapor_"):
-            grup = data.replace("rapor_", "")
-            sh = get_spreadsheet()
-            sayfa = sh.worksheet(bugununTarihiniAl())
-            veriler = sayfa.get_all_values()
-            found = False
-            for row in veriler[1:]:
-                if len(row) >= 2 and trKarakterCoz(row[1]) == trKarakterCoz(grup):
-                    vals = [guvenliSayi(x) for x in row[1:7]]
-                    while len(vals) < 6: vals.append(0.0)
-                    devir, kasa, odenen, kom, kalan = vals[1], vals[2], vals[3], vals[4], vals[5]
-                    msg = (
-                        f"📊 <b>[ {row[1]} ] GÜNCEL KASA ANALİZİ</b>\n━━━━━━━━━━━━\n"
-                        f"📅 Tarih: {bugununTarihiniAl()}\n━━━━━━━━━━━━\n"
-                        f"🔄 Önceki Devir: {paraFormatla(abs(devir))} ₺\n"
-                        f"💰 Eklenen Kasa: {paraFormatla(abs(kasa))} ₺\n"
-                        f"💸 Yapılan Ödeme: {paraFormatla(abs(odenen))} ₺\n"
-                        f"✂️ Kesinti/Masraf: {paraFormatla(abs(kom))} ₺\n━━━━━━━━━━━━\n"
-                        f"🏦 <b>NET KALAN TL: {paraFormatla(abs(kalan))} ₺</b>"
-                    )
-                    await query.message.reply_text(msg, parse_mode=ParseMode.HTML)
-                    found = True
-                    break
-            if not found:
-                await query.message.reply_text(f"⚠️ {grup} grubu için veri bulunamadı.", parse_mode=ParseMode.HTML)
-    except Exception as e:
-        await query.message.reply_text(f"❌ <b>Hata:</b> {e}", parse_mode=ParseMode.HTML)
-
-async def generic_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    if not msg or not msg.text: return
-    text = msg.text.strip()
-    text_lower = text.lower()
-    user_id = msg.from_user.id
-    
-    if not yetkili_mi(user_id):
-        await msg.reply_text("⛔ <b>Erişim Reddedildi!</b>", parse_mode=ParseMode.HTML)
-        return
+        telegram_api("answerCallbackQuery", {"callback_query_id": cq["id"]})
         
-    try:
-        if text_lower in ["/start", "/menu", "/menü"] or text_lower.startswith("/start@") or text_lower.startswith("/menu@"):
-            await start_command(update, context)
-        elif text_lower in ["/rehber", "/komutlar", "/yardim", "/yardım"] or text_lower.startswith("/rehber@"):
-            await msg.reply_text(rehber_metni(), parse_mode=ParseMode.HTML)
-        elif text_lower == "/ozet" or text_lower.startswith("/ozet@"):
-            await msg.reply_text(hizliOzetUret_impl(), parse_mode=ParseMode.HTML)
-        elif text_lower == "/canlikur" or text_lower.startswith("/canlikur@"):
-            await msg.reply_text(canliKurSorgula_impl(), parse_mode=ParseMode.HTML)
-        elif text_lower == "/kur" or text_lower.startswith("/kur@"):
-            await msg.reply_text(kurRaporuUret_impl(), parse_mode=ParseMode.HTML)
-        elif text_lower == "/iban" or text_lower.startswith("/iban@"):
-            await msg.reply_text(ibanListesiGetir_impl(), parse_mode=ParseMode.HTML)
-        elif text_lower.startswith("/hesap"):
-            await msg.reply_text(hesapMakinesi_impl(text), parse_mode=ParseMode.HTML)
-        elif text_lower.startswith("/çeviri") or text_lower.startswith("/ceviri"):
-            await msg.reply_text(metinCevir_impl(text), parse_mode=ParseMode.HTML)
-        elif text_lower.startswith("/kasa "):
-            await msg.reply_text(hucreyeVeriYaz_impl(text, 4, "Güncel Kasa Ekleme", 1), parse_mode=ParseMode.HTML)
-        elif text_lower.startswith("/kasasil "):
-            await msg.reply_text(hucreyeVeriYaz_impl(text, 4, "Güncel Kasa Silme", -1), parse_mode=ParseMode.HTML)
-        elif text_lower.startswith("/odeme "):
-            await msg.reply_text(hucreyeVeriYaz_impl(text, 5, "Ödenen Ekleme", 1), parse_mode=ParseMode.HTML)
-        elif text_lower.startswith("/odemesil "):
-            await msg.reply_text(hucreyeVeriYaz_impl(text, 5, "Ödenen Silme", -1), parse_mode=ParseMode.HTML)
-        elif text_lower.startswith("/devir "):
-            await msg.reply_text(hucreyeVeriYaz_impl(text, 3, "Devir Ekleme", 1), parse_mode=ParseMode.HTML)
-        elif text_lower.startswith("/devirsil "):
-            await msg.reply_text(hucreyeVeriYaz_impl(text, 3, "Devir Silme", -1), parse_mode=ParseMode.HTML)
-        elif text_lower.startswith("/masrafekle "):
-            await msg.reply_text(masrafVerisiYaz_impl(text, "Masraf Ekleme", 1), parse_mode=ParseMode.HTML)
-        elif text_lower.startswith("/masrafsil "):
-            await msg.reply_text(masrafVerisiYaz_impl(text, "Masraf Silme", -1), parse_mode=ParseMode.HTML)
-        elif text_lower == "/gerial":
-            if not app_state["SON_ISLEM"]:
-                await msg.reply_text("Hafıza Boş: Geri alınacak işlem yok.", parse_mode=ParseMode.HTML)
-            else:
-                last = app_state["SON_ISLEM"]
+        if not yetkili_mi(user_id):
+            telegramMesajGonder(chat_id, "⛔ <b>Erişim Reddedildi!</b>")
+            return
+            
+        try:
+            if data == "rehber":
+                telegramMesajGonder(chat_id, rehber_metni())
+            elif data == "rapor_ozet" or data == "rapor_tumu":
+                telegramMesajGonder(chat_id, hizliOzetUret_impl())
+            elif data == "rapor_masraf":
+                telegramMesajGonder(chat_id, masrafRaporuUret_impl())
+            elif data.startswith("rapor_"):
+                grup = data.replace("rapor_", "")
                 sh = get_spreadsheet()
-                sayfa = sh.worksheet(last["sayfa"])
-                sayfa.update_cell(last["satir"], last["sutun"], last["eskiDeger"])
-                app_state["SON_ISLEM"] = None
-                sistemeLogYaz("İptal Edilen İşlem", f"{last['grupAdi']} ({last['islemTuru']})")
-                await msg.reply_text(f"⏪ <b>ZAMAN GERİYE SARILDI!</b>\nHedef: <b>{last['grupAdi']}</b>\nEski haline döndürüldü.", parse_mode=ParseMode.HTML)
-        elif text_lower.startswith("/not ") and not text_lower.startswith("/notlar"):
-            not_metni = text[5:].strip()
-            sh = get_spreadsheet()
-            try: not_sayfasi = sh.worksheet("NOTLAR")
-            except: not_sayfasi = sh.add_worksheet(title="NOTLAR", rows=500, cols=3)
-            now_str = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
-            not_sayfasi.append_row([now_str, not_metni])
-            await msg.reply_text(f"📓 <b>NOT KAYDEDİLDİ</b>\n🕒 {now_str}\n📝 <i>{not_metni}</i>", parse_mode=ParseMode.HTML)
-        elif text_lower == "/notlar" or text_lower.startswith("/notlar@"):
-            sh = get_spreadsheet()
-            not_sayfasi = sh.worksheet("NOTLAR")
-            rows = not_sayfasi.get_all_values()
-            if len(rows) < 1:
-                await msg.reply_text("📭 Not defteri boş.", parse_mode=ParseMode.HTML)
-            else:
-                last_10 = rows[-10:]
-                out = "📓 <b>ŞİRKET HAFIZASI (SON NOTLAR)</b>\n━━━━━━━━━━━━━━━━━━━\n\n"
-                for r in reversed(last_10):
-                    out += f"📌 <b>{r[0] if len(r)>0 else ''}</b>\n<code>{r[1] if len(r)>1 else ''}</code>\n\n"
-                await msg.reply_text(out, parse_mode=ParseMode.HTML)
-    except Exception as err:
-        logger.error(f"Komut hatası: {err}")
-        await msg.reply_text(f"❌ <b>Hata:</b> {err}", parse_mode=ParseMode.HTML)
+                sayfa = sh.worksheet(bugununTarihiniAl())
+                veriler = sayfa.get_all_values()
+                found = False
+                for row in veriler[1:]:
+                    if len(row) >= 2 and trKarakterCoz(row[1]) == trKarakterCoz(grup):
+                        vals = [guvenliSayi(x) for x in row[1:7]]
+                        while len(vals) < 6: vals.append(0.0)
+                        devir, kasa, odenen, kom, kalan = vals[1], vals[2], vals[3], vals[4], vals[5]
+                        msg = (
+                            f"📊 <b>[ {row[1]} ] GÜNCEL KASA ANALİZİ</b>\n━━━━━━━━━━━━\n"
+                            f"📅 Tarih: {bugununTarihiniAl()}\n━━━━━━━━━━━━\n"
+                            f"🔄 Önceki Devir: {paraFormatla(abs(devir))} ₺\n"
+                            f"💰 Eklenen Kasa: {paraFormatla(abs(kasa))} ₺\n"
+                            f"💸 Yapılan Ödeme: {paraFormatla(abs(odenen))} ₺\n"
+                            f"✂️ Kesinti/Masraf: {paraFormatla(abs(kom))} ₺\n━━━━━━━━━━━━\n"
+                            f"🏦 <b>NET KALAN TL: {paraFormatla(abs(kalan))} ₺</b>"
+                        )
+                        telegramMesajGonder(chat_id, msg)
+                        found = True
+                        break
+                if not found:
+                    telegramMesajGonder(chat_id, f"⚠️ {grup} grubu için veri bulunamadı.")
+        except Exception as e:
+            telegramMesajGonder(chat_id, f"❌ <b>Hata:</b> {e}")
+        return
 
-# --- LIGHTWEIGHT HTTP SERVER (STANDALONE THREAD) ---
-class DashboardHandler(BaseHTTPRequestHandler):
+    # Normal Mesajlar
+    if "message" in update and "text" in update["message"]:
+        msg = update["message"]
+        chat_id = msg["chat"]["id"]
+        user_id = msg["from"]["id"]
+        text = msg["text"].strip()
+        text_lower = text.lower()
+        is_group = chat_id < 0
+
+        if not yetkili_mi(user_id):
+            telegramMesajGonder(chat_id, "⛔ <b>Erişim Reddedildi!</b>")
+            return
+
+        try:
+            if text_lower in ["/start", "/menu", "/menü"] or text_lower.startswith("/start@") or text_lower.startswith("/menu@"):
+                telegramMesajGonder(chat_id, "👋 <b>CFO ve Finans Yönetim Botu</b>\nLütfen bir işlem seçin:\n\n👨💻 <i>Yazılım: @CRYPTOATAKAN © 2026</i>", menuKlavyesiOlustur(is_group))
+            elif text_lower in ["/rehber", "/komutlar", "/yardim", "/yardım"] or text_lower.startswith("/rehber@"):
+                telegramMesajGonder(chat_id, rehber_metni())
+            elif text_lower == "/ozet" or text_lower.startswith("/ozet@"):
+                telegramMesajGonder(chat_id, hizliOzetUret_impl())
+            elif text_lower == "/canlikur" or text_lower.startswith("/canlikur@"):
+                telegramMesajGonder(chat_id, canliKurSorgula_impl())
+            elif text_lower == "/kur" or text_lower.startswith("/kur@"):
+                telegramMesajGonder(chat_id, kurRaporuUret_impl())
+            elif text_lower == "/iban" or text_lower.startswith("/iban@"):
+                telegramMesajGonder(chat_id, ibanListesiGetir_impl())
+            elif text_lower.startswith("/hesap"):
+                telegramMesajGonder(chat_id, hesapMakinesi_impl(text))
+            elif text_lower.startswith("/çeviri") or text_lower.startswith("/ceviri"):
+                telegramMesajGonder(chat_id, metinCevir_impl(text))
+            elif text_lower.startswith("/kasa "):
+                telegramMesajGonder(chat_id, hucreyeVeriYaz_impl(text, 4, "Güncel Kasa Ekleme", 1))
+            elif text_lower.startswith("/kasasil "):
+                telegramMesajGonder(chat_id, hucreyeVeriYaz_impl(text, 4, "Güncel Kasa Silme", -1))
+            elif text_lower.startswith("/odeme "):
+                telegramMesajGonder(chat_id, hucreyeVeriYaz_impl(text, 5, "Ödenen Ekleme", 1))
+            elif text_lower.startswith("/odemesil "):
+                telegramMesajGonder(chat_id, hucreyeVeriYaz_impl(text, 5, "Ödenen Silme", -1))
+            elif text_lower.startswith("/devir "):
+                telegramMesajGonder(chat_id, hucreyeVeriYaz_impl(text, 3, "Devir Ekleme", 1))
+            elif text_lower.startswith("/devirsil "):
+                telegramMesajGonder(chat_id, hucreyeVeriYaz_impl(text, 3, "Devir Silme", -1))
+            elif text_lower.startswith("/masrafekle "):
+                telegramMesajGonder(chat_id, masrafVerisiYaz_impl(text, "Masraf Ekleme", 1))
+            elif text_lower.startswith("/masrafsil "):
+                telegramMesajGonder(chat_id, masrafVerisiYaz_impl(text, "Masraf Silme", -1))
+            elif text_lower == "/gerial":
+                if not app_state["SON_ISLEM"]:
+                    telegramMesajGonder(chat_id, "Hafıza Boş: Geri alınacak işlem yok.")
+                else:
+                    last = app_state["SON_ISLEM"]
+                    sh = get_spreadsheet()
+                    sayfa = sh.worksheet(last["sayfa"])
+                    sayfa.update_cell(last["satir"], last["sutun"], last["eskiDeger"])
+                    app_state["SON_ISLEM"] = None
+                    sistemeLogYaz("İptal Edilen İşlem", f"{last['grupAdi']} ({last['islemTuru']})")
+                    telegramMesajGonder(chat_id, f"⏪ <b>ZAMAN GERİYE SARILDI!</b>\nHedef: <b>{last['grupAdi']}</b>\nEski haline döndürüldü.")
+            elif text_lower.startswith("/not ") and not text_lower.startswith("/notlar"):
+                not_metni = text[5:].strip()
+                sh = get_spreadsheet()
+                try: not_sayfasi = sh.worksheet("NOTLAR")
+                except: not_sayfasi = sh.add_worksheet(title="NOTLAR", rows=500, cols=3)
+                now_str = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
+                not_sayfasi.append_row([now_str, not_metni])
+                telegramMesajGonder(chat_id, f"📓 <b>NOT KAYDEDİLDİ</b>\n🕒 {now_str}\n📝 <i>{not_metni}</i>")
+            elif text_lower == "/notlar" or text_lower.startswith("/notlar@"):
+                sh = get_spreadsheet()
+                not_sayfasi = sh.worksheet("NOTLAR")
+                rows = not_sayfasi.get_all_values()
+                if len(rows) < 1:
+                    telegramMesajGonder(chat_id, "📭 Not defteri boş.")
+                else:
+                    last_10 = rows[-10:]
+                    out = "📓 <b>ŞİRKET HAFIZASI (SON NOTLAR)</b>\n━━━━━━━━━━━━━━━━━━━\n\n"
+                    for r in reversed(last_10):
+                        out += f"📌 <b>{r[0] if len(r)>0 else ''}</b>\n<code>{r[1] if len(r)>1 else ''}</code>\n\n"
+                    telegramMesajGonder(chat_id, out)
+        except Exception as err:
+            telegramMesajGonder(chat_id, f"❌ <b>Hata:</b> {err}")
+
+# --- HEALTH SERVER ---
+class HealthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
         self.send_header("Content-type", "text/html; charset=utf-8")
         self.end_headers()
-        html = "<html><body style='background:#121212;color:white;font-family:sans-serif;text-align:center;padding:50px;'><h2>🚀 CFO Canli Paneli 7/24 Aktif!</h2></body></html>"
-        self.wfile.write(html.encode("utf-8"))
-    def log_message(self, format, *args):
-        pass
+        self.wfile.write(b"<h1>CFO Bot Aktif</h1>")
+    def log_message(self, format, *args): pass
 
-def run_http_server():
+def run_health_server():
     port = int(os.environ.get("PORT", 8080))
-    server = HTTPServer(("0.0.0.0", port), DashboardHandler)
+    server = HTTPServer(("0.0.0.0", port), HealthHandler)
     server.serve_forever()
 
+# --- MAIN LOOP (LONG POLLING) ---
 if __name__ == "__main__":
-    # Arka planda HTTP sunucusunu başlat
-    threading.Thread(target=run_http_server, daemon=True).start()
+    threading.Thread(target=run_health_server, daemon=True).start()
+    print("CFO Bot Polling Başlatıldı (7/24 Kesintisiz)...")
     
-    # Telegram Botunu ana döngüde %100 kesintisiz dinle
-    print("CFO Botu Telegram Polling Başlatılıyor...")
-    app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-    app.add_handler(CommandHandler("start", start_command))
-    app.add_handler(CommandHandler("menu", start_command))
-    app.add_handler(CallbackQueryHandler(callback_handler))
-    app.add_handler(MessageHandler(filters.ALL, generic_message_handler))
-    app.run_polling(drop_pending_updates=False)
+    offset = 0
+    while True:
+        try:
+            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates?offset={offset}&timeout=25"
+            res = http_get_json(url)
+            if res.get("ok"):
+                for upd in res.get("result", []):
+                    offset = upd["update_id"] + 1
+                    process_telegram_update(upd)
+        except Exception as e:
+            time.sleep(2)
