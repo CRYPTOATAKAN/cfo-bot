@@ -123,7 +123,7 @@ def guvenliSayi(deger) -> float:
     metin = str(deger).strip()
     if metin in ["", "-"]: return 0.0
     
-    # Eksi kontrolü (parantez içi veya eksi işareti: -50 veya (50))
+    # Eksi kontrolü (-50 veya (50))
     eksi_mi = "-" in metin or (metin.startswith("(") and metin.endswith(")"))
     temiz = re.sub(r"[^0-9,.]", "", metin)
     
@@ -372,41 +372,85 @@ def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
     sistemeLogYaz("Yeni Masraf Ekleme", f"{masraf} | {paraFormatla(tutar)}")
     return f"✅ <b>Yeni Masraf Oluşturuldu!</b>\n📉 Masraf Kalemi: <b>{masraf}</b>\n💵 Tutar: <b>{paraFormatla(tutar)}</b>\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
 
-def hizliOzetUret_impl() -> str:
-    sh = get_spreadsheet()
-    sayfa = sh.worksheet(bugununTarihiniAl())
-    veriler = sayfa.get_all_values()
+def tablodan_finans_ozeti_hesapla(veriler: List[List[str]]) -> Dict[str, Any]:
+    """Excel tablosundaki tüm grupları ve varsa Excel GENEL TOPLAM satırını %100 uyumlu hesaplar."""
     toplamDevir = toplamKasa = toplamOdenen = toplamKomisyon = toplamKalan = 0.0
-    aktifGrupSayisi = 0
+    aktif_gruplar = []
+    excel_toplam_satiri = None
     
-    for row in veriler[1:]:
+    for row_idx, row in enumerate(veriler[1:], start=2):
         if len(row) >= 2:
-            ad = row[1].strip().upper()
-            if ad and ad != "*" and "GENEL TOPLAM" not in ad:
+            grup_adi = row[1].strip()
+            if not grup_adi or grup_adi == "*":
+                continue
+                
+            # GENEL TOPLAM Satırı kontrolü
+            if "GENEL TOPLAM" in grup_adi.upper():
+                vals = [guvenliSayi(x) for x in row[1:7]]
+                while len(vals) < 6: vals.append(0.0)
+                excel_toplam_satiri = {
+                    "devir": vals[1], "kasa": vals[2], "odenen": vals[3],
+                    "komisyon": vals[4], "kalan": vals[5]
+                }
+                continue
+                
+            # Normal Grup Satırı (Rows 2 - 42)
+            if row_idx <= 42:
                 vals = [guvenliSayi(x) for x in row[1:7]]
                 while len(vals) < 6: vals.append(0.0)
                 devir, kasa, odenen, kom, kalan = vals[1], vals[2], vals[3], vals[4], vals[5]
+                
+                # Tüm tanımlı grupların toplamlarını eksiksiz al
                 toplamDevir += devir
                 toplamKasa += kasa
                 toplamOdenen += odenen
                 toplamKomisyon += kom
                 toplamKalan += kalan
-                if any(abs(x) > 0.001 for x in [devir, kasa, odenen, kalan]):
-                    aktifGrupSayisi += 1
+                
+                # Sadece hareket gören veya bakiyesi olan grupları listele
+                if any(abs(x) > 0.001 for x in [devir, kasa, odenen, kom, kalan]):
+                    aktif_gruplar.append({
+                        "ad": grup_adi, "devir": devir, "kasa": kasa,
+                        "odenen": odenen, "komisyon": kom, "kalan": kalan
+                    })
                     
+    # Eğer Excel'de GENEL TOPLAM formül satırı varsa ve sıfırdan farklıysa onu esas al
+    if excel_toplam_satiri and any(abs(v) > 0.001 for v in excel_toplam_satiri.values()):
+        toplamDevir = excel_toplam_satiri["devir"]
+        toplamKasa = excel_toplam_satiri["kasa"]
+        toplamOdenen = excel_toplam_satiri["odenen"]
+        toplamKomisyon = excel_toplam_satiri["komisyon"]
+        toplamKalan = excel_toplam_satiri["kalan"]
+
+    return {
+        "devir": toplamDevir,
+        "kasa": toplamKasa,
+        "odenen": toplamOdenen,
+        "komisyon": toplamKomisyon,
+        "kalan": toplamKalan,
+        "aktif_gruplar": aktif_gruplar
+    }
+
+def hizliOzetUret_impl() -> str:
+    sh = get_spreadsheet()
+    sayfa = sh.worksheet(bugununTarihiniAl())
+    veriler = sayfa.get_all_values()
+    
+    finans = tablodan_finans_ozeti_hesapla(veriler)
     saat = datetime.datetime.now().strftime("%H:%M")
+    
     return (
         f"📊 <b>GÜNLÜK FİNANS BİLANÇOSU</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"📅 Tarih: {bugununTarihiniAl()} | ⏰ Saat: {saat}\n"
-        f"🏢 Aktif Grup Sayısı: {aktifGrupSayisi}\n"
+        f"🏢 Aktif Grup Sayısı: {len(finans['aktif_gruplar'])}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"🔄 Toplam Devir: {paraFormatla(toplamDevir)}\n"
-        f"💰 Eklenen Kasa: {paraFormatla(toplamKasa)}\n"
-        f"💸 Toplam Ödeme: {paraFormatla(toplamOdenen)}\n"
-        f"✂️ Toplam Kesinti: {paraFormatla(toplamKomisyon)}\n"
+        f"🔄 Toplam Devir: {paraFormatla(finans['devir'])}\n"
+        f"💰 Eklenen Kasa: {paraFormatla(finans['kasa'])}\n"
+        f"💸 Toplam Ödeme: {paraFormatla(finans['odenen'])}\n"
+        f"✂️ Toplam Komisyon: {paraFormatla(finans['komisyon'])}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"🏦 <b>NET KALAN KASA: {paraFormatla(toplamKalan)}</b>\n"
+        f"🏦 <b>NET KALAN KASA: {paraFormatla(finans['kalan'])}</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"💡 <i>Tüm grupların anlık genel toplamıdır.</i>"
     )
@@ -416,7 +460,9 @@ def tumGruplarRaporu_impl() -> str:
     sayfa = sh.worksheet(bugununTarihiniAl())
     veriler = sayfa.get_all_values()
     
+    finans = tablodan_finans_ozeti_hesapla(veriler)
     saat = datetime.datetime.now().strftime("%H:%M")
+    
     mesaj = (
         f"📊 <b>GÜNLÜK DETAYLI GRUP RAPORU</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -424,44 +470,29 @@ def tumGruplarRaporu_impl() -> str:
         f"━━━━━━━━━━━━━━━━━━━━\n\n"
     )
     
-    bulunan = 0
-    toplamDevir = toplamKasa = toplamOdenen = toplamKalan = 0.0
-    
-    for row in veriler[1:]:
-        if len(row) >= 2:
-            grup = row[1].strip()
-            if grup and grup != "*" and "GENEL TOPLAM" not in grup.upper():
-                vals = [guvenliSayi(x) for x in row[1:7]]
-                while len(vals) < 6: vals.append(0.0)
-                devir, kasa, odenen, kom, kalan = vals[1], vals[2], vals[3], vals[4], vals[5]
-                
-                if any(abs(x) > 0.001 for x in [devir, kasa, odenen, kalan]):
-                    bulunan += 1
-                    toplamDevir += devir
-                    toplamKasa += kasa
-                    toplamOdenen += odenen
-                    toplamKalan += kalan
-                    emoji = grupEmojisiBul(grup)
-                    
-                    mesaj += (
-                        f"{emoji} <b>{grup.upper()}</b>\n"
-                        f"🔄 Devir: {paraFormatla(devir)}\n"
-                        f"💰 Kasa: {paraFormatla(kasa)}\n"
-                        f"💸 Ödenen: {paraFormatla(odenen)}\n"
-                        f"🏦 <b>Kalan: {paraFormatla(kalan)}</b>\n\n"
-                    )
-                    
-    if bulunan == 0:
+    if not finans["aktif_gruplar"]:
         return "📭 <b>Bugün için henüz işlem görmüş aktif bir grup bulunmuyor.</b>"
+        
+    for g in finans["aktif_gruplar"]:
+        emoji = grupEmojisiBul(g["ad"])
+        mesaj += (
+            f"{emoji} <b>{g['ad'].upper()}</b>\n"
+            f"🔄 Devir: {paraFormatla(g['devir'])}\n"
+            f"💰 Kasa: {paraFormatla(g['kasa'])}\n"
+            f"💸 Ödenen: {paraFormatla(g['odenen'])}\n"
+            f"✂️ Komisyon: {paraFormatla(g['komisyon'])}\n"
+            f"🏦 <b>Kalan: {paraFormatla(g['kalan'])}</b>\n\n"
+        )
         
     mesaj += (
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"🏆 <b>GENEL TOPLAM BİLANÇO</b>\n"
-        f"🔄 Toplam Devir: {paraFormatla(toplamDevir)}\n"
-        f"💰 Toplam Kasa: {paraFormatla(toplamKasa)}\n"
-        f"💸 Toplam Ödeme: {paraFormatla(toplamOdenen)}\n"
+        f"🔄 Toplam Devir: {paraFormatla(finans['devir'])}\n"
+        f"💰 Toplam Kasa: {paraFormatla(finans['kasa'])}\n"
+        f"💸 Toplam Ödeme: {paraFormatla(finans['odenen'])}\n"
+        f"✂️ Toplam Komisyon: {paraFormatla(finans['komisyon'])}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"🏦 <b>NET KALAN KASA: {paraFormatla(toplamKalan)}</b>\n"
+        f"🏦 <b>NET KALAN KASA: {paraFormatla(finans['kalan'])}</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━"
     )
     return mesaj
@@ -833,7 +864,7 @@ def process_telegram_update(update: dict):
                             f"🔄 Devir: {paraFormatla(devir)}\n"
                             f"💰 Kasa: {paraFormatla(kasa)}\n"
                             f"💸 Ödenen: {paraFormatla(odenen)}\n"
-                            f"✂️ Kesinti: {paraFormatla(kom)}\n"
+                            f"✂️ Komisyon: {paraFormatla(kom)}\n"
                             f"━━━━━━━━━━━━━━━━━━━━\n"
                             f"🏦 <b>NET KALAN: {paraFormatla(kalan)}</b>\n"
                             f"━━━━━━━━━━━━━━━━━━━━"
@@ -982,15 +1013,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         .status-dot { width:8px; height:8px; border-radius:50%; background:#22c55e; animation:pulse 2s infinite; }
         @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
         
-        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:16px; margin-bottom:30px; }
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:30px; }
         .stat-card { background:#111827; border:1px solid #1f2937; border-radius:16px; padding:20px; position:relative; overflow:hidden; }
         .stat-card::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; }
         .stat-devir::before { background:#6366f1; }
         .stat-kasa::before { background:#3b82f6; }
         .stat-odenen::before { background:#f59e0b; }
+        .stat-komisyon::before { background:#ec4899; }
         .stat-kalan::before { background:#10b981; }
         .stat-label { font-size:13px; color:#9ca3af; font-weight:600; text-transform:uppercase; margin-bottom:8px; }
-        .stat-value { font-size:26px; font-weight:800; color:#ffffff; }
+        .stat-value { font-size:24px; font-weight:800; color:#ffffff; }
         
         .section-title { font-size:18px; font-weight:700; color:#f8fafc; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
         .groups-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:16px; margin-bottom:30px; }
@@ -1037,6 +1069,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 <div class="stat-label">💸 Toplam Ödeme</div>
                 <div class="stat-value" id="toplam-odenen">0,00 ₺</div>
             </div>
+            <div class="stat-card stat-komisyon">
+                <div class="stat-label">✂️ Toplam Komisyon</div>
+                <div class="stat-value" id="toplam-komisyon" style="color:#f472b6;">0,00 ₺</div>
+            </div>
             <div class="stat-card stat-kalan">
                 <div class="stat-label">🏦 NET KALAN KASA</div>
                 <div class="stat-value" id="toplam-kalan" style="color:#34d399;">0,00 ₺</div>
@@ -1073,6 +1109,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 document.getElementById('toplam-devir').innerText = fmt(d.devir);
                 document.getElementById('toplam-kasa').innerText = fmt(d.kasa);
                 document.getElementById('toplam-odenen').innerText = fmt(d.odenen);
+                document.getElementById('toplam-komisyon').innerText = fmt(d.komisyon);
                 document.getElementById('toplam-kalan').innerText = fmt(d.kalan);
 
                 const gc = document.getElementById('groups-container');
@@ -1100,7 +1137,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                             <span>${fmt(g.odenen)}</span>
                         </div>
                         <div class="row-item">
-                            <span>✂️ Kesinti/Masraf:</span>
+                            <span>✂️ Komisyon/Kesinti:</span>
                             <span>${fmt(g.komisyon)}</span>
                         </div>
                     </div>
@@ -1128,22 +1165,16 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                 sh = get_spreadsheet()
                 sayfa = sh.worksheet(bugununTarihiniAl())
                 veriler = sayfa.get_all_values()
-                gruplar = []
-                toplamDevir = toplamKasa = toplamOdenen = toplamKalan = 0.0
-                for row in veriler[1:]:
-                    if len(row) >= 2:
-                        ad = row[1].strip().upper()
-                        if ad and ad != "*" and "GENEL TOPLAM" not in ad:
-                            vals = [guvenliSayi(x) for x in row[1:7]]
-                            while len(vals) < 6: vals.append(0.0)
-                            devir, kasa, odenen, kom, kalan = vals[1], vals[2], vals[3], vals[4], vals[5]
-                            if any(abs(x) > 0.001 for x in [devir, kasa, odenen, kalan]):
-                                gruplar.append({"ad": row[1], "devir": devir, "kasa": kasa, "odenen": odenen, "kalan": kalan, "komisyon": kom})
-                                toplamDevir += devir
-                                toplamKasa += kasa
-                                toplamOdenen += odenen
-                                toplamKalan += kalan
-                data = {"tarih": bugununTarihiniAl(), "devir": toplamDevir, "kasa": toplamKasa, "odenen": toplamOdenen, "kalan": toplamKalan, "gruplar": gruplar}
+                finans = tablodan_finans_ozeti_hesapla(veriler)
+                data = {
+                    "tarih": bugununTarihiniAl(),
+                    "devir": finans["devir"],
+                    "kasa": finans["kasa"],
+                    "odenen": finans["odenen"],
+                    "komisyon": finans["komisyon"],
+                    "kalan": finans["kalan"],
+                    "gruplar": finans["aktif_gruplar"]
+                }
                 self.wfile.write(json.dumps(data).encode("utf-8"))
             except Exception as e:
                 self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
