@@ -5,6 +5,7 @@ import json
 import time
 import datetime
 import threading
+import unicodedata
 import urllib.request
 import urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -94,25 +95,28 @@ def bugununTarihiniAl():
     return datetime.datetime.now().strftime("%d.%m.%Y")
 
 def normalize_text(text: str) -> str:
-    """Türkçe harf duyarlılığını ve büyük/küçük harf farklarını (TİGER, tiger, Tiger, TIGER) %100 kusursuz eşitler."""
+    """Türkçe harf duyarlılığını ve büyük/küçük harf farklarını (SACİD, sacid, sacıd, SACID) %100 kusursuz eşitler."""
     if not text: return ""
     t = str(text).strip()
+    t = unicodedata.normalize("NFKD", t)
     tr_map = {
-        "i": "I", "ı": "I", "İ": "I", "I": "I", "î": "I", "Î": "I",
-        "ş": "S", "Ş": "S",
-        "ğ": "G", "Ğ": "G",
-        "ü": "U", "Ü": "U",
-        "ö": "O", "Ö": "O",
-        "ç": "C", "Ç": "C"
+        "i": "I", "ı": "I", "İ": "I", "I": "I", "î": "I", "Î": "I", "\u0130": "I", "\u0131": "I",
+        "ş": "S", "Ş": "S", "\u015f": "S", "\u015e": "S",
+        "ğ": "G", "Ğ": "G", "\u011f": "G", "\u011e": "G",
+        "ü": "U", "Ü": "U", "\u00fc": "U", "\u00dc": "U",
+        "ö": "O", "Ö": "O", "\u00f6": "O", "\u00d6": "O",
+        "ç": "C", "Ç": "C", "\u00e7": "C", "\u00c7": "C"
     }
     for k, v in tr_map.items():
         t = t.replace(k, v)
     t = t.upper()
+    t = "".join(c for c in unicodedata.normalize("NFKD", t) if not unicodedata.combining(c))
     return re.sub(r"[^A-Z0-9]", "", t)
 
 def grupEmojisiBul(grupAdi: str) -> str:
     temiz = normalize_text(grupAdi)
     if "TIGER" in temiz: return "🐅"
+    if "SACID" in temiz: return "👤"
     if "BSM" in temiz: return "⚡"
     if "GENELTOPLAM" in temiz: return "🏆"
     if "MASRAF" in temiz or "GIDER" in temiz: return "📉"
@@ -141,10 +145,8 @@ def guvenliSayi(deger) -> float:
     
     if "." in temiz and "," in temiz:
         if temiz.rfind(",") > temiz.rfind("."):
-            # 69.500,50 (Türkçe format)
             temiz = temiz.replace(".", "").replace(",", ".")
         else:
-            # 69,500.50 (İngilizce format)
             temiz = temiz.replace(",", "")
     elif "." in temiz:
         parts = temiz.split(".")
@@ -285,7 +287,7 @@ def rehber_metni():
         "• <code>/kur</code> : 🟡 Anlık USDT kurlarını listeler.\n"
         "• <code>/iban</code> : 🏦 Kullanımdaki ve boşta olan İBAN'ları listeler.\n"
         "• <code>/çeviri [Metin]</code> : 🌐 Otomatik çeviri yapar.\n"
-        "• <code>/hesap TİGER 5 34.50</code> : Tether / Kasa hesap makinesi.\n"
+        "• <code>/hesap SACİD 2 48.00</code> : Tether / Kasa hesap makinesi.\n"
         "• <code>/not [Metin]</code> : Şirket ajandasına not ekler.\n"
         "• <code>/notlar</code> : Son notları listeler.\n"
         "• <code>/panel</code> : Canlı CFO Web Dashboard linkini verir.\n"
@@ -396,7 +398,6 @@ def tablodan_finans_ozeti_hesapla(veriler: List[List[str]]) -> Dict[str, Any]:
             if not grup_adi or grup_adi == "*":
                 continue
                 
-            # GENEL TOPLAM Satırı kontrolü
             if "GENEL TOPLAM" in grup_adi.upper():
                 vals = [guvenliSayi(x) for x in row[1:7]]
                 while len(vals) < 6: vals.append(0.0)
@@ -406,7 +407,6 @@ def tablodan_finans_ozeti_hesapla(veriler: List[List[str]]) -> Dict[str, Any]:
                 }
                 continue
                 
-            # Normal Grup Satırı (Rows 2 - 42)
             if row_idx <= 42:
                 vals = [guvenliSayi(x) for x in row[1:7]]
                 while len(vals) < 6: vals.append(0.0)
@@ -586,7 +586,7 @@ def canliKurSorgula_impl() -> str:
 def hesapMakinesi_impl(orijinalMetin: str) -> str:
     args = orijinalMetin.strip().split()
     if len(args) < 4:
-        return "⚠️ <b>Hatalı Kullanım!</b>\nFormat: <code>/hesap GRUPADI ORAN KUR</code>\nÖrnek: <code>/hesap TİGER 5 34.50</code>"
+        return "⚠️ <b>Hatalı Kullanım!</b>\nFormat: <code>/hesap GRUPADI ORAN KUR</code>\nÖrnek: <code>/hesap SACİD 2 48.00</code>"
     kurStr = args.pop()
     komisyonStr = args.pop()
     arananGrup = " ".join(args[1:]).strip()
@@ -618,13 +618,13 @@ def hesapMakinesi_impl(orijinalMetin: str) -> str:
     komisyonKesintisi = guncelKasa * (komisyonOrani / 100.0)
     netKasaTl = guncelKasa - komisyonKesintisi
     usdtKarsiligi = netKasaTl / kur if kur > 0 else 0
-    duzUsdt = int(usdtKarsiligi)
+    duzUsdt = int(round(usdtKarsiligi))
     
     islemZamani = datetime.datetime.now().strftime("%d.%m.%Y | %H:%M")
     mesaj = (
         f"🧮 <b>HESAP KESİM RAPORU</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"🏢 Grup: <b>{gercekGrupAdi}</b>\n"
+        f"🏢 Grup: <b>{gercekGrupAdi.upper()}</b>\n"
         f"🕒 Zaman: {islemZamani}\n\n"
     )
     if devirBorc != 0:
