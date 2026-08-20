@@ -8,7 +8,7 @@ import threading
 import urllib.request
 import urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List, Tuple, Set
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -19,14 +19,15 @@ KURUCU_ID = int(os.environ.get("KURUCU_ID", "8395730761"))
 SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID", "1Gim_-YSb_TtODclXiZ0hnx2WDsc-RCW9CD51LeVNOaI")
 WEB_APP_URL = os.environ.get("WEB_APP_URL", "https://site--cfo-bot-servis--drx8qyvbw8cw.code.run")
 LOG_SAYFASI = "Guvenlik_Log"
+ADMIN_SAYFASI = "YONETICILER"
 
 app_state = {
-    "EK_ADMINLER": [],
+    "EK_ADMINLER": set(),
     "SISTEM_KILIDI": "PASIF",
     "CIRO_HEDEFI": None,
     "SON_ISLEM": None,
     "LOG_HAFTASI": None,
-    "GRUP_BAGLANTILARI": {}
+    "ADMIN_CACHE_TIME": 0
 }
 
 SCOPES = [
@@ -94,10 +95,6 @@ def get_spreadsheet():
 def bugununTarihiniAl():
     return datetime.datetime.now().strftime("%d.%m.%Y")
 
-def dununTarihiniAl():
-    dun = datetime.datetime.now() - datetime.timedelta(days=1)
-    return dun.strftime("%d.%m.%Y")
-
 def trKarakterCoz(metin: str) -> str:
     if not metin: return ""
     tr_map = str.maketrans("iıüöçşğ", "IIÜÖÇŞĞ")
@@ -158,8 +155,37 @@ def sistemeLogYaz(islemAdi: str, detay: str):
     except Exception as e:
         print(f"Log hatası: {e}")
 
+# --- YETKİ & ADMİN YÖNETİMİ ---
+def admin_listesini_guncelle():
+    now = time.time()
+    if now - app_state["ADMIN_CACHE_TIME"] < 60:
+        return # 60 saniyelik önbellek
+    try:
+        sh = get_spreadsheet()
+        try:
+            adminSayfasi = sh.worksheet(ADMIN_SAYFASI)
+        except gspread.exceptions.WorksheetNotFound:
+            adminSayfasi = sh.add_worksheet(title=ADMIN_SAYFASI, rows=100, cols=4)
+            adminSayfasi.append_row(["Telegram ID", "Yönetici Adı", "Ekleyen", "Tarih"])
+            adminSayfasi.append_row([str(KURUCU_ID), "KURUCU (ATAKAN)", "SİSTEM", bugununTarihiniAl()])
+            app_state["EK_ADMINLER"] = {KURUCU_ID}
+            app_state["ADMIN_CACHE_TIME"] = now
+            return
+
+        rows = adminSayfasi.get_all_values()
+        yeni_set = {KURUCU_ID}
+        for r in rows[1:]:
+            if len(r) > 0 and r[0].strip().isdigit():
+                yeni_set.add(int(r[0].strip()))
+        app_state["EK_ADMINLER"] = yeni_set
+        app_state["ADMIN_CACHE_TIME"] = now
+    except Exception as e:
+        print(f"Admin listesi okuma hatası: {e}")
+
 def yetkili_mi(user_id: int) -> bool:
-    if user_id == KURUCU_ID: return True
+    if user_id == KURUCU_ID:
+        return True
+    admin_listesini_guncelle()
     return user_id in app_state["EK_ADMINLER"]
 
 def menuKlavyesiOlustur(isGroup: bool):
@@ -221,36 +247,30 @@ def rehber_metni():
         "<code>/hesap TİGER 5 34.50</code> : Tether / Kasa hesap makinesi.\n"
         "<code>/not [Metin]</code> : Şirket ajandasına not ekler.\n"
         "<code>/notlar</code> : Son notları listeler.\n"
-        "<code>/panel</code> : Canlı CFO Web Dashboard linkini verir.\n\n"
-        "🛡️ <b>CEO & SİSTEM YÖNETİMİ</b>\n"
-        "<code>/kilit</code> : Acil durumda veri girişini tamamen kilitler.\n"
-        "<code>/kilitac</code> : Sistem kilidini kaldırır.\n"
-        "<code>/adminekle [ID]</code> : Yeni yönetici ekler.\n"
+        "<code>/panel</code> : Canlı CFO Web Dashboard linkini verir.\n"
+        "<code>/id</code> : Kendi Telegram kullanıcı ID'nizi öğrenirsiniz.\n\n"
+        "🛡️ <b>YÖNETİCİ KONTROLLERİ</b>\n"
+        "<code>/adminekle [ID] [İsim]</code> : Yeni yönetici ekler.\n"
         "<code>/adminsil [ID]</code> : Yöneticiyi siler.\n"
         "<code>/adminler</code> : Yetkili yöneticileri listeler.\n\n"
         "💡 <i>Tüm işlemler arka planda güvenlik protokolüyle işlenmektedir.</i>"
     )
 
 def parse_grup_ve_tutar(parametreler: List[str]) -> Tuple[str, float]:
-    """Parametrelerin sırası ne olursa olsun grup adı ve tutarı akıllıca ayrıştırır."""
     if len(parametreler) < 2:
-        raise ValueError("Eksik bilgi! Örnek kullanım: /kasa TİGER 1500")
-    
-    # 1. Durum: Son parametre tutar mı? (/kasa TİGER 1500)
+        raise ValueError("Eksik bilgi! Örnek: <code>/kasa TİGER 1500</code>")
     try:
         tutar = float(parametreler[-1].replace(",", "."))
         grup = " ".join(parametreler[:-1]).strip()
         return grup, tutar
     except ValueError:
         pass
-        
-    # 2. Durum: İlk parametre tutar mı? (/kasa 1500 TİGER)
     try:
         tutar = float(parametreler[0].replace(",", "."))
         grup = " ".join(parametreler[1:]).strip()
         return grup, tutar
     except ValueError:
-        raise ValueError("Lütfen geçerli bir sayısal tutar girin! Örnek: /kasa TİGER 1500")
+        raise ValueError("Lütfen geçerli bir sayısal tutar girin! Örnek: <code>/kasa TİGER 1500</code>")
 
 def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int) -> str:
     parcalar = komut_metni.strip().split()[1:]
@@ -312,7 +332,6 @@ def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
             sistemeLogYaz(isim, f"{masraf} | {rakamFormatla(abs(tutar))} TL")
             return f"✅ <b>{isim} Başarılı!</b>\n📉 Masraf: <b>{masraf}</b>\nİşlem: {rakamFormatla(abs(tutar))} TL\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
             
-    # Yeni masraf satırı
     bos_satir = len(tum_veriler) + 1
     for i, row in enumerate(tum_veriler[1:], start=2):
         col_i = row[8] if len(row) > 8 else ""
@@ -575,41 +594,36 @@ def yenigun_gerceklestir_impl(masraflari_sil: bool) -> str:
     sh = get_spreadsheet()
     yeniTarih = bugununTarihiniAl()
     
-    # Sayfa zaten var mı?
     try:
         sh.worksheet(yeniTarih)
         return f"⚠️ <b>{yeniTarih}</b> tarihli sayfa zaten mevcut! Yeniden oluşturulamaz."
     except gspread.exceptions.WorksheetNotFound:
         pass
         
-    # En son sayfayı bul
     tum_sayfalar = sh.worksheets()
     kaynak_sayfa = None
     for ws in tum_sayfalar:
-        if ws.title not in [LOG_SAYFASI, "NOTLAR", "YEDEK"]:
+        if ws.title not in [LOG_SAYFASI, "NOTLAR", "YEDEK", ADMIN_SAYFASI]:
             kaynak_sayfa = ws
             break
             
     if not kaynak_sayfa:
         return "❌ Kopyalanacak şablon sayfa bulunamadı!"
         
-    # Sayfayı kopyala
     yeni_sayfa = kaynak_sayfa.duplicate(new_sheet_name=yeniTarih)
     veriler = yeni_sayfa.get_all_values()
     
-    # Devirleri aktar (Dünün Kalanı -> Yeni Günün Deviri)
     for r_idx, row in enumerate(veriler[1:], start=2):
-        if r_idx > 43: break # Formül koruması
+        if r_idx > 43: break
         if len(row) >= 7:
             grup = row[1].strip()
             if grup and grup != "*" and "GENEL TOPLAM" not in grup.upper():
-                dunun_kalani = guvenliSayi(row[6]) # G sütunu (Kalan)
-                yeni_sayfa.update_cell(r_idx, 3, dunun_kalani) # C sütunu (Devir)
-                yeni_sayfa.update_cell(r_idx, 4, 0) # D sütunu (Kasa sıfırla)
-                yeni_sayfa.update_cell(r_idx, 5, 0) # E sütunu (Ödenen sıfırla)
+                dunun_kalani = guvenliSayi(row[6])
+                yeni_sayfa.update_cell(r_idx, 3, dunun_kalani)
+                yeni_sayfa.update_cell(r_idx, 4, 0)
+                yeni_sayfa.update_cell(r_idx, 5, 0)
                 
     if masraflari_sil:
-        # Masrafları temizle
         for r_idx in range(2, 40):
             yeni_sayfa.update_cell(r_idx, 9, "")
             yeni_sayfa.update_cell(r_idx, 10, "")
@@ -617,9 +631,71 @@ def yenigun_gerceklestir_impl(masraflari_sil: bool) -> str:
     sistemeLogYaz("Yeni Gün Geçişi", f"Yeni gün sayfası ({yeniTarih}) açıldı.")
     return f"🌅 <b>{yeniTarih} GÜNÜ BAŞARIYLA AÇILDI!</b>\n\n🔄 Dünün tüm kalan bakiyeleri Devir sütununa aktarıldı.\n💰 Kasa ve Ödenen alanları sıfırlandı.\n\nİyi çalışmalar dileriz! 🚀"
 
-# --- YARDIMCI: VERİ ANALİZİ BİLDİRİMİ İLE ÇALIŞTIRICI ---
+# --- ADMİN YÖNETİM FONKSİYONLARI ---
+def admin_ekle_impl(komut_metni: str, ekleyen_id: int) -> str:
+    if ekleyen_id != KURUCU_ID:
+        return "⛔ <b>Yetkisiz İşlem:</b> Sadece Kurucu yeni yönetici ekleyebilir."
+    p = komut_metni.strip().split()
+    if len(p) < 2 or not p[1].isdigit():
+        return "⚠️ <b>Hatalı Kullanım!</b>\nÖrnek: <code>/adminekle 123456789 Ahmet</code>"
+    yeni_id = int(p[1])
+    isim = " ".join(p[2:]) if len(p) > 2 else f"Yönetici_{yeni_id}"
+    
+    sh = get_spreadsheet()
+    try: adminSayfasi = sh.worksheet(ADMIN_SAYFASI)
+    except:
+        adminSayfasi = sh.add_worksheet(title=ADMIN_SAYFASI, rows=100, cols=4)
+        adminSayfasi.append_row(["Telegram ID", "Yönetici Adı", "Ekleyen", "Tarih"])
+        
+    rows = adminSayfasi.get_all_values()
+    for r in rows[1:]:
+        if len(r) > 0 and r[0].strip() == str(yeni_id):
+            return f"⚠️ <b>{yeni_id}</b> zaten yetkili yöneticiler arasında!"
+            
+    adminSayfasi.append_row([str(yeni_id), isim, "KURUCU", bugununTarihiniAl()])
+    app_state["EK_ADMINLER"].add(yeni_id)
+    sistemeLogYaz("Yönetici Eklendi", f"{isim} (ID: {yeni_id})")
+    return f"✅ <b>Yönetici Eklendi!</b>\n👤 <b>İsim:</b> {isim}\n🆔 <b>Telegram ID:</b> <code>{yeni_id}</code>\n\nArtık botu kullanabilir."
+
+def admin_sil_impl(komut_metni: str, silen_id: int) -> str:
+    if silen_id != KURUCU_ID:
+        return "⛔ <b>Yetkisiz İşlem:</b> Sadece Kurucu yönetici silebilir."
+    p = komut_metni.strip().split()
+    if len(p) < 2 or not p[1].isdigit():
+        return "⚠️ <b>Hatalı Kullanım!</b>\nÖrnek: <code>/adminsil 123456789</code>"
+    silinecek_id = int(p[1])
+    if silinecek_id == KURUCU_ID:
+        return "⛔ Kurucu yönetici silinemez!"
+        
+    sh = get_spreadsheet()
+    adminSayfasi = sh.worksheet(ADMIN_SAYFASI)
+    rows = adminSayfasi.get_all_values()
+    for i, r in enumerate(rows[1:], start=2):
+        if len(r) > 0 and r[0].strip() == str(silinecek_id):
+            adminSayfasi.delete_rows(i)
+            app_state["EK_ADMINLER"].discard(silinecek_id)
+            sistemeLogYaz("Yönetici Silindi", f"ID: {silinecek_id}")
+            return f"🗑️ <b>ID: {silinecek_id}</b> yönetici listesinden silindi ve yetkisi alındı."
+    return f"⚠️ <b>{silinecek_id}</b> yönetici listesinde bulunamadı."
+
+def admin_listesi_impl() -> str:
+    sh = get_spreadsheet()
+    try:
+        adminSayfasi = sh.worksheet(ADMIN_SAYFASI)
+        rows = adminSayfasi.get_all_values()
+        out = "🛡️ <b>YETKİLİ YÖNETİCİLER LİSTESİ</b>\n━━━━━━━━━━━━━━━━━━━\n\n"
+        out += f"👑 <b>KURUCU:</b> <code>{KURUCU_ID}</code> (@CRYPTOATAKAN)\n\n"
+        for r in rows[1:]:
+            if len(r) > 0 and r[0].strip().isdigit() and int(r[0].strip()) != KURUCU_ID:
+                isim = r[1] if len(r) > 1 else "Yönetici"
+                out += f"👤 <b>{isim}:</b> <code>{r[0]}</code>\n"
+        out += "\n💡 <i>Yeni yönetici eklemek için: /adminekle ID İsim</i>"
+        return out
+    except Exception as e:
+        return f"❌ <b>Hata:</b> {e}"
+
+# --- YARDIMCI: ANALİZ BİLDİRİMİ İLE ÇALIŞTIRICI ---
 def islemi_analiz_bildirimiyle_yap(chat_id: int, islem_fn, *args):
-    """Kullanıcı komut yazdığında anında bildirim verir, işlem bitince kendini siler."""
     yukleniyor = telegramMesajGonder(chat_id, "⏳ <b>Veriler analiz ediliyor, lütfen bekleyin...</b>")
     msg_id = yukleniyor.get("result", {}).get("message_id") if yukleniyor.get("ok") else None
     
@@ -648,7 +724,7 @@ def process_telegram_update(update: dict):
         telegram_api("answerCallbackQuery", {"callback_query_id": cq["id"]})
         
         if not yetkili_mi(user_id):
-            telegramMesajGonder(chat_id, "⛔ <b>Erişim Reddedildi!</b>")
+            telegramMesajGonder(chat_id, "⛔ <b>Erişim Reddedildi!</b>\nBu işlem için yetkiniz bulunmamaktadır.")
             return
             
         if data == "rehber":
@@ -701,10 +777,31 @@ def process_telegram_update(update: dict):
         text_lower = text.lower()
         is_group = chat_id < 0
 
-        if not yetkili_mi(user_id):
-            telegramMesajGonder(chat_id, "⛔ <b>Erişim Reddedildi!</b>")
+        # EĞER MESAJ '/' İLE BAŞLAMIYORSA (KOMUT DEĞİLSE), BOT TAMAMEN SESSİZ KALIR (SIFIR SPAM)
+        if not text.startswith("/"):
             return
 
+        # /id komutu herkese açıktır (kullanıcı kendi ID'sini öğrenip Kurucu'ya verebilsin diye)
+        if text_lower in ["/id", "/myid", "/bilgi"] or text_lower.startswith("/id@"):
+            telegramMesajGonder(
+                chat_id,
+                f"👤 <b>Telegram Kullanıcı Bilginiz:</b>\n"
+                f"🆔 <b>Kullanıcı ID:</b> <code>{user_id}</code>\n\n"
+                f"💡 <i>Botu kullanabilmek için bu ID numarasını yöneticiye iletiniz.</i>"
+            )
+            return
+
+        # DİĞER TÜM KOMUTLAR İÇİN YETKİ KONTROLÜ
+        if not yetkili_mi(user_id):
+            telegramMesajGonder(
+                chat_id,
+                f"⛔ <b>Erişim Reddedildi!</b>\n"
+                f"Bu bot sadece yetkili şirket yöneticilerine özeldir.\n"
+                f"Kullanıcı ID'niz: <code>{user_id}</code>"
+            )
+            return
+
+        # YETKİLİ KULLANICI KOMUTLARI
         if text_lower in ["/start", "/menu", "/menü"] or text_lower.startswith("/start@") or text_lower.startswith("/menu@"):
             telegramMesajGonder(chat_id, "👋 <b>CFO ve Finans Yönetim Botu</b>\nLütfen bir işlem seçin:\n\n👨💻 <i>Yazılım: @CRYPTOATAKAN © 2026</i>", menuKlavyesiOlustur(is_group))
         elif text_lower in ["/rehber", "/komutlar", "/yardim", "/yardım"] or text_lower.startswith("/rehber@"):
@@ -746,6 +843,12 @@ def process_telegram_update(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, masrafVerisiYaz_impl, text, "Masraf Ekleme", 1)
         elif text_lower.startswith("/masrafsil "):
             islemi_analiz_bildirimiyle_yap(chat_id, masrafVerisiYaz_impl, text, "Masraf Silme", -1)
+        elif text_lower.startswith("/adminekle"):
+            islemi_analiz_bildirimiyle_yap(chat_id, admin_ekle_impl, text, user_id)
+        elif text_lower.startswith("/adminsil"):
+            islemi_analiz_bildirimiyle_yap(chat_id, admin_sil_impl, text, user_id)
+        elif text_lower in ["/adminler", "/yoneticiler"] or text_lower.startswith("/adminler@"):
+            islemi_analiz_bildirimiyle_yap(chat_id, admin_listesi_impl)
         elif text_lower == "/gerial":
             def gerial_impl():
                 if not app_state["SON_ISLEM"]:
