@@ -5,6 +5,7 @@ import json
 import logging
 import datetime
 import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Optional, Dict, Any, List
 
 import requests
@@ -18,10 +19,6 @@ from telegram.constants import ParseMode
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 )
-
-import uvicorn
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("CFO_BOT")
@@ -273,7 +270,6 @@ def masrafVerisiYaz_impl(komut: str, isim: str, carp: int):
             sistemeLogYaz(isim, f"{masraf} | {rakamFormatla(abs(tutar))} TL")
             return f"✅ <b>{isim} Başarılı!</b>\n📉 Masraf: {masraf}\nİşlem: {rakamFormatla(abs(tutar))} TL\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
             
-    # Yeni masraf ekle
     bos_satir = len(tum_veriler) + 1
     for i, row in enumerate(tum_veriler[1:], start=2):
         col_i = row[8] if len(row) > 8 else ""
@@ -519,7 +515,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text(hizliOzetUret_impl(), parse_mode=ParseMode.HTML)
         elif data.startswith("rapor_"):
             grup = data.replace("rapor_", "")
-            # Tek grup raporu
             sh = get_spreadsheet()
             sayfa = sh.worksheet(bugununTarihiniAl())
             veriler = sayfa.get_all_values()
@@ -625,45 +620,25 @@ async def generic_message_handler(update: Update, context: ContextTypes.DEFAULT_
         logger.error(f"Komut hatası: {err}")
         await msg.reply_text(f"❌ <b>Hata:</b> {err}", parse_mode=ParseMode.HTML)
 
-# --- FASTAPI WEB APPLICATION (CFO LIVE DASHBOARD) ---
-fastapi_app = FastAPI()
+# --- LIGHTWEIGHT HTTP SERVER (STANDALONE THREAD) ---
+class DashboardHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/html; charset=utf-8")
+        self.end_headers()
+        html = "<html><body style='background:#121212;color:white;font-family:sans-serif;text-align:center;padding:50px;'><h2>🚀 CFO Canli Paneli 7/24 Aktif!</h2></body></html>"
+        self.wfile.write(html.encode("utf-8"))
+    def log_message(self, format, *args):
+        pass
 
-@fastapi_app.get("/api/dashboard")
-async def get_dashboard_api():
-    try:
-        sh = get_spreadsheet()
-        sayfa = sh.worksheet(bugununTarihiniAl())
-        veriler = sayfa.get_all_values()
-        gruplar = []
-        toplamDevir = toplamKasa = toplamOdenen = toplamCiro = toplamKalan = 0.0
-        for row in veriler[1:]:
-            if len(row) >= 2:
-                ad = row[1].strip().upper()
-                if ad and ad != "*" and "GENEL TOPLAM" not in ad:
-                    vals = [guvenliSayi(x) for x in row[1:7]]
-                    while len(vals) < 6: vals.append(0.0)
-                    devir, kasa, odenen, kom, kalan = vals[1], vals[2], vals[3], vals[4], vals[5]
-                    if any(abs(x) > 0.01 for x in [devir, kasa, odenen, kalan]):
-                        gruplar.append({"ad": row[1], "devir": devir, "kasa": kasa, "odenen": odenen, "kalan": kalan, "komisyon": kom})
-                        toplamDevir += devir
-                        toplamKasa += kasa
-                        toplamOdenen += odenen
-                        toplamCiro += kom
-                        toplamKalan += kalan
-        return {"tarih": bugununTarihiniAl(), "devir": toplamDevir, "kasa": toplamKasa, "odenen": toplamOdenen, "kalan": toplamKalan, "ciro": toplamCiro, "gruplar": gruplar}
-    except Exception as e:
-        return {"error": str(e)}
-
-@fastapi_app.get("/", response_class=HTMLResponse)
-async def serve_dashboard():
-    return "<h3>Canlı CFO Paneli Çalışıyor!</h3>"
-
-def start_fastapi():
-    uvicorn.run(fastapi_app, host="0.0.0.0", port=8080, log_level="warning")
+def run_http_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), DashboardHandler)
+    server.serve_forever()
 
 if __name__ == "__main__":
-    # Arka planda web dashboard'u aç
-    threading.Thread(target=start_fastapi, daemon=True).start()
+    # Arka planda HTTP sunucusunu başlat
+    threading.Thread(target=run_http_server, daemon=True).start()
     
     # Telegram Botunu ana döngüde %100 kesintisiz dinle
     print("CFO Botu Telegram Polling Başlatılıyor...")
