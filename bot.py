@@ -110,33 +110,36 @@ def grupEmojisiBul(grupAdi: str) -> str:
 def rakamFormatla(sayi) -> str:
     try:
         val = int(round(float(sayi)))
-        return f"{val:,}".replace(",", ".")
+        is_neg = val < 0
+        val_str = f"{abs(val):,}".replace(",", ".")
+        return f"-{val_str}" if is_neg else val_str
     except:
         return str(sayi)
 
 def guvenliSayi(deger) -> float:
-    """Türkçe ve Uluslararası Google Sheets sayı formatlarını (69.500 / 69,50 / 56.870) %100 hatasız dönüştürür."""
+    """Türkçe ve Uluslararası Google Sheets sayı formatlarını (+/- işaretleri koruyarak) %100 hatasız dönüştürür."""
     if deger is None or deger == "": return 0.0
     if isinstance(deger, (int, float)): return float(deger)
     metin = str(deger).strip()
     if metin in ["", "-"]: return 0.0
-    eksi_mi = "-" in metin
+    
+    # Eksi kontrolü (parantez içi veya eksi işareti: -50 veya (50))
+    eksi_mi = "-" in metin or (metin.startswith("(") and metin.endswith(")"))
     temiz = re.sub(r"[^0-9,.]", "", metin)
     
     if "." in temiz and "," in temiz:
         if temiz.rfind(",") > temiz.rfind("."):
-            # 69.500,50 (Türkçe format: nokta binlik, virgül ondalık)
+            # 69.500,50 (Türkçe format)
             temiz = temiz.replace(".", "").replace(",", ".")
         else:
-            # 69,500.50 (İngilizce format: virgül binlik, nokta ondalık)
+            # 69,500.50 (İngilizce format)
             temiz = temiz.replace(",", "")
     elif "." in temiz:
         parts = temiz.split(".")
-        # 69.500 veya 1.250.000 gibi binlik ayracı
         if len(parts) > 2 or (len(parts) == 2 and len(parts[1]) == 3 and int(parts[0]) > 0):
             temiz = temiz.replace(".", "")
         else:
-            pass # 69.5 gibi ondalık
+            pass
     elif "," in temiz:
         parts = temiz.split(",")
         if len(parts) > 2:
@@ -151,14 +154,20 @@ def guvenliSayi(deger) -> float:
         return 0.0
 
 def paraFormatla(deger) -> str:
-    """Sayıları Türkçe para formatında düzenler: 69.500,00 ₺"""
+    """Matematiksel işaretleri (+/-) eksiksiz koruyan Türkçe para formatı: -50.000,00 ₺ veya 150.000,00 ₺"""
     try:
         val = float(deger)
-        tam = int(abs(val))
+        if abs(val) < 0.0001:
+            return "0,00 ₺"
+        is_negative = val < 0
+        tam = int(abs(round(val, 2)))
         tam_str = f"{tam:,}".replace(",", ".")
         ondalik = f"{abs(val):.2f}".split(".")[1]
-        sign = "-" if val < 0 else ""
-        return f"{sign}{tam_str},{ondalik} ₺"
+        
+        if is_negative:
+            return f"-{tam_str},{ondalik} ₺"
+        else:
+            return f"{tam_str},{ondalik} ₺"
     except:
         return "0,00 ₺"
 
@@ -311,7 +320,7 @@ def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int) 
                 "sayfa": bugununTarihiniAl(), "satir": i, "sutun": sutun_idx,
                 "eskiDeger": mevcut_val, "grupAdi": row[1], "islemTuru": isim
             }
-            sistemeLogYaz(isim, f"{row[1].upper()} | {paraFormatla(abs(tutar))}")
+            sistemeLogYaz(isim, f"{row[1].upper()} | {paraFormatla(tutar * carp)}")
             
             row_vals = [guvenliSayi(x) for x in row[1:7]]
             while len(row_vals) < 6: row_vals.append(0.0)
@@ -321,12 +330,12 @@ def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int) 
             return (
                 f"✅ <b>{isim} Başarılı!</b>\n━━━━━━━━━━━━━━━━━━━━\n"
                 f"{grupEmojisiBul(row[1])} <b>{row[1].upper()}</b>\n"
-                f"💵 İşlem Tutarı: <b>{paraFormatla(abs(tutar))}</b>\n\n"
-                f"🔄 Devir: {paraFormatla(abs(dDevir))}\n"
-                f"💰 Kasa: {paraFormatla(abs(dKasa))}\n"
-                f"💸 Ödenen: {paraFormatla(abs(dOdenen))}\n"
-                f"✂️ Komisyon: {paraFormatla(abs(dKomisyon))}\n"
-                f"🏦 <b>Kalan: {paraFormatla(abs(dKalan))}</b>\n\n"
+                f"💵 İşlem Tutarı: <b>{paraFormatla(tutar * carp)}</b>\n\n"
+                f"🔄 Devir: {paraFormatla(dDevir)}\n"
+                f"💰 Kasa: {paraFormatla(dKasa)}\n"
+                f"💸 Ödenen: {paraFormatla(dOdenen)}\n"
+                f"✂️ Komisyon: {paraFormatla(dKomisyon)}\n"
+                f"🏦 <b>Kalan: {paraFormatla(dKalan)}</b>\n\n"
                 f"<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
             )
     raise ValueError(f"Tabloda '<b>{grup_ham}</b>' adlı grup bulunamadı.")
@@ -348,8 +357,8 @@ def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
             yeni = mevcut + (tutar * carp)
             sayfa.update_cell(i, 10, yeni)
             app_state["SON_ISLEM"] = {"sayfa": bugununTarihiniAl(), "satir": i, "sutun": 10, "eskiDeger": mevcut, "grupAdi": masraf, "islemTuru": isim}
-            sistemeLogYaz(isim, f"{masraf} | {paraFormatla(abs(tutar))}")
-            return f"✅ <b>{isim} Başarılı!</b>\n📉 Masraf Kalemi: <b>{masraf}</b>\n💵 İşlem Tutarı: <b>{paraFormatla(abs(tutar))}</b>\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
+            sistemeLogYaz(isim, f"{masraf} | {paraFormatla(tutar * carp)}")
+            return f"✅ <b>{isim} Başarılı!</b>\n📉 Masraf Kalemi: <b>{masraf}</b>\n💵 İşlem Tutarı: <b>{paraFormatla(tutar * carp)}</b>\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
             
     bos_satir = len(tum_veriler) + 1
     for i, row in enumerate(tum_veriler[1:], start=2):
@@ -360,8 +369,8 @@ def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
     sayfa.update_cell(bos_satir, 9, masraf)
     sayfa.update_cell(bos_satir, 10, tutar)
     app_state["SON_ISLEM"] = {"sayfa": bugununTarihiniAl(), "satir": bos_satir, "sutun": 10, "eskiDeger": 0, "grupAdi": masraf, "islemTuru": "Yeni Masraf Ekleme"}
-    sistemeLogYaz("Yeni Masraf Ekleme", f"{masraf} | {paraFormatla(abs(tutar))}")
-    return f"✅ <b>Yeni Masraf Oluşturuldu!</b>\n📉 Masraf Kalemi: <b>{masraf}</b>\n💵 Tutar: <b>{paraFormatla(abs(tutar))}</b>\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
+    sistemeLogYaz("Yeni Masraf Ekleme", f"{masraf} | {paraFormatla(tutar)}")
+    return f"✅ <b>Yeni Masraf Oluşturuldu!</b>\n📉 Masraf Kalemi: <b>{masraf}</b>\n💵 Tutar: <b>{paraFormatla(tutar)}</b>\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
 
 def hizliOzetUret_impl() -> str:
     sh = get_spreadsheet()
@@ -382,7 +391,7 @@ def hizliOzetUret_impl() -> str:
                 toplamOdenen += odenen
                 toplamKomisyon += kom
                 toplamKalan += kalan
-                if any(abs(x) > 0.01 for x in [devir, kasa, odenen, kalan]):
+                if any(abs(x) > 0.001 for x in [devir, kasa, odenen, kalan]):
                     aktifGrupSayisi += 1
                     
     saat = datetime.datetime.now().strftime("%H:%M")
@@ -392,12 +401,12 @@ def hizliOzetUret_impl() -> str:
         f"📅 Tarih: {bugununTarihiniAl()} | ⏰ Saat: {saat}\n"
         f"🏢 Aktif Grup Sayısı: {aktifGrupSayisi}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"🔄 Toplam Devir: {paraFormatla(abs(toplamDevir))}\n"
-        f"💰 Eklenen Kasa: {paraFormatla(abs(toplamKasa))}\n"
-        f"💸 Toplam Ödeme: {paraFormatla(abs(toplamOdenen))}\n"
-        f"✂️ Toplam Kesinti: {paraFormatla(abs(toplamKomisyon))}\n"
+        f"🔄 Toplam Devir: {paraFormatla(toplamDevir)}\n"
+        f"💰 Eklenen Kasa: {paraFormatla(toplamKasa)}\n"
+        f"💸 Toplam Ödeme: {paraFormatla(toplamOdenen)}\n"
+        f"✂️ Toplam Kesinti: {paraFormatla(toplamKomisyon)}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"🏦 <b>NET KALAN KASA: {paraFormatla(abs(toplamKalan))}</b>\n"
+        f"🏦 <b>NET KALAN KASA: {paraFormatla(toplamKalan)}</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"💡 <i>Tüm grupların anlık genel toplamıdır.</i>"
     )
@@ -426,7 +435,7 @@ def tumGruplarRaporu_impl() -> str:
                 while len(vals) < 6: vals.append(0.0)
                 devir, kasa, odenen, kom, kalan = vals[1], vals[2], vals[3], vals[4], vals[5]
                 
-                if any(abs(x) > 0.01 for x in [devir, kasa, odenen, kalan]):
+                if any(abs(x) > 0.001 for x in [devir, kasa, odenen, kalan]):
                     bulunan += 1
                     toplamDevir += devir
                     toplamKasa += kasa
@@ -436,10 +445,10 @@ def tumGruplarRaporu_impl() -> str:
                     
                     mesaj += (
                         f"{emoji} <b>{grup.upper()}</b>\n"
-                        f"🔄 Devir: {paraFormatla(abs(devir))}\n"
-                        f"💰 Kasa: {paraFormatla(abs(kasa))}\n"
-                        f"💸 Ödenen: {paraFormatla(abs(odenen))}\n"
-                        f"🏦 <b>Kalan: {paraFormatla(abs(kalan))}</b>\n\n"
+                        f"🔄 Devir: {paraFormatla(devir)}\n"
+                        f"💰 Kasa: {paraFormatla(kasa)}\n"
+                        f"💸 Ödenen: {paraFormatla(odenen)}\n"
+                        f"🏦 <b>Kalan: {paraFormatla(kalan)}</b>\n\n"
                     )
                     
     if bulunan == 0:
@@ -448,11 +457,11 @@ def tumGruplarRaporu_impl() -> str:
     mesaj += (
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"🏆 <b>GENEL TOPLAM BİLANÇO</b>\n"
-        f"🔄 Toplam Devir: {paraFormatla(abs(toplamDevir))}\n"
-        f"💰 Toplam Kasa: {paraFormatla(abs(toplamKasa))}\n"
-        f"💸 Toplam Ödeme: {paraFormatla(abs(toplamOdenen))}\n"
+        f"🔄 Toplam Devir: {paraFormatla(toplamDevir)}\n"
+        f"💰 Toplam Kasa: {paraFormatla(toplamKasa)}\n"
+        f"💸 Toplam Ödeme: {paraFormatla(toplamOdenen)}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"🏦 <b>NET KALAN KASA: {paraFormatla(abs(toplamKalan))}</b>\n"
+        f"🏦 <b>NET KALAN KASA: {paraFormatla(toplamKalan)}</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━"
     )
     return mesaj
@@ -468,9 +477,9 @@ def masrafRaporuUret_impl() -> str:
             ad = row[8].strip()
             if ad and "GENEL TOPLAM" not in ad.upper() and ad != "-":
                 fiyat = guvenliSayi(row[9])
-                if abs(fiyat) > 0:
-                    toplam += abs(fiyat)
-                    masraflar.append({"ad": ad, "fiyat": abs(fiyat)})
+                if abs(fiyat) > 0.001:
+                    toplam += fiyat
+                    masraflar.append({"ad": ad, "fiyat": fiyat})
     if not masraflar:
         return "📭 <b>Bugün için kaydedilmiş bir masraf bulunmuyor.</b>"
     masraflar.sort(key=lambda x: x["fiyat"], reverse=True)
@@ -821,12 +830,12 @@ def process_telegram_update(update: dict):
                             f"━━━━━━━━━━━━━━━━━━━━\n"
                             f"📅 Tarih: {bugununTarihiniAl()}\n"
                             f"━━━━━━━━━━━━━━━━━━━━\n"
-                            f"🔄 Devir: {paraFormatla(abs(devir))}\n"
-                            f"💰 Kasa: {paraFormatla(abs(kasa))}\n"
-                            f"💸 Ödenen: {paraFormatla(abs(odenen))}\n"
-                            f"✂️ Kesinti: {paraFormatla(abs(kom))}\n"
+                            f"🔄 Devir: {paraFormatla(devir)}\n"
+                            f"💰 Kasa: {paraFormatla(kasa)}\n"
+                            f"💸 Ödenen: {paraFormatla(odenen)}\n"
+                            f"✂️ Kesinti: {paraFormatla(kom)}\n"
                             f"━━━━━━━━━━━━━━━━━━━━\n"
-                            f"🏦 <b>NET KALAN: {paraFormatla(abs(kalan))}</b>\n"
+                            f"🏦 <b>NET KALAN: {paraFormatla(kalan)}</b>\n"
                             f"━━━━━━━━━━━━━━━━━━━━"
                         )
                 return f"⚠️ <b>{grup_adi}</b> grubu için veri bulunamadı."
@@ -841,11 +850,9 @@ def process_telegram_update(update: dict):
         text_lower = text.lower()
         is_group = chat_id < 0
 
-        # Normal konuşmalara tam sessizlik
         if not text.startswith("/"):
             return
 
-        # /id komutu
         if text_lower in ["/id", "/myid", "/bilgi"] or text_lower.startswith("/id@"):
             telegramMesajGonder(
                 chat_id,
@@ -855,7 +862,6 @@ def process_telegram_update(update: dict):
             )
             return
 
-        # Yetki kontrolü
         if not yetkili_mi(user_id):
             telegramMesajGonder(
                 chat_id,
@@ -865,7 +871,6 @@ def process_telegram_update(update: dict):
             )
             return
 
-        # Yetkili komutları
         if text_lower in ["/start", "/menu", "/menü"] or text_lower.startswith("/start@") or text_lower.startswith("/menu@"):
             telegramMesajGonder(chat_id, "👋 <b>CFO ve Finans Yönetim Botu</b>\nLütfen bir işlem seçin:\n\n👨💻 <i>Yazılım: @CRYPTOATAKAN © 2026</i>", menuKlavyesiOlustur(is_group))
         elif text_lower in ["/rehber", "/komutlar", "/yardim", "/yardım"] or text_lower.startswith("/rehber@"):
@@ -1050,7 +1055,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
     <script>
         function fmt(n) {
-            return Number(n).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+            const num = Number(n);
+            const isNeg = num < 0;
+            const formatted = Math.abs(num).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+            return isNeg ? '-' + formatted : formatted;
         }
 
         async function fetchData() {
@@ -1077,7 +1085,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                     <div class="group-card">
                         <div class="group-header">
                             <div class="group-name"><span>🔹</span> ${g.ad.toUpperCase()}</div>
-                            <div class="group-kalan-badge">${fmt(g.kalan)}</div>
+                            <div class="group-kalan-badge" style="background:${g.kalan < 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)'}; color:${g.kalan < 0 ? '#f87171' : '#34d399'};">${fmt(g.kalan)}</div>
                         </div>
                         <div class="row-item">
                             <span>🔄 Devir:</span>
@@ -1129,7 +1137,7 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                             vals = [guvenliSayi(x) for x in row[1:7]]
                             while len(vals) < 6: vals.append(0.0)
                             devir, kasa, odenen, kom, kalan = vals[1], vals[2], vals[3], vals[4], vals[5]
-                            if any(abs(x) > 0.01 for x in [devir, kasa, odenen, kalan]):
+                            if any(abs(x) > 0.001 for x in [devir, kasa, odenen, kalan]):
                                 gruplar.append({"ad": row[1], "devir": devir, "kasa": kasa, "odenen": odenen, "kalan": kalan, "komisyon": kom})
                                 toplamDevir += devir
                                 toplamKasa += kasa
