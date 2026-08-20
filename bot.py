@@ -8,7 +8,7 @@ import threading
 import urllib.request
 import urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -17,7 +17,7 @@ from google.oauth2.service_account import Credentials
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8629756462:AAHSn66-SVOZzWp_UrBj36bHjF1hpts5bco")
 KURUCU_ID = int(os.environ.get("KURUCU_ID", "8395730761"))
 SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID", "1Gim_-YSb_TtODclXiZ0hnx2WDsc-RCW9CD51LeVNOaI")
-WEB_APP_URL = os.environ.get("WEB_APP_URL", "")
+WEB_APP_URL = os.environ.get("WEB_APP_URL", "https://site--cfo-bot-servis--drx8qyvbw8cw.code.run")
 LOG_SAYFASI = "Guvenlik_Log"
 
 app_state = {
@@ -36,7 +36,7 @@ SCOPES = [
 
 def http_get_json(url: str, headers: dict = None) -> dict:
     req = urllib.request.Request(url, headers=headers or {"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=10) as response:
+    with urllib.request.urlopen(req, timeout=12) as response:
         return json.loads(response.read().decode("utf-8"))
 
 def telegram_api(method: str, payload: dict) -> dict:
@@ -47,7 +47,7 @@ def telegram_api(method: str, payload: dict) -> dict:
         with urllib.request.urlopen(req, timeout=15) as response:
             return json.loads(response.read().decode("utf-8"))
     except Exception as e:
-        print(f"Telegram API Error ({method}): {e}")
+        print(f"Telegram API Hatası ({method}): {e}")
         return {"ok": False, "error": str(e)}
 
 def telegramMesajGonder(chat_id, metin: str, reply_markup=None):
@@ -68,9 +68,9 @@ def get_gspread_client():
             creds = Credentials.from_service_account_info(info, scopes=SCOPES)
             return gspread.authorize(creds)
         except Exception as e:
-            print(f"GOOGLE_SERVICE_ACCOUNT_JSON parse error: {e}")
+            print(f"GOOGLE_SERVICE_ACCOUNT_JSON okunamadı: {e}")
 
-    # 2. File locations
+    # 2. Dosya yolları
     for path in [
         os.path.join(os.path.dirname(__file__), "service_account.json"),
         "./service_account.json",
@@ -83,7 +83,7 @@ def get_gspread_client():
                 creds = Credentials.from_service_account_file(path, scopes=SCOPES)
                 return gspread.authorize(creds)
             except Exception as e:
-                print(f"File {path} load error: {e}")
+                print(f"{path} okunamadı: {e}")
 
     raise FileNotFoundError("Google Service Account anahtarı bulunamadı!")
 
@@ -93,6 +93,10 @@ def get_spreadsheet():
 
 def bugununTarihiniAl():
     return datetime.datetime.now().strftime("%d.%m.%Y")
+
+def dununTarihiniAl():
+    dun = datetime.datetime.now() - datetime.timedelta(days=1)
+    return dun.strftime("%d.%m.%Y")
 
 def trKarakterCoz(metin: str) -> str:
     if not metin: return ""
@@ -166,10 +170,10 @@ def menuKlavyesiOlustur(isGroup: bool):
     )
     keyboard = [
         [panel_button],
-        [{"text": "📊 Tüm Gruplar", "callback_data": "rapor_tumu"}],
-        [{"text": "📉 Masraf Raporu", "callback_data": "rapor_masraf"}],
+        [{"text": "📊 Tüm Gruplar Raporu", "callback_data": "rapor_tumu"}],
+        [{"text": "📉 Masraf & Gider Raporu", "callback_data": "rapor_masraf"}],
         [{"text": "💼 Hızlı Finans Özeti", "callback_data": "rapor_ozet"}],
-        [{"text": "🎯 Ciro Hedefi İbresi", "callback_data": "menu_hedef"}]
+        [{"text": "🌅 Yeni Gün Geçişi", "callback_data": "menu_yenigun"}]
     ]
     try:
         sh = get_spreadsheet()
@@ -198,11 +202,14 @@ def rehber_metni():
         "<code>/kasasil TİGER 500</code> : Kasadan siler.\n"
         "<code>/odeme TİGER 1000</code> : Ödenen tutarı girer.\n"
         "<code>/odemesil TİGER 200</code> : Ödenen tutardan siler.\n"
-        "<code>/masrafekle 500 Yemek</code> : Günlük masraf işler.\n"
-        "<code>/masrafsil 500 Yemek</code> : Masraf siler.\n"
+        "<code>/devir TİGER 5000</code> : Devir bakiyesi ekler.\n"
+        "<code>/devirsil TİGER 1000</code> : Devirden siler.\n"
+        "<code>/masrafekle Yemek 500</code> : Günlük masraf işler.\n"
+        "<code>/masrafsil Yemek 200</code> : Masraf siler.\n"
+        "<code>/masraf</code> : Günlük masraf listesini döker.\n"
         "<code>/gerial</code> : En son işlemi geri alır.\n\n"
         "📊 <b>GÜNLÜK DÖNGÜ VE RAPORLAR</b>\n"
-        "<code>/yenigun</code> : 🌅 Yeni gün sayfasını açar, devirleri koruyarak aktarır.\n"
+        "<code>/yenigun</code> : 🌅 Yeni gün sayfasını açar, devirleri aktarır.\n"
         "<code>/rapor</code> : Tüm grupların güncel durum raporunu çeker.\n"
         "<code>/ozet</code> : Kasa, Masraf ve Ödenen hızlı özetini sunar.\n"
         "<code>/log</code> veya <code>/son5</code> : Yapılan son işlemleri listeler.\n\n"
@@ -213,20 +220,42 @@ def rehber_metni():
         "<code>/çeviri [Metin]</code> : 🌐 Otomatik çeviri yapar.\n"
         "<code>/hesap TİGER 5 34.50</code> : Tether / Kasa hesap makinesi.\n"
         "<code>/not [Metin]</code> : Şirket ajandasına not ekler.\n"
-        "<code>/notlar</code> : Son notları listeler.\n\n"
+        "<code>/notlar</code> : Son notları listeler.\n"
+        "<code>/panel</code> : Canlı CFO Web Dashboard linkini verir.\n\n"
         "🛡️ <b>CEO & SİSTEM YÖNETİMİ</b>\n"
-        "<code>/yedekle</code> : 📦 Tüm Excel verilerini .xlsx olarak gönderir.\n"
         "<code>/kilit</code> : Acil durumda veri girişini tamamen kilitler.\n"
         "<code>/kilitac</code> : Sistem kilidini kaldırır.\n"
-        "<code>/panel</code> : Canlı CFO Web Dashboard linkini verir.\n\n"
+        "<code>/adminekle [ID]</code> : Yeni yönetici ekler.\n"
+        "<code>/adminsil [ID]</code> : Yöneticiyi siler.\n"
+        "<code>/adminler</code> : Yetkili yöneticileri listeler.\n\n"
         "💡 <i>Tüm işlemler arka planda güvenlik protokolüyle işlenmektedir.</i>"
     )
 
-def hucreyeVeriYaz_impl(komut: str, sutun_idx: int, isim: str, carp: int):
-    p = komut.split(" ")
-    if len(p) < 3: raise ValueError("Eksik komut. Örnek: /kasa TİGER 1500")
-    tutar = float(p[-1].replace(",", "."))
-    grup = trKarakterCoz(" ".join(p[1:-1]))
+def parse_grup_ve_tutar(parametreler: List[str]) -> Tuple[str, float]:
+    """Parametrelerin sırası ne olursa olsun grup adı ve tutarı akıllıca ayrıştırır."""
+    if len(parametreler) < 2:
+        raise ValueError("Eksik bilgi! Örnek kullanım: /kasa TİGER 1500")
+    
+    # 1. Durum: Son parametre tutar mı? (/kasa TİGER 1500)
+    try:
+        tutar = float(parametreler[-1].replace(",", "."))
+        grup = " ".join(parametreler[:-1]).strip()
+        return grup, tutar
+    except ValueError:
+        pass
+        
+    # 2. Durum: İlk parametre tutar mı? (/kasa 1500 TİGER)
+    try:
+        tutar = float(parametreler[0].replace(",", "."))
+        grup = " ".join(parametreler[1:]).strip()
+        return grup, tutar
+    except ValueError:
+        raise ValueError("Lütfen geçerli bir sayısal tutar girin! Örnek: /kasa TİGER 1500")
+
+def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int) -> str:
+    parcalar = komut_metni.strip().split()[1:]
+    grup_ham, tutar = parse_grup_ve_tutar(parcalar)
+    grup = trKarakterCoz(grup_ham)
     
     sh = get_spreadsheet()
     sayfa = sh.worksheet(bugununTarihiniAl())
@@ -261,13 +290,12 @@ def hucreyeVeriYaz_impl(komut: str, sutun_idx: int, isim: str, carp: int):
                 f"🏦 Kalan: <b>{paraFormatla(abs(dKalan))} ₺</b>\n\n"
                 f"<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
             )
-    raise ValueError(f"Tabloda '{grup}' adlı grup bulunamadı.")
+    raise ValueError(f"Tabloda '<b>{grup_ham}</b>' adlı grup bulunamadı.")
 
-def masrafVerisiYaz_impl(komut: str, isim: str, carp: int):
-    p = komut.split(" ")
-    if len(p) < 3: raise ValueError("Eksik komut. Örnek: /masrafekle 500 Yemek")
-    tutar = float(p[-1].replace(",", "."))
-    masraf = trKarakterCoz(" ".join(p[1:-1]))
+def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
+    parcalar = komut_metni.strip().split()[1:]
+    masraf_ham, tutar = parse_grup_ve_tutar(parcalar)
+    masraf = trKarakterCoz(masraf_ham)
     
     sh = get_spreadsheet()
     sayfa = sh.worksheet(bugununTarihiniAl())
@@ -282,8 +310,9 @@ def masrafVerisiYaz_impl(komut: str, isim: str, carp: int):
             sayfa.update_cell(i, 10, yeni)
             app_state["SON_ISLEM"] = {"sayfa": bugununTarihiniAl(), "satir": i, "sutun": 10, "eskiDeger": mevcut, "grupAdi": masraf, "islemTuru": isim}
             sistemeLogYaz(isim, f"{masraf} | {rakamFormatla(abs(tutar))} TL")
-            return f"✅ <b>{isim} Başarılı!</b>\n📉 Masraf: {masraf}\nİşlem: {rakamFormatla(abs(tutar))} TL\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
+            return f"✅ <b>{isim} Başarılı!</b>\n📉 Masraf: <b>{masraf}</b>\nİşlem: {rakamFormatla(abs(tutar))} TL\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
             
+    # Yeni masraf satırı
     bos_satir = len(tum_veriler) + 1
     for i, row in enumerate(tum_veriler[1:], start=2):
         col_i = row[8] if len(row) > 8 else ""
@@ -294,9 +323,9 @@ def masrafVerisiYaz_impl(komut: str, isim: str, carp: int):
     sayfa.update_cell(bos_satir, 10, tutar)
     app_state["SON_ISLEM"] = {"sayfa": bugununTarihiniAl(), "satir": bos_satir, "sutun": 10, "eskiDeger": 0, "grupAdi": masraf, "islemTuru": "Yeni Masraf Ekleme"}
     sistemeLogYaz("Yeni Masraf Ekleme", f"{masraf} | {rakamFormatla(abs(tutar))} TL")
-    return f"✅ <b>Yeni Masraf Oluşturuldu!</b>\n📉 Masraf: {masraf}\nTutar: {rakamFormatla(abs(tutar))} TL\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
+    return f"✅ <b>Yeni Masraf Oluşturuldu!</b>\n📉 Masraf: <b>{masraf}</b>\nTutar: {rakamFormatla(abs(tutar))} TL\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
 
-def hizliOzetUret_impl():
+def hizliOzetUret_impl() -> str:
     sh = get_spreadsheet()
     sayfa = sh.worksheet(bugununTarihiniAl())
     veriler = sayfa.get_all_values()
@@ -329,10 +358,42 @@ def hizliOzetUret_impl():
         f"✂️ Toplam Kesinti: {paraFormatla(abs(toplamKomisyon))} ₺\n\n"
         f"━━━━━━━━━━━\n"
         f"🏦 <b>NET KALAN KASA: {paraFormatla(abs(toplamKalan))} ₺</b>\n━━━━━━━━━━━\n"
-        f"💡 <i>Tüm grupların anlık toplamıdır.</i>"
+        f"💡 <i>Tüm grupların anlık genel toplamıdır.</i>"
     )
 
-def masrafRaporuUret_impl():
+def tumGruplarRaporu_impl() -> str:
+    sh = get_spreadsheet()
+    sayfa = sh.worksheet(bugununTarihiniAl())
+    veriler = sayfa.get_all_values()
+    
+    mesaj = f"📊 <b>{bugununTarihiniAl()} GÜNCEL KASA RAPORU</b>\n━━━━━━━━━━━━━━━━━━━\n\n"
+    bulunan = 0
+    toplamKalan = 0.0
+    
+    for row in veriler[1:]:
+        if len(row) >= 2:
+            grup = row[1].strip()
+            if grup and grup != "*" and "GENEL TOPLAM" not in grup.upper():
+                vals = [guvenliSayi(x) for x in row[1:7]]
+                while len(vals) < 6: vals.append(0.0)
+                devir, kasa, odenen, kom, kalan = vals[1], vals[2], vals[3], vals[4], vals[5]
+                if any(abs(x) > 0.01 for x in [devir, kasa, odenen, kalan]):
+                    bulunan += 1
+                    toplamKalan += kalan
+                    emoji = grupEmojisiBul(grup)
+                    mesaj += (
+                        f"{emoji} <b>{grup.upper()}</b>\n"
+                        f"🔄 Devir: {paraFormatla(abs(devir))} ₺ | 💰 Kasa: {paraFormatla(abs(kasa))} ₺\n"
+                        f"💸 Ödenen: {paraFormatla(abs(odenen))} ₺ | 🏦 <b>Kalan: {paraFormatla(abs(kalan))} ₺</b>\n"
+                        f"───────────────────\n"
+                    )
+    if bulunan == 0:
+        return "📭 <b>Henüz işlem görmüş aktif bir grup bulunmuyor.</b>"
+        
+    mesaj += f"\n🏦 <b>GENEL TOPLAM NET KALAN: {paraFormatla(abs(toplamKalan))} ₺</b>"
+    return mesaj
+
+def masrafRaporuUret_impl() -> str:
     sh = get_spreadsheet()
     sayfa = sh.worksheet(bugununTarihiniAl())
     veriler = sayfa.get_all_values()
@@ -355,8 +416,8 @@ def masrafRaporuUret_impl():
     mesaj += f"\n━━━━━━━━━━━━━━━━━━━\n📋 Toplam Kalem: <b>{len(masraflar)} Adet</b>\n📊 <b>TOPLAM GİDER: {rakamFormatla(toplam)} ₺</b>"
     return mesaj
 
-def kurRaporuUret_impl():
-    yanit = "📊 <b>GÜNCEL KURLAR</b>\n\n"
+def kurRaporuUret_impl() -> str:
+    yanit = "📊 <b>GÜNCEL KRİPTO KURLARI</b>\n\n"
     try:
         r = http_get_json("https://data-api.binance.vision/api/v3/ticker/24hr?symbol=USDTTRY")
         yanit += f"🟡 <b>BİNANCE USDT/TRY</b>\n💵 Anlık Kur: {float(r['lastPrice']):.2f} ₺\n🔺 24s Yüksek: {float(r['highPrice']):.2f} ₺\n🔻 24s Düşük: {float(r['lowPrice']):.2f} ₺\n\n"
@@ -371,7 +432,7 @@ def kurRaporuUret_impl():
     except: yanit += "🟢 <b>BTCTÜRK USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
     return yanit.strip()
 
-def canliKurSorgula_impl():
+def canliKurSorgula_impl() -> str:
     try:
         b_usdt = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=USDTTRY")
         b_btc = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=BTCUSDT")
@@ -400,7 +461,7 @@ def canliKurSorgula_impl():
     except Exception as e:
         return f"❌ <b>API Hatası:</b> {e}"
 
-def hesapMakinesi_impl(orijinalMetin: str):
+def hesapMakinesi_impl(orijinalMetin: str) -> str:
     args = orijinalMetin.strip().split()
     if len(args) < 4:
         return "⚠️ <b>Hatalı Kullanım!</b>\nFormat: <code>/hesap GRUPADI ORAN KUR</code>\nÖrnek: <code>/hesap TİGER 5 34.50</code>"
@@ -430,7 +491,7 @@ def hesapMakinesi_impl(orijinalMetin: str):
             break
             
     if not grupBulundu:
-        return f"⚠️ <b>Grup Bulunamadı:</b> Excel'de <code>{arananGrup}</code> bulunamadı."
+        return f"⚠️ <b>Grup Bulunamadı:</b> Excel tablosunda <code>{arananGrup}</code> bulunamadı."
         
     komisyonKesintisi = guncelKasa * (komisyonOrani / 100.0)
     netKasaTl = guncelKasa - komisyonKesintisi
@@ -454,7 +515,7 @@ def hesapMakinesi_impl(orijinalMetin: str):
     )
     return mesaj
 
-def ibanListesiGetir_impl():
+def ibanListesiGetir_impl() -> str:
     sh = get_spreadsheet()
     sayfa = sh.worksheet(bugununTarihiniAl())
     veriler = sayfa.get_all_values()
@@ -475,7 +536,7 @@ def ibanListesiGetir_impl():
     mesaj += "🔴 <b>KULLANIMDAKİLER</b>\n" + ("\n".join(dolu) if dolu else "<i>Kullanımda İBAN yok.</i>")
     return mesaj
 
-def metinCevir_impl(gelenMetin: str):
+def metinCevir_impl(gelenMetin: str) -> str:
     cevrilecek = re.sub(r'^/(?:çeviri|ceviri)(?:@\w+)?\s*', '', gelenMetin, flags=re.IGNORECASE).strip()
     if not cevrilecek:
         return "⚠️ Lütfen çevrilmesini istediğiniz metni yazın.\nÖrnek: <code>/çeviri Merhaba</code>"
@@ -495,15 +556,94 @@ def metinCevir_impl(gelenMetin: str):
     except Exception as e:
         return f"❌ <b>Çeviri Hatası:</b> {e}"
 
+def yenigun_baslat_mesaji():
+    klavye = {
+        "inline_keyboard": [
+            [{"text": "🔄 Masrafları Temizle & Yeni Güne Geç", "callback_data": "yenigun_onay_sil"}],
+            [{"text": "📋 Masrafları Koru & Yeni Güne Geç", "callback_data": "yenigun_onay_tut"}],
+            [{"text": "❌ İptal Et", "callback_data": "yenigun_iptal"}]
+        ]
+    }
+    return (
+        "🌅 <b>YENİ GÜN DEVİR İŞLEMİ</b>\n━━━━━━━━━━━━━━━━━━━\n\n"
+        "Bugünün sayfası açılacak, dün kalan bakiyeler **Devir** sütununa otomatik aktarılacaktır.\n\n"
+        "Lütfen masraf tercihinizi seçin:",
+        klavye
+    )
+
+def yenigun_gerceklestir_impl(masraflari_sil: bool) -> str:
+    sh = get_spreadsheet()
+    yeniTarih = bugununTarihiniAl()
+    
+    # Sayfa zaten var mı?
+    try:
+        sh.worksheet(yeniTarih)
+        return f"⚠️ <b>{yeniTarih}</b> tarihli sayfa zaten mevcut! Yeniden oluşturulamaz."
+    except gspread.exceptions.WorksheetNotFound:
+        pass
+        
+    # En son sayfayı bul
+    tum_sayfalar = sh.worksheets()
+    kaynak_sayfa = None
+    for ws in tum_sayfalar:
+        if ws.title not in [LOG_SAYFASI, "NOTLAR", "YEDEK"]:
+            kaynak_sayfa = ws
+            break
+            
+    if not kaynak_sayfa:
+        return "❌ Kopyalanacak şablon sayfa bulunamadı!"
+        
+    # Sayfayı kopyala
+    yeni_sayfa = kaynak_sayfa.duplicate(new_sheet_name=yeniTarih)
+    veriler = yeni_sayfa.get_all_values()
+    
+    # Devirleri aktar (Dünün Kalanı -> Yeni Günün Deviri)
+    for r_idx, row in enumerate(veriler[1:], start=2):
+        if r_idx > 43: break # Formül koruması
+        if len(row) >= 7:
+            grup = row[1].strip()
+            if grup and grup != "*" and "GENEL TOPLAM" not in grup.upper():
+                dunun_kalani = guvenliSayi(row[6]) # G sütunu (Kalan)
+                yeni_sayfa.update_cell(r_idx, 3, dunun_kalani) # C sütunu (Devir)
+                yeni_sayfa.update_cell(r_idx, 4, 0) # D sütunu (Kasa sıfırla)
+                yeni_sayfa.update_cell(r_idx, 5, 0) # E sütunu (Ödenen sıfırla)
+                
+    if masraflari_sil:
+        # Masrafları temizle
+        for r_idx in range(2, 40):
+            yeni_sayfa.update_cell(r_idx, 9, "")
+            yeni_sayfa.update_cell(r_idx, 10, "")
+            
+    sistemeLogYaz("Yeni Gün Geçişi", f"Yeni gün sayfası ({yeniTarih}) açıldı.")
+    return f"🌅 <b>{yeniTarih} GÜNÜ BAŞARIYLA AÇILDI!</b>\n\n🔄 Dünün tüm kalan bakiyeleri Devir sütununa aktarıldı.\n💰 Kasa ve Ödenen alanları sıfırlandı.\n\nİyi çalışmalar dileriz! 🚀"
+
+# --- YARDIMCI: VERİ ANALİZİ BİLDİRİMİ İLE ÇALIŞTIRICI ---
+def islemi_analiz_bildirimiyle_yap(chat_id: int, islem_fn, *args):
+    """Kullanıcı komut yazdığında anında bildirim verir, işlem bitince kendini siler."""
+    yukleniyor = telegramMesajGonder(chat_id, "⏳ <b>Veriler analiz ediliyor, lütfen bekleyin...</b>")
+    msg_id = yukleniyor.get("result", {}).get("message_id") if yukleniyor.get("ok") else None
+    
+    try:
+        sonuc = islem_fn(*args)
+        if isinstance(sonuc, tuple):
+            text, markup = sonuc
+            telegramMesajGonder(chat_id, text, markup)
+        else:
+            telegramMesajGonder(chat_id, str(sonuc))
+    except Exception as e:
+        telegramMesajGonder(chat_id, f"❌ <b>Hata:</b> {e}")
+    finally:
+        if msg_id:
+            telegramMesajSil(chat_id, msg_id)
+
 # --- UPDATE DISPATCHER ---
 def process_telegram_update(update: dict):
-    # Callback Queries (Buton Tıklamaları)
+    # 1. Buton Tıklamaları (Callback Query)
     if "callback_query" in update:
         cq = update["callback_query"]
         data = cq.get("data", "")
         chat_id = cq["message"]["chat"]["id"]
         user_id = cq["from"]["id"]
-        msg_id = cq["message"]["message_id"]
         
         telegram_api("answerCallbackQuery", {"callback_query_id": cq["id"]})
         
@@ -511,26 +651,36 @@ def process_telegram_update(update: dict):
             telegramMesajGonder(chat_id, "⛔ <b>Erişim Reddedildi!</b>")
             return
             
-        try:
-            if data == "rehber":
-                telegramMesajGonder(chat_id, rehber_metni())
-            elif data == "rapor_ozet" or data == "rapor_tumu":
-                telegramMesajGonder(chat_id, hizliOzetUret_impl())
-            elif data == "rapor_masraf":
-                telegramMesajGonder(chat_id, masrafRaporuUret_impl())
-            elif data.startswith("rapor_"):
-                grup = data.replace("rapor_", "")
+        if data == "rehber":
+            telegramMesajGonder(chat_id, rehber_metni())
+        elif data == "rapor_ozet":
+            islemi_analiz_bildirimiyle_yap(chat_id, hizliOzetUret_impl)
+        elif data == "rapor_masraf":
+            islemi_analiz_bildirimiyle_yap(chat_id, masrafRaporuUret_impl)
+        elif data == "rapor_tumu":
+            islemi_analiz_bildirimiyle_yap(chat_id, tumGruplarRaporu_impl)
+        elif data == "menu_yenigun":
+            metin, klavye = yenigun_baslat_mesaji()
+            telegramMesajGonder(chat_id, metin, klavye)
+        elif data == "yenigun_onay_sil":
+            islemi_analiz_bildirimiyle_yap(chat_id, yenigun_gerceklestir_impl, True)
+        elif data == "yenigun_onay_tut":
+            islemi_analiz_bildirimiyle_yap(chat_id, yenigun_gerceklestir_impl, False)
+        elif data == "yenigun_iptal":
+            telegramMesajGonder(chat_id, "❌ Yeni gün devir işlemi iptal edildi.")
+        elif data.startswith("rapor_"):
+            grup = data.replace("rapor_", "")
+            def tek_grup_rapor(grup_adi):
                 sh = get_spreadsheet()
                 sayfa = sh.worksheet(bugununTarihiniAl())
                 veriler = sayfa.get_all_values()
-                found = False
                 for row in veriler[1:]:
-                    if len(row) >= 2 and trKarakterCoz(row[1]) == trKarakterCoz(grup):
+                    if len(row) >= 2 and trKarakterCoz(row[1]) == trKarakterCoz(grup_adi):
                         vals = [guvenliSayi(x) for x in row[1:7]]
                         while len(vals) < 6: vals.append(0.0)
                         devir, kasa, odenen, kom, kalan = vals[1], vals[2], vals[3], vals[4], vals[5]
-                        msg = (
-                            f"📊 <b>[ {row[1]} ] GÜNCEL KASA ANALİZİ</b>\n━━━━━━━━━━━━\n"
+                        return (
+                            f"📊 <b>[ {row[1].upper()} ] GÜNCEL KASA ANALİZİ</b>\n━━━━━━━━━━━━\n"
                             f"📅 Tarih: {bugununTarihiniAl()}\n━━━━━━━━━━━━\n"
                             f"🔄 Önceki Devir: {paraFormatla(abs(devir))} ₺\n"
                             f"💰 Eklenen Kasa: {paraFormatla(abs(kasa))} ₺\n"
@@ -538,16 +688,11 @@ def process_telegram_update(update: dict):
                             f"✂️ Kesinti/Masraf: {paraFormatla(abs(kom))} ₺\n━━━━━━━━━━━━\n"
                             f"🏦 <b>NET KALAN TL: {paraFormatla(abs(kalan))} ₺</b>"
                         )
-                        telegramMesajGonder(chat_id, msg)
-                        found = True
-                        break
-                if not found:
-                    telegramMesajGonder(chat_id, f"⚠️ {grup} grubu için veri bulunamadı.")
-        except Exception as e:
-            telegramMesajGonder(chat_id, f"❌ <b>Hata:</b> {e}")
+                return f"⚠️ <b>{grup_adi}</b> grubu için veri bulunamadı."
+            islemi_analiz_bildirimiyle_yap(chat_id, tek_grup_rapor, grup)
         return
 
-    # Normal Mesajlar
+    # 2. Normal Mesajlar
     if "message" in update and "text" in update["message"]:
         msg = update["message"]
         chat_id = msg["chat"]["id"]
@@ -560,72 +705,82 @@ def process_telegram_update(update: dict):
             telegramMesajGonder(chat_id, "⛔ <b>Erişim Reddedildi!</b>")
             return
 
-        try:
-            if text_lower in ["/start", "/menu", "/menü"] or text_lower.startswith("/start@") or text_lower.startswith("/menu@"):
-                telegramMesajGonder(chat_id, "👋 <b>CFO ve Finans Yönetim Botu</b>\nLütfen bir işlem seçin:\n\n👨💻 <i>Yazılım: @CRYPTOATAKAN © 2026</i>", menuKlavyesiOlustur(is_group))
-            elif text_lower in ["/rehber", "/komutlar", "/yardim", "/yardım"] or text_lower.startswith("/rehber@"):
-                telegramMesajGonder(chat_id, rehber_metni())
-            elif text_lower == "/ozet" or text_lower.startswith("/ozet@"):
-                telegramMesajGonder(chat_id, hizliOzetUret_impl())
-            elif text_lower == "/canlikur" or text_lower.startswith("/canlikur@"):
-                telegramMesajGonder(chat_id, canliKurSorgula_impl())
-            elif text_lower == "/kur" or text_lower.startswith("/kur@"):
-                telegramMesajGonder(chat_id, kurRaporuUret_impl())
-            elif text_lower == "/iban" or text_lower.startswith("/iban@"):
-                telegramMesajGonder(chat_id, ibanListesiGetir_impl())
-            elif text_lower.startswith("/hesap"):
-                telegramMesajGonder(chat_id, hesapMakinesi_impl(text))
-            elif text_lower.startswith("/çeviri") or text_lower.startswith("/ceviri"):
-                telegramMesajGonder(chat_id, metinCevir_impl(text))
-            elif text_lower.startswith("/kasa "):
-                telegramMesajGonder(chat_id, hucreyeVeriYaz_impl(text, 4, "Güncel Kasa Ekleme", 1))
-            elif text_lower.startswith("/kasasil "):
-                telegramMesajGonder(chat_id, hucreyeVeriYaz_impl(text, 4, "Güncel Kasa Silme", -1))
-            elif text_lower.startswith("/odeme "):
-                telegramMesajGonder(chat_id, hucreyeVeriYaz_impl(text, 5, "Ödenen Ekleme", 1))
-            elif text_lower.startswith("/odemesil "):
-                telegramMesajGonder(chat_id, hucreyeVeriYaz_impl(text, 5, "Ödenen Silme", -1))
-            elif text_lower.startswith("/devir "):
-                telegramMesajGonder(chat_id, hucreyeVeriYaz_impl(text, 3, "Devir Ekleme", 1))
-            elif text_lower.startswith("/devirsil "):
-                telegramMesajGonder(chat_id, hucreyeVeriYaz_impl(text, 3, "Devir Silme", -1))
-            elif text_lower.startswith("/masrafekle "):
-                telegramMesajGonder(chat_id, masrafVerisiYaz_impl(text, "Masraf Ekleme", 1))
-            elif text_lower.startswith("/masrafsil "):
-                telegramMesajGonder(chat_id, masrafVerisiYaz_impl(text, "Masraf Silme", -1))
-            elif text_lower == "/gerial":
+        if text_lower in ["/start", "/menu", "/menü"] or text_lower.startswith("/start@") or text_lower.startswith("/menu@"):
+            telegramMesajGonder(chat_id, "👋 <b>CFO ve Finans Yönetim Botu</b>\nLütfen bir işlem seçin:\n\n👨💻 <i>Yazılım: @CRYPTOATAKAN © 2026</i>", menuKlavyesiOlustur(is_group))
+        elif text_lower in ["/rehber", "/komutlar", "/yardim", "/yardım"] or text_lower.startswith("/rehber@"):
+            telegramMesajGonder(chat_id, rehber_metni())
+        elif text_lower == "/panel" or text_lower.startswith("/panel@"):
+            telegramMesajGonder(chat_id, f"🌐 <b>Canlı CFO Web Paneli:</b>\n{WEB_APP_URL}")
+        elif text_lower == "/ozet" or text_lower.startswith("/ozet@"):
+            islemi_analiz_bildirimiyle_yap(chat_id, hizliOzetUret_impl)
+        elif text_lower == "/rapor" or text_lower.startswith("/rapor@"):
+            islemi_analiz_bildirimiyle_yap(chat_id, tumGruplarRaporu_impl)
+        elif text_lower in ["/masraf", "/gider"] or text_lower.startswith("/masraf@"):
+            islemi_analiz_bildirimiyle_yap(chat_id, masrafRaporuUret_impl)
+        elif text_lower == "/canlikur" or text_lower.startswith("/canlikur@"):
+            islemi_analiz_bildirimiyle_yap(chat_id, canliKurSorgula_impl)
+        elif text_lower == "/kur" or text_lower.startswith("/kur@"):
+            islemi_analiz_bildirimiyle_yap(chat_id, kurRaporuUret_impl)
+        elif text_lower == "/iban" or text_lower.startswith("/iban@"):
+            islemi_analiz_bildirimiyle_yap(chat_id, ibanListesiGetir_impl)
+        elif text_lower.startswith("/hesap"):
+            islemi_analiz_bildirimiyle_yap(chat_id, hesapMakinesi_impl, text)
+        elif text_lower.startswith("/çeviri") or text_lower.startswith("/ceviri"):
+            islemi_analiz_bildirimiyle_yap(chat_id, metinCevir_impl, text)
+        elif text_lower == "/yenigun" or text_lower.startswith("/yenigun@"):
+            metin, klavye = yenigun_baslat_mesaji()
+            telegramMesajGonder(chat_id, metin, klavye)
+        elif text_lower.startswith("/kasa "):
+            islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 4, "Kasa Ekleme", 1)
+        elif text_lower.startswith("/kasasil "):
+            islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 4, "Kasa Silme", -1)
+        elif text_lower.startswith("/odeme "):
+            islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 5, "Ödenen Ekleme", 1)
+        elif text_lower.startswith("/odemesil "):
+            islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 5, "Ödenen Silme", -1)
+        elif text_lower.startswith("/devir "):
+            islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 3, "Devir Ekleme", 1)
+        elif text_lower.startswith("/devirsil "):
+            islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 3, "Devir Silme", -1)
+        elif text_lower.startswith("/masrafekle "):
+            islemi_analiz_bildirimiyle_yap(chat_id, masrafVerisiYaz_impl, text, "Masraf Ekleme", 1)
+        elif text_lower.startswith("/masrafsil "):
+            islemi_analiz_bildirimiyle_yap(chat_id, masrafVerisiYaz_impl, text, "Masraf Silme", -1)
+        elif text_lower == "/gerial":
+            def gerial_impl():
                 if not app_state["SON_ISLEM"]:
-                    telegramMesajGonder(chat_id, "Hafıza Boş: Geri alınacak işlem yok.")
-                else:
-                    last = app_state["SON_ISLEM"]
-                    sh = get_spreadsheet()
-                    sayfa = sh.worksheet(last["sayfa"])
-                    sayfa.update_cell(last["satir"], last["sutun"], last["eskiDeger"])
-                    app_state["SON_ISLEM"] = None
-                    sistemeLogYaz("İptal Edilen İşlem", f"{last['grupAdi']} ({last['islemTuru']})")
-                    telegramMesajGonder(chat_id, f"⏪ <b>ZAMAN GERİYE SARILDI!</b>\nHedef: <b>{last['grupAdi']}</b>\nEski haline döndürüldü.")
-            elif text_lower.startswith("/not ") and not text_lower.startswith("/notlar"):
+                    return "Hafıza Boş: Geri alınacak işlem yok."
+                last = app_state["SON_ISLEM"]
+                sh = get_spreadsheet()
+                sayfa = sh.worksheet(last["sayfa"])
+                sayfa.update_cell(last["satir"], last["sutun"], last["eskiDeger"])
+                app_state["SON_ISLEM"] = None
+                sistemeLogYaz("İptal Edilen İşlem", f"{last['grupAdi']} ({last['islemTuru']})")
+                return f"⏪ <b>ZAMAN GERİYE SARILDI!</b>\nHedef: <b>{last['grupAdi']}</b>\nEski haline döndürüldü."
+            islemi_analiz_bildirimiyle_yap(chat_id, gerial_impl)
+        elif text_lower.startswith("/not ") and not text_lower.startswith("/notlar"):
+            def not_ekle_impl():
                 not_metni = text[5:].strip()
                 sh = get_spreadsheet()
                 try: not_sayfasi = sh.worksheet("NOTLAR")
                 except: not_sayfasi = sh.add_worksheet(title="NOTLAR", rows=500, cols=3)
                 now_str = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
                 not_sayfasi.append_row([now_str, not_metni])
-                telegramMesajGonder(chat_id, f"📓 <b>NOT KAYDEDİLDİ</b>\n🕒 {now_str}\n📝 <i>{not_metni}</i>")
-            elif text_lower == "/notlar" or text_lower.startswith("/notlar@"):
+                return f"📓 <b>NOT KAYDEDİLDİ</b>\n🕒 {now_str}\n📝 <i>{not_metni}</i>"
+            islemi_analiz_bildirimiyle_yap(chat_id, not_ekle_impl)
+        elif text_lower == "/notlar" or text_lower.startswith("/notlar@"):
+            def notlari_getir_impl():
                 sh = get_spreadsheet()
                 not_sayfasi = sh.worksheet("NOTLAR")
                 rows = not_sayfasi.get_all_values()
                 if len(rows) < 1:
-                    telegramMesajGonder(chat_id, "📭 Not defteri boş.")
-                else:
-                    last_10 = rows[-10:]
-                    out = "📓 <b>ŞİRKET HAFIZASI (SON NOTLAR)</b>\n━━━━━━━━━━━━━━━━━━━\n\n"
-                    for r in reversed(last_10):
-                        out += f"📌 <b>{r[0] if len(r)>0 else ''}</b>\n<code>{r[1] if len(r)>1 else ''}</code>\n\n"
-                    telegramMesajGonder(chat_id, out)
-        except Exception as err:
-            telegramMesajGonder(chat_id, f"❌ <b>Hata:</b> {err}")
+                    return "📭 Not defteri boş."
+                last_10 = rows[-10:]
+                out = "📓 <b>ŞİRKET HAFIZASI (SON NOTLAR)</b>\n━━━━━━━━━━━━━━━━━━━\n\n"
+                for r in reversed(last_10):
+                    out += f"📌 <b>{r[0] if len(r)>0 else ''}</b>\n<code>{r[1] if len(r)>1 else ''}</code>\n\n"
+                return out
+            islemi_analiz_bildirimiyle_yap(chat_id, notlari_getir_impl)
 
 # --- HEALTH SERVER ---
 class HealthHandler(BaseHTTPRequestHandler):
@@ -633,7 +788,7 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-type", "text/html; charset=utf-8")
         self.end_headers()
-        self.wfile.write(b"<h1>CFO Bot Aktif</h1>")
+        self.wfile.write(b"<h1>CFO Canli Paneli 7/24 Aktif</h1>")
     def log_message(self, format, *args): pass
 
 def run_health_server():
