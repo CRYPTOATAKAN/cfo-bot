@@ -728,7 +728,7 @@ def metinCevir_impl(gelenMetin: str) -> str:
     except Exception as e:
         return f"❌ <b>Çeviri Hatası:</b> {e}"
 
-# --- YENİ GÜN GEÇİŞİ (2-42 DÖNGÜSÜ & DİNAMİK İLERİ TARİH) ---
+# --- YENİ GÜN GEÇİŞİ (TEK SEFERDE TOPLU YAZMA - 429 KOTA KORUMALI) ---
 def yenigun_baslat_mesaji():
     sh = get_spreadsheet()
     kaynak_sayfa = get_active_daily_sheet(sh)
@@ -770,7 +770,7 @@ def yenigun_gerceklestir_impl(masraflari_sil: bool) -> str:
             hedef_yeni_tarih = (d_obj + datetime.timedelta(days=1)).strftime("%d.%m.%Y")
         except: pass
         
-    # 2. Eğer hedef sayfa adı önceden bozuk (küçük 7x2) olarak açılmışsa onu temizle
+    # 2. Eğer hedef sayfa adı önceden bozuk/yarım açılmışsa temizle
     try:
         mevcut_sayfa = sh.worksheet(hedef_yeni_tarih)
         if mevcut_sayfa.col_count < 8 or mevcut_sayfa.row_count < 30:
@@ -783,30 +783,33 @@ def yenigun_gerceklestir_impl(masraflari_sil: bool) -> str:
     if not is_valid_daily_sheet(kaynak_sayfa):
         return "❌ Kopyalanacak geçerli bir kaynak finans sayfası bulunamadı!"
         
-    # 3. Gerçek tam finans sayfasını kopyala (Tüm hücre ve formülleriyle birlikte)
+    # 3. Gerçek tam finans sayfasını kopyala
     yeni_sayfa = kaynak_sayfa.duplicate(new_sheet_name=hedef_yeni_tarih)
     veriler = kaynak_sayfa.get_all_values()
     
     toplam_devir = 0.0
     
-    # 4. SADECE VE SADECE 2'DEN 42'YE KADAR DEVİR VE TEMİZLİK DÖNGÜSÜ
+    # 4. TEK SEFERDE TOPLU MATRİS OLUŞTURMA (Batch Update - 429 Kota Hatasını %100 Önler)
+    # C2:E42 aralığı için 41 satırlık [Devir, Kasa, Ödenen] matrisi
+    matrix_c_e = []
     for r_idx in range(2, 43):
+        dunun_kalani = 0.0
         if r_idx - 1 < len(veriler):
             row = veriler[r_idx - 1]
             if len(row) >= 2:
                 grup = row[1].strip()
                 if grup and grup != "*" and "GENEL TOPLAM" not in grup.upper():
-                    dunun_kalani = guvenliSayi(row[6]) if len(row) > 6 else 0.0 # G Sütunu (Kalan Kasa)
-                    yeni_sayfa.update_cell(r_idx, 3, dunun_kalani) # C Sütunu (Devir/Borç)
-                    yeni_sayfa.update_cell(r_idx, 4, 0) # D Sütunu (Kasa Sıfırla)
-                    yeni_sayfa.update_cell(r_idx, 5, 0) # E Sütunu (Ödenen Sıfırla)
+                    dunun_kalani = guvenliSayi(row[6]) if len(row) > 6 else 0.0
                     toplam_devir += dunun_kalani
+        matrix_c_e.append([dunun_kalani, 0, 0])
+        
+    # Tek bir API çağrısıyla tüm 2-42 satırlarını anında güncelle
+    yeni_sayfa.update('C2:E42', matrix_c_e, value_input_option='USER_ENTERED')
                 
-    # 5. Masrafları Temizleme Seçimi (Sadece 2'den 42'ye kadar)
+    # 5. Masrafları Temizleme Seçimi (I2:J42 tek seferde toplu temizleme)
     if masraflari_sil and yeni_sayfa.col_count >= 10:
-        for r_idx in range(2, 43):
-            yeni_sayfa.update_cell(r_idx, 9, "")
-            yeni_sayfa.update_cell(r_idx, 10, "")
+        empty_masraf = [['', ''] for _ in range(41)]
+        yeni_sayfa.update('I2:J42', empty_masraf)
             
     sistemeLogYaz("Yeni Gün Geçişi", f"Yeni gün ({hedef_yeni_tarih}) açıldı. Kaynak: {kaynak_sayfa.title} | Devir: {paraFormatla(toplam_devir)}")
     
