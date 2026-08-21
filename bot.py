@@ -44,7 +44,7 @@ SCOPES = [
 
 def http_get_json(url: str, headers: dict = None) -> dict:
     req = urllib.request.Request(url, headers=headers or {"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=12) as response:
+    with urllib.request.urlopen(req, timeout=10) as response:
         return json.loads(response.read().decode("utf-8"))
 
 def telegram_api(method: str, payload: dict) -> dict:
@@ -328,7 +328,7 @@ def rehber_metni():
         "• <code>/log</code> veya <code>/son5</code> : Yapılan son işlemleri listeler.\n\n"
         "🌍 <b>EKSTRA ARAÇLAR</b>\n"
         "• <code>/canlikur</code> : 🌍 Dünya borsalarını ve kripto kurlarını getirir.\n"
-        "• <code>/kur</code> : 🟡 Anlık USDT kurlarını listeler.\n"
+        "• <code>/kur</code> : 🟡 Anlık USDT kurlarını listeler (Binance, Paribu, BtcTurk, WhiteBIT, OKX).\n"
         "• <code>/iban</code> : 🏦 Kullanımdaki ve boşta olan İBAN'ları listeler.\n"
         "• <code>/çeviri [Metin]</code> : 🌐 Otomatik çeviri yapar.\n"
         "• <code>/hesap SACİD 2 48.00</code> : Tether / Kasa hesap makinesi.\n"
@@ -580,20 +580,76 @@ def masrafRaporuUret_impl() -> str:
     )
     return mesaj
 
+def f_tl(val) -> str:
+    try:
+        s = f"{float(val):.2f}"
+        return s.replace(".", ",") + " ₺"
+    except:
+        return "- ₺"
+
 def kurRaporuUret_impl() -> str:
-    yanit = "📊 <b>GÜNCEL KRİPTO KURLARI</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
+    yanit = "📊 <b>GÜNCEL KURLAR</b>\n\n"
+    
+    # 1. Binance
     try:
         r = http_get_json("https://data-api.binance.vision/api/v3/ticker/24hr?symbol=USDTTRY")
-        yanit += f"🟡 <b>BİNANCE USDT/TRY</b>\n💵 Anlık: {float(r['lastPrice']):.2f} ₺ | 🔺 Yüksek: {float(r['highPrice']):.2f} ₺ | 🔻 Düşük: {float(r['lowPrice']):.2f} ₺\n\n"
-    except: yanit += "🟡 <b>BİNANCE USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
+        yanit += (
+            f"🟡 <b>BİNANCE USDT/TRY</b>\n"
+            f"💵 Anlık Kur: {f_tl(r.get('lastPrice'))}\n"
+            f"🔺 24saat En Yüksek: {f_tl(r.get('highPrice'))}\n"
+            f"🔻 24saat En Düşük: {f_tl(r.get('lowPrice'))}\n\n"
+        )
+    except Exception as e:
+        yanit += "🟡 <b>BİNANCE USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
+
+    # 2. Paribu
     try:
         r = http_get_json("https://www.paribu.com/ticker")["USDT_TL"]
-        yanit += f"🔵 <b>PARİBU USDT/TRY</b>\n💵 Anlık: {float(r['last']):.2f} ₺ | 🔺 Yüksek: {float(r['high24hr']):.2f} ₺ | 🔻 Düşük: {float(r['low24hr']):.2f} ₺\n\n"
-    except: yanit += "🔵 <b>PARİBU USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
+        yanit += (
+            f"🔵 <b>PARİBU USDT/TRY</b>\n"
+            f"💵 Anlık Kur: {f_tl(r.get('last'))}\n"
+            f"🔺 24saat En Yüksek: {f_tl(r.get('high24hr'))}\n"
+            f"🔻 24saat En Düşük: {f_tl(r.get('low24hr'))}\n\n"
+        )
+    except Exception as e:
+        yanit += "🔵 <b>PARİBU USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
+
+    # 3. BtcTurk
     try:
         r = http_get_json("https://api.btcturk.com/api/v2/ticker?pairSymbol=USDT_TRY")["data"][0]
-        yanit += f"🟢 <b>BTCTÜRK USDT/TRY</b>\n💵 Anlık: {float(r['last']):.2f} ₺ | 🔺 Yüksek: {float(r['high']):.2f} ₺ | 🔻 Düşük: {float(r['low']):.2f} ₺\n\n"
-    except: yanit += "🟢 <b>BTCTÜRK USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
+        yanit += (
+            f"🟢 <b>BTCTÜRK USDT/TRY</b>\n"
+            f"💵 Anlık Kur: {f_tl(r.get('last'))}\n"
+            f"🔺 24saat En Yüksek: {f_tl(r.get('high'))}\n"
+            f"🔻 24saat En Düşük: {f_tl(r.get('low'))}\n\n"
+        )
+    except Exception as e:
+        yanit += "🟢 <b>BTCTÜRK USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
+
+    # 4. WhiteBIT
+    try:
+        r = http_get_json("https://whitebit.com/api/v1/public/ticker?market=USDT_TRY")["result"]
+        yanit += (
+            f"⚪ <b>WHITEBIT USDT/TRY</b>\n"
+            f"💵 Anlık Kur: {f_tl(r.get('last'))}\n"
+            f"🔺 24saat En Yüksek: {f_tl(r.get('high'))}\n"
+            f"🔻 24saat En Düşük: {f_tl(r.get('low'))}\n\n"
+        )
+    except Exception as e:
+        yanit += "⚪ <b>WHITEBIT USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
+
+    # 5. OKX
+    try:
+        r = http_get_json("https://www.okx.com/api/v5/market/ticker?instId=USDT-TRY")["data"][0]
+        yanit += (
+            f"⚫ <b>OKX USDT/TRY</b>\n"
+            f"💵 Anlık Kur: {f_tl(r.get('last'))}\n"
+            f"🔺 24saat En Yüksek: {f_tl(r.get('high24h'))}\n"
+            f"🔻 24saat En Düşük: {f_tl(r.get('low24h'))}\n\n"
+        )
+    except Exception as e:
+        pass
+
     return yanit.strip()
 
 def canliKurSorgula_impl() -> str:
