@@ -64,6 +64,14 @@ def telegramMesajGonder(chat_id, metin: str, reply_markup=None):
         payload["reply_markup"] = reply_markup
     return telegram_api("sendMessage", payload)
 
+def telegramFotoGonder(chat_id, foto_url: str, caption: str = None, reply_markup=None):
+    payload = {"chat_id": chat_id, "photo": foto_url, "parse_mode": "HTML"}
+    if caption:
+        payload["caption"] = caption
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+    return telegram_api("sendPhoto", payload)
+
 def telegramMesajSil(chat_id, message_id):
     return telegram_api("deleteMessage", {"chat_id": chat_id, "message_id": message_id})
 
@@ -326,12 +334,13 @@ def rehber_metni():
         "• <code>/rapor</code> : Tüm grupların güncel durum raporu.\n"
         "• <code>/ozet</code> : Kasa, Masraf ve Ödenen hızlı finans özeti.\n"
         "• <code>/log</code> veya <code>/son5</code> : Yapılan son işlemleri listeler.\n\n"
-        "🌍 <b>EKSTRA ARAÇLAR</b>\n"
-        "• <code>/canlikur</code> : 🌍 Dünya borsalarını ve kripto kurlarını getirir.\n"
+        "🌍 <b>EKSTRA ARAÇLAR & KRİPTO</b>\n"
+        "• <code>/qr [Cüzdan Adresi]</code> : ⚡ Borsa/Tron cüzdan adresini anında QR koda çevirir.\n"
         "• <code>/kur</code> : 🟡 Anlık USDT kurlarını listeler (Binance, Paribu, BtcTurk, WhiteBIT, OKX).\n"
+        "• <code>/canlikur</code> : 🌍 Dünya borsalarını ve döviz kurlarını getirir.\n"
         "• <code>/iban</code> : 🏦 Kullanımdaki ve boşta olan İBAN'ları listeler.\n"
-        "• <code>/çeviri [Metin]</code> : 🌐 Otomatik çeviri yapar.\n"
         "• <code>/hesap SACİD 2 48.00</code> : Tether / Kasa hesap makinesi.\n"
+        "• <code>/çeviri [Metin]</code> : 🌐 Otomatik çeviri yapar.\n"
         "• <code>/not [Metin]</code> : Şirket ajandasına not ekler.\n"
         "• <code>/notlar</code> : Son notları listeler.\n"
         "• <code>/panel</code> : Canlı CFO Web Dashboard linkini verir.\n"
@@ -681,6 +690,55 @@ def canliKurSorgula_impl() -> str:
         )
     except Exception as e:
         return f"❌ <b>API Hatası:</b> {e}"
+
+def cuzdanQrUret_impl(chat_id: int, komut_metni: str):
+    parcalar = komut_metni.strip().split()
+    if len(parcalar) < 2:
+        telegramMesajGonder(
+            chat_id,
+            "⚠️ <b>Hatalı Kullanım!</b>\n"
+            "Lütfen QR koda dönüştürmek istediğiniz borsa/cüzdan adresini girin.\n\n"
+            "📌 <b>Örnek Kullanım:</b>\n"
+            "<code>/qr TQHuwJh5c4ygbKhfFoGqTZTahjQuJAX3iV</code>"
+        )
+        return
+        
+    cuzdan_adresi = parcalar[1].strip()
+    if len(cuzdan_adresi) < 10:
+        telegramMesajGonder(chat_id, "⚠️ <b>Geçersiz Cüzdan Adresi:</b> Lütfen geçerli bir borsa veya cüzdan adresi giriniz.")
+        return
+
+    # Tronscan & Ağ Tespiti
+    is_tron = cuzdan_adresi.startswith("T") and len(cuzdan_adresi) == 34
+    is_evm = cuzdan_adresi.startswith("0x") and len(cuzdan_adresi) == 42
+    
+    ag_adi = "TRON (TRC20)" if is_tron else ("Ethereum / BSC (EVM)" if is_evm else "Kripto Cüzdanı")
+    kesif_url = f"https://tronscan.org/#/address/{cuzdan_adresi}" if is_tron else (f"https://etherscan.io/address/{cuzdan_adresi}" if is_evm else f"https://tronscan.org/#/address/{cuzdan_adresi}")
+    
+    qr_foto_url = f"https://api.qrserver.com/v1/create-qr-code/?size=500x500&data={urllib.parse.quote(cuzdan_adresi)}&margin=15"
+    
+    caption = (
+        f"⚡ <b>CÜZDAN ADRESİ QR KODU</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🌐 <b>Ağ Türü:</b> {ag_adi}\n\n"
+        f"📌 <b>Cüzdan Adresi:</b>\n"
+        f"<code>{cuzdan_adresi}</code>\n\n"
+        f"🔍 <b>Ağ İnceleme:</b> <a href=\"{kesif_url}\">Tronscan Explorer</a>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 <i>Adresi kopyalamak için üzerine dokunabilirsiniz.</i>"
+    )
+    
+    klavye = {
+        "inline_keyboard": [
+            [{"text": "🔍 Tronscan'de İncele", "url": kesif_url}]
+        ]
+    }
+    
+    res = telegramFotoGonder(chat_id, qr_foto_url, caption, klavye)
+    if not res.get("ok"):
+        # Yedek QR servisi
+        fallback_qr = f"https://quickchart.io/qr?text={urllib.parse.quote(cuzdan_adresi)}&size=500&margin=2"
+        telegramFotoGonder(chat_id, fallback_qr, caption, klavye)
 
 def hesapMakinesi_impl(orijinalMetin: str) -> str:
     args = orijinalMetin.strip().split()
@@ -1045,6 +1103,10 @@ def process_telegram_update(update: dict):
         is_group = chat_id < 0
 
         if not text.startswith("/"):
+            # Kullanıcı doğrudan Tron adresi yapıştırdıysa otomatik QR oluştur
+            if (text.startswith("T") and len(text) == 34) or (text.startswith("0x") and len(text) == 42):
+                if yetkili_mi(user_id):
+                    cuzdanQrUret_impl(chat_id, f"/qr {text}")
             return
 
         komut_parcalari = text.split()
@@ -1072,6 +1134,8 @@ def process_telegram_update(update: dict):
             telegramMesajGonder(chat_id, "👋 <b>CFO ve Finans Yönetim Botu</b>\nLütfen bir işlem seçin:\n\n👨💻 <i>Yazılım: @CRYPTOATAKAN © 2026</i>", menuKlavyesiOlustur(is_group))
         elif ana_komut in ["/rehber", "/komutlar", "/yardim", "/yardım"]:
             telegramMesajGonder(chat_id, rehber_metni())
+        elif ana_komut in ["/qr", "/tronqr", "/tron", "/cuzdan", "/cüzdan", "/adres"]:
+            cuzdanQrUret_impl(chat_id, text)
         elif ana_komut == "/panel":
             panel_btn = {"inline_keyboard": [[{"text": "🚀 Canlı CFO Panelini Aç", "url": WEB_APP_URL}]]}
             telegramMesajGonder(
