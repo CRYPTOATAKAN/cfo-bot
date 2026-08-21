@@ -20,9 +20,6 @@ TR_TZ = datetime.timezone(datetime.timedelta(hours=3))
 def suankiZamaniAl():
     return datetime.datetime.now(TR_TZ)
 
-def bugununTarihiniAl():
-    return suankiZamaniAl().strftime("%d.%m.%Y")
-
 # --- AYARLAR & SABİTLER ---
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8629756462:AAHSn66-SVOZzWp_UrBj36bHjF1hpts5bco")
 KURUCU_ID = int(os.environ.get("KURUCU_ID", "8395730761"))
@@ -100,6 +97,48 @@ def get_spreadsheet():
     gc = get_gspread_client()
     return gc.open_by_key(SPREADSHEET_ID)
 
+def is_valid_daily_sheet(ws) -> bool:
+    """Bir sayfanın gerçek ana kasa tablosu (en az 8 sütun ve 30 satır) olup olmadığını doğrular."""
+    if ws.title in [LOG_SAYFASI, "NOTLAR", "YEDEK", ADMIN_SAYFASI]:
+        return False
+    try:
+        if ws.col_count < 8 or ws.row_count < 30:
+            return False
+        return True
+    except:
+        return False
+
+def get_active_daily_sheet(sh) -> gspread.Worksheet:
+    """Excel tablosundaki en son tarihli aktif çalışma sayfasını bulur."""
+    tum_ws = sh.worksheets()
+    tarih_sayfalari = []
+    
+    for ws in tum_ws:
+        if is_valid_daily_sheet(ws) and re.match(r'^\d{2}\.\d{2}\.\d{4}$', ws.title):
+            try:
+                t_obj = datetime.datetime.strptime(ws.title, "%d.%m.%Y")
+                tarih_sayfalari.append((t_obj, ws))
+            except: pass
+            
+    if tarih_sayfalari:
+        tarih_sayfalari.sort(key=lambda x: x[0], reverse=True)
+        return tarih_sayfalari[0][1]
+        
+    for ws in tum_ws:
+        if is_valid_daily_sheet(ws):
+            return ws
+            
+    return tum_ws[0]
+
+def bugununTarihiniAl() -> str:
+    """Aktif en son sayfanın adını döner."""
+    try:
+        sh = get_spreadsheet()
+        ws = get_active_daily_sheet(sh)
+        return ws.title
+    except:
+        return suankiZamaniAl().strftime("%d.%m.%Y")
+
 def normalize_text(text: str) -> str:
     """Türkçe harf duyarlılığını ve büyük/küçük harf farklarını %100 kusursuz eşitler."""
     if not text: return ""
@@ -145,7 +184,6 @@ def guvenliSayi(deger) -> float:
     metin = str(deger).strip()
     if metin in ["", "-"]: return 0.0
     
-    # Eksi kontrolü (-50 veya (50))
     eksi_mi = "-" in metin or (metin.startswith("(") and metin.endswith(")"))
     temiz = re.sub(r"[^0-9,.]", "", metin)
     
@@ -252,7 +290,7 @@ def menuKlavyesiOlustur(isGroup: bool):
     ]
     try:
         sh = get_spreadsheet()
-        sayfa = sh.worksheet(bugununTarihiniAl())
+        sayfa = get_active_daily_sheet(sh)
         tum_satirlar = sayfa.get_all_values()
         eklenen = set()
         for r in tum_satirlar[1:]:
@@ -284,7 +322,7 @@ def rehber_metni():
         "• <code>/masraf</code> : Günlük masraf listesini döker.\n"
         "• <code>/gerial</code> : En son işlemi geri alır.\n\n"
         "📊 <b>GÜNLÜK DÖNGÜ VE RAPORLAR</b>\n"
-        "• <code>/yenigun</code> : 🌅 Yeni gün sayfasını açar, devirleri aktarır.\n"
+        "• <code>/yenigun</code> : 🌅 Yeni gün sayfasını açar, dünün Kalan Kasasını Devir'e aktarır.\n"
         "• <code>/rapor</code> : Tüm grupların güncel durum raporu.\n"
         "• <code>/ozet</code> : Kasa, Masraf ve Ödenen hızlı finans özeti.\n"
         "• <code>/log</code> veya <code>/son5</code> : Yapılan son işlemleri listeler.\n\n"
@@ -327,7 +365,7 @@ def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int) 
     hedef_norm = normalize_text(grup_ham)
     
     sh = get_spreadsheet()
-    sayfa = sh.worksheet(bugununTarihiniAl())
+    sayfa = get_active_daily_sheet(sh)
     tum_veriler = sayfa.get_all_values()
     
     for i, row in enumerate(tum_veriler[1:], start=2):
@@ -337,7 +375,7 @@ def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int) 
             sayfa.update_cell(i, sutun_idx, yeni_val)
             
             app_state["SON_ISLEM"] = {
-                "sayfa": bugununTarihiniAl(), "satir": i, "sutun": sutun_idx,
+                "sayfa": sayfa.title, "satir": i, "sutun": sutun_idx,
                 "eskiDeger": mevcut_val, "grupAdi": row[1], "islemTuru": isim
             }
             sistemeLogYaz(isim, f"{row[1].upper()} | {paraFormatla(tutar * carp)}")
@@ -366,7 +404,7 @@ def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
     hedef_norm = normalize_text(masraf_ham)
     
     sh = get_spreadsheet()
-    sayfa = sh.worksheet(bugununTarihiniAl())
+    sayfa = get_active_daily_sheet(sh)
     tum_veriler = sayfa.get_all_values()
     
     for i, row in enumerate(tum_veriler[1:], start=2):
@@ -376,7 +414,7 @@ def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
             mevcut = guvenliSayi(col_j)
             yeni = mevcut + (tutar * carp)
             sayfa.update_cell(i, 10, yeni)
-            app_state["SON_ISLEM"] = {"sayfa": bugununTarihiniAl(), "satir": i, "sutun": 10, "eskiDeger": mevcut, "grupAdi": col_i, "islemTuru": isim}
+            app_state["SON_ISLEM"] = {"sayfa": sayfa.title, "satir": i, "sutun": 10, "eskiDeger": mevcut, "grupAdi": col_i, "islemTuru": isim}
             sistemeLogYaz(isim, f"{col_i} | {paraFormatla(tutar * carp)}")
             return f"✅ <b>{isim} Başarılı!</b>\n📉 Masraf Kalemi: <b>{col_i}</b>\n💵 İşlem Tutarı: <b>{paraFormatla(tutar * carp)}</b>\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
             
@@ -388,7 +426,7 @@ def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
             break
     sayfa.update_cell(bos_satir, 9, masraf_ham.upper())
     sayfa.update_cell(bos_satir, 10, tutar)
-    app_state["SON_ISLEM"] = {"sayfa": bugununTarihiniAl(), "satir": bos_satir, "sutun": 10, "eskiDeger": 0, "grupAdi": masraf_ham, "islemTuru": "Yeni Masraf Ekleme"}
+    app_state["SON_ISLEM"] = {"sayfa": sayfa.title, "satir": bos_satir, "sutun": 10, "eskiDeger": 0, "grupAdi": masraf_ham, "islemTuru": "Yeni Masraf Ekleme"}
     sistemeLogYaz("Yeni Masraf Ekleme", f"{masraf_ham} | {paraFormatla(tutar)}")
     return f"✅ <b>Yeni Masraf Oluşturuldu!</b>\n📉 Masraf Kalemi: <b>{masraf_ham.upper()}</b>\n💵 Tutar: <b>{paraFormatla(tutar)}</b>\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
 
@@ -447,7 +485,7 @@ def tablodan_finans_ozeti_hesapla(veriler: List[List[str]]) -> Dict[str, Any]:
 
 def hizliOzetUret_impl() -> str:
     sh = get_spreadsheet()
-    sayfa = sh.worksheet(bugununTarihiniAl())
+    sayfa = get_active_daily_sheet(sh)
     veriler = sayfa.get_all_values()
     
     finans = tablodan_finans_ozeti_hesapla(veriler)
@@ -456,7 +494,7 @@ def hizliOzetUret_impl() -> str:
     return (
         f"📊 <b>GÜNLÜK FİNANS BİLANÇOSU</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📅 Tarih: {bugununTarihiniAl()} | ⏰ Saat: {saat}\n"
+        f"📅 Tarih: {sayfa.title} | ⏰ Saat: {saat}\n"
         f"🏢 Aktif Grup Sayısı: {len(finans['aktif_gruplar'])}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n"
         f"🔄 Toplam Devir: {paraFormatla(finans['devir'])}\n"
@@ -471,7 +509,7 @@ def hizliOzetUret_impl() -> str:
 
 def tumGruplarRaporu_impl() -> str:
     sh = get_spreadsheet()
-    sayfa = sh.worksheet(bugununTarihiniAl())
+    sayfa = get_active_daily_sheet(sh)
     veriler = sayfa.get_all_values()
     
     finans = tablodan_finans_ozeti_hesapla(veriler)
@@ -480,7 +518,7 @@ def tumGruplarRaporu_impl() -> str:
     mesaj = (
         f"📊 <b>GÜNLÜK DETAYLI GRUP RAPORU</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📅 Tarih: {bugununTarihiniAl()} | ⏰ Saat: {saat}\n"
+        f"📅 Tarih: {sayfa.title} | ⏰ Saat: {saat}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n"
     )
     
@@ -513,7 +551,7 @@ def tumGruplarRaporu_impl() -> str:
 
 def masrafRaporuUret_impl() -> str:
     sh = get_spreadsheet()
-    sayfa = sh.worksheet(bugununTarihiniAl())
+    sayfa = get_active_daily_sheet(sh)
     veriler = sayfa.get_all_values()
     masraflar = []
     toplam = 0.0
@@ -529,7 +567,7 @@ def masrafRaporuUret_impl() -> str:
         return "📭 <b>Bugün için kaydedilmiş bir masraf bulunmuyor.</b>"
     masraflar.sort(key=lambda x: x["fiyat"], reverse=True)
     mesaj = (
-        f"📉 <b>{bugununTarihiniAl()} GÜNLÜK GİDER TABLOSU</b>\n"
+        f"📉 <b>{sayfa.title} GÜNLÜK GİDER TABLOSU</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n"
     )
     for m in masraflar:
@@ -601,7 +639,7 @@ def hesapMakinesi_impl(orijinalMetin: str) -> str:
     komisyonOrani = float(komisyonStr.replace(",", "."))
     
     sh = get_spreadsheet()
-    sayfa = sh.worksheet(bugununTarihiniAl())
+    sayfa = get_active_daily_sheet(sh)
     veriler = sayfa.get_all_values()
     
     grupBulundu = False
@@ -651,7 +689,7 @@ def hesapMakinesi_impl(orijinalMetin: str) -> str:
 
 def ibanListesiGetir_impl() -> str:
     sh = get_spreadsheet()
-    sayfa = sh.worksheet(bugununTarihiniAl())
+    sayfa = get_active_daily_sheet(sh)
     veriler = sayfa.get_all_values()
     bosta, dolu = [], []
     for row in veriler[1:]:
@@ -690,7 +728,19 @@ def metinCevir_impl(gelenMetin: str) -> str:
     except Exception as e:
         return f"❌ <b>Çeviri Hatası:</b> {e}"
 
+# --- YENİ GÜN GEÇİŞİ (2-42 DÖNGÜSÜ & DİNAMİK İLERİ TARİH) ---
 def yenigun_baslat_mesaji():
+    sh = get_spreadsheet()
+    kaynak_sayfa = get_active_daily_sheet(sh)
+    
+    # Dinamik İleri Tarih: Son sayfa adına +1 gün ekle
+    hedef_tarih = suankiZamaniAl().strftime("%d.%m.%Y")
+    if re.match(r'^\d{2}\.\d{2}\.\d{4}$', kaynak_sayfa.title):
+        try:
+            d_obj = datetime.datetime.strptime(kaynak_sayfa.title, "%d.%m.%Y")
+            hedef_tarih = (d_obj + datetime.timedelta(days=1)).strftime("%d.%m.%Y")
+        except: pass
+
     klavye = {
         "inline_keyboard": [
             [{"text": "🔄 Masrafları Temizle & Yeni Güne Geç", "callback_data": "yenigun_onay_sil"}],
@@ -699,73 +749,73 @@ def yenigun_baslat_mesaji():
         ]
     }
     return (
-        f"🌅 <b>YENİ GÜN DEVİR İŞLEMİ ({bugununTarihiniAl()})</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
-        "Bugünün sayfası açılacak, dün kalan bakiyeler **Devir** sütununa otomatik aktarılacaktır.\n\n"
+        f"🌅 <b>YENİ GÜN DEVİR İŞLEMİ ➔ {hedef_tarih}</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"📁 <b>Kaynak Sayfa:</b> <code>{kaynak_sayfa.title}</code>\n"
+        f"📅 <b>Açılacak Yeni Sayfa:</b> <code>{hedef_tarih}</code>\n\n"
+        "1. Dünkü <b>Kalan Kasa</b> (G sütunu) tutarları bugünkü <b>Devir</b> (C sütunu) hanesine aktarılacaktır.\n"
+        "2. <b>Güncel Kasa</b> (D) ve <b>Ödenen</b> (E) sütunları sıfırlanacaktır (2-42. Satırlar).\n\n"
         "Lütfen masraf tercihinizi seçin:",
         klavye
     )
 
 def yenigun_gerceklestir_impl(masraflari_sil: bool) -> str:
     sh = get_spreadsheet()
-    yeniTarih = bugununTarihiniAl()
+    kaynak_sayfa = get_active_daily_sheet(sh)
     
+    # 1. Dinamik İleri Tarih Hesaplama (+1 Gün)
+    hedef_yeni_tarih = suankiZamaniAl().strftime("%d.%m.%Y")
+    if re.match(r'^\d{2}\.\d{2}\.\d{4}$', kaynak_sayfa.title):
+        try:
+            d_obj = datetime.datetime.strptime(kaynak_sayfa.title, "%d.%m.%Y")
+            hedef_yeni_tarih = (d_obj + datetime.timedelta(days=1)).strftime("%d.%m.%Y")
+        except: pass
+        
+    # 2. Eğer hedef sayfa adı önceden bozuk (küçük 7x2) olarak açılmışsa onu temizle
     try:
-        sh.worksheet(yeniTarih)
-        return f"⚠️ <b>{yeniTarih}</b> tarihli sayfa zaten mevcut! Gün içinde mükerrer sayfa açılamaz."
+        mevcut_sayfa = sh.worksheet(hedef_yeni_tarih)
+        if mevcut_sayfa.col_count < 8 or mevcut_sayfa.row_count < 30:
+            sh.del_worksheet(mevcut_sayfa)
+        else:
+            return f"⚠️ <b>{hedef_yeni_tarih}</b> tarihli sayfa zaten mevcut ve kullanımda!"
     except gspread.exceptions.WorksheetNotFound:
         pass
         
-    tum_sayfalar = sh.worksheets()
-    kaynak_sayfa = None
-    
-    # Tarih formatında (GG.AA.YYYY) olan en son sayfayı kaynak (dünkü sayfa) olarak seç
-    tarih_sayfalari = []
-    for ws in tum_sayfalar:
-        if re.match(r'^\d{2}\.\d{2}\.\d{4}$', ws.title):
-            try:
-                t_obj = datetime.datetime.strptime(ws.title, "%d.%m.%Y")
-                tarih_sayfalari.append((t_obj, ws))
-            except: pass
-            
-    if tarih_sayfalari:
-        tarih_sayfalari.sort(key=lambda x: x[0], reverse=True)
-        kaynak_sayfa = tarih_sayfalari[0][1]
-    else:
-        for ws in tum_sayfalar:
-            if ws.title not in [LOG_SAYFASI, "NOTLAR", "YEDEK", ADMIN_SAYFASI]:
-                kaynak_sayfa = ws
-                break
-            
-    if not kaynak_sayfa:
-        return "❌ Kopyalanacak dünkü şablon sayfa bulunamadı!"
+    if not is_valid_daily_sheet(kaynak_sayfa):
+        return "❌ Kopyalanacak geçerli bir kaynak finans sayfası bulunamadı!"
         
-    yeni_sayfa = kaynak_sayfa.duplicate(new_sheet_name=yeniTarih)
-    veriler = yeni_sayfa.get_all_values()
+    # 3. Gerçek tam finans sayfasını kopyala (Tüm hücre ve formülleriyle birlikte)
+    yeni_sayfa = kaynak_sayfa.duplicate(new_sheet_name=hedef_yeni_tarih)
+    veriler = kaynak_sayfa.get_all_values()
     
     toplam_devir = 0.0
-    for r_idx, row in enumerate(veriler[1:], start=2):
-        if r_idx > 42: break
-        if len(row) >= 7:
-            grup = row[1].strip()
-            if grup and grup != "*" and "GENEL TOPLAM" not in grup.upper():
-                dunun_kalani = guvenliSayi(row[6]) # G Sütunu (Dünkü Kalan)
-                yeni_sayfa.update_cell(r_idx, 3, dunun_kalani) # C Sütunu (Bugünkü Devir)
-                yeni_sayfa.update_cell(r_idx, 4, 0) # D Sütunu (Kasa Sıfırla)
-                yeni_sayfa.update_cell(r_idx, 5, 0) # E Sütunu (Ödenen Sıfırla)
-                toplam_devir += dunun_kalani
+    
+    # 4. SADECE VE SADECE 2'DEN 42'YE KADAR DEVİR VE TEMİZLİK DÖNGÜSÜ
+    for r_idx in range(2, 43):
+        if r_idx - 1 < len(veriler):
+            row = veriler[r_idx - 1]
+            if len(row) >= 2:
+                grup = row[1].strip()
+                if grup and grup != "*" and "GENEL TOPLAM" not in grup.upper():
+                    dunun_kalani = guvenliSayi(row[6]) if len(row) > 6 else 0.0 # G Sütunu (Kalan Kasa)
+                    yeni_sayfa.update_cell(r_idx, 3, dunun_kalani) # C Sütunu (Devir/Borç)
+                    yeni_sayfa.update_cell(r_idx, 4, 0) # D Sütunu (Kasa Sıfırla)
+                    yeni_sayfa.update_cell(r_idx, 5, 0) # E Sütunu (Ödenen Sıfırla)
+                    toplam_devir += dunun_kalani
                 
-    if masraflari_sil:
-        for r_idx in range(2, 40):
+    # 5. Masrafları Temizleme Seçimi (Sadece 2'den 42'ye kadar)
+    if masraflari_sil and yeni_sayfa.col_count >= 10:
+        for r_idx in range(2, 43):
             yeni_sayfa.update_cell(r_idx, 9, "")
             yeni_sayfa.update_cell(r_idx, 10, "")
             
-    sistemeLogYaz("Yeni Gün Geçişi", f"Yeni gün sayfası ({yeniTarih}) açıldı. Devir: {paraFormatla(toplam_devir)}")
+    sistemeLogYaz("Yeni Gün Geçişi", f"Yeni gün ({hedef_yeni_tarih}) açıldı. Kaynak: {kaynak_sayfa.title} | Devir: {paraFormatla(toplam_devir)}")
+    
     return (
-        f"🌅 <b>{yeniTarih} GÜNÜ BAŞARIYLA AÇILDI!</b>\n"
+        f"🌅 <b>{hedef_yeni_tarih} GÜNÜ BAŞARIYLA AÇILDI!</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📁 <b>Kaynak Sayfa:</b> {kaynak_sayfa.title}\n"
-        f"🔄 <b>Aktarılan Toplam Devir:</b> {paraFormatla(toplam_devir)}\n"
-        f"💰 <b>Kasa ve Ödenen:</b> Sıfırlandı (Yeni güne hazır)\n"
+        f"📁 <b>Kaynak Alınan Gün:</b> <code>{kaynak_sayfa.title}</code>\n"
+        f"🔄 <b>Devir'e Aktarılan Kalan Kasa:</b> {paraFormatla(toplam_devir)}\n"
+        f"💰 <b>Kasa ve Ödenen (2-42. Satırlar):</b> Sıfırlandı\n"
         f"📉 <b>Masraflar:</b> {'Temizlendi' if masraflari_sil else 'Korundu'}\n\n"
         f"İyi çalışmalar ve bol kazançlar dileriz! 🚀"
     )
@@ -887,7 +937,7 @@ def process_telegram_update(update: dict):
             hedef_norm = normalize_text(grup)
             def tek_grup_rapor(grup_adi):
                 sh = get_spreadsheet()
-                sayfa = sh.worksheet(bugununTarihiniAl())
+                sayfa = get_active_daily_sheet(sh)
                 veriler = sayfa.get_all_values()
                 for row in veriler[1:]:
                     if len(row) >= 2 and normalize_text(row[1]) == hedef_norm:
@@ -898,7 +948,7 @@ def process_telegram_update(update: dict):
                         return (
                             f"{emoji} <b>{row[1].upper()} KASA ANALİZİ</b>\n"
                             f"━━━━━━━━━━━━━━━━━━━━\n"
-                            f"📅 Tarih: {bugununTarihiniAl()}\n"
+                            f"📅 Tarih: {sayfa.title}\n"
                             f"━━━━━━━━━━━━━━━━━━━━\n"
                             f"🔄 Devir: {paraFormatla(devir)}\n"
                             f"💰 Kasa: {paraFormatla(kasa)}\n"
@@ -1204,11 +1254,11 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
             self.end_headers()
             try:
                 sh = get_spreadsheet()
-                sayfa = sh.worksheet(bugununTarihiniAl())
+                sayfa = get_active_daily_sheet(sh)
                 veriler = sayfa.get_all_values()
                 finans = tablodan_finans_ozeti_hesapla(veriler)
                 data = {
-                    "tarih": bugununTarihiniAl(),
+                    "tarih": sayfa.title,
                     "devir": finans["devir"],
                     "kasa": finans["kasa"],
                     "odenen": finans["odenen"],
