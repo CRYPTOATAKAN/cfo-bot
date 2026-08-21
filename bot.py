@@ -14,6 +14,15 @@ from typing import Optional, Dict, Any, List, Tuple, Set
 import gspread
 from google.oauth2.service_account import Credentials
 
+# --- TÜRKİYE SAAT DİLİMİ (UTC+3) ---
+TR_TZ = datetime.timezone(datetime.timedelta(hours=3))
+
+def suankiZamaniAl():
+    return datetime.datetime.now(TR_TZ)
+
+def bugununTarihiniAl():
+    return suankiZamaniAl().strftime("%d.%m.%Y")
+
 # --- AYARLAR & SABİTLER ---
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8629756462:AAHSn66-SVOZzWp_UrBj36bHjF1hpts5bco")
 KURUCU_ID = int(os.environ.get("KURUCU_ID", "8395730761"))
@@ -91,11 +100,8 @@ def get_spreadsheet():
     gc = get_gspread_client()
     return gc.open_by_key(SPREADSHEET_ID)
 
-def bugununTarihiniAl():
-    return datetime.datetime.now().strftime("%d.%m.%Y")
-
 def normalize_text(text: str) -> str:
-    """Türkçe harf duyarlılığını ve büyük/küçük harf farklarını (SACİD, sacid, sacıd, SACID) %100 kusursuz eşitler."""
+    """Türkçe harf duyarlılığını ve büyük/küçük harf farklarını %100 kusursuz eşitler."""
     if not text: return ""
     t = str(text).strip()
     t = unicodedata.normalize("NFKD", t)
@@ -193,7 +199,7 @@ def sistemeLogYaz(islemAdi: str, detay: str):
         except gspread.exceptions.WorksheetNotFound:
             logSayfasi = sh.add_worksheet(title=LOG_SAYFASI, rows=500, cols=5)
             logSayfasi.append_row(["Tarih/Saat", "İşlem Türü", "İşlem Detayı"])
-        tarihSaat = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
+        tarihSaat = suankiZamaniAl().strftime("%d.%m.%Y %H:%M")
         logSayfasi.append_row([tarihSaat, islemAdi, detay])
     except Exception as e:
         print(f"Log hatası: {e}")
@@ -387,7 +393,6 @@ def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
     return f"✅ <b>Yeni Masraf Oluşturuldu!</b>\n📉 Masraf Kalemi: <b>{masraf_ham.upper()}</b>\n💵 Tutar: <b>{paraFormatla(tutar)}</b>\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
 
 def tablodan_finans_ozeti_hesapla(veriler: List[List[str]]) -> Dict[str, Any]:
-    """Excel tablosundaki tüm grupları ve varsa Excel GENEL TOPLAM satırını %100 uyumlu hesaplar."""
     toplamDevir = toplamKasa = toplamOdenen = toplamKomisyon = toplamKalan = 0.0
     aktif_gruplar = []
     excel_toplam_satiri = None
@@ -446,7 +451,7 @@ def hizliOzetUret_impl() -> str:
     veriler = sayfa.get_all_values()
     
     finans = tablodan_finans_ozeti_hesapla(veriler)
-    saat = datetime.datetime.now().strftime("%H:%M")
+    saat = suankiZamaniAl().strftime("%H:%M")
     
     return (
         f"📊 <b>GÜNLÜK FİNANS BİLANÇOSU</b>\n"
@@ -470,7 +475,7 @@ def tumGruplarRaporu_impl() -> str:
     veriler = sayfa.get_all_values()
     
     finans = tablodan_finans_ozeti_hesapla(veriler)
-    saat = datetime.datetime.now().strftime("%H:%M")
+    saat = suankiZamaniAl().strftime("%H:%M")
     
     mesaj = (
         f"📊 <b>GÜNLÜK DETAYLI GRUP RAPORU</b>\n"
@@ -578,7 +583,7 @@ def canliKurSorgula_impl() -> str:
             f"🇯🇵 Japon Yeni (JPY): <code>{(try_rate / fiat.get('JPY', 1)):.2f} ₺</code>\n"
             f"🇸🇦 Suudi Riyali (SAR): <code>{(try_rate / fiat.get('SAR', 1)):.2f} ₺</code>\n"
             f"🇷🇺 Rus Rublesi (RUB): <code>{(try_rate / fiat.get('RUB', 1)):.2f} ₺</code>\n\n"
-            f"<i>⏱ Son Güncelleme: {datetime.datetime.now().strftime('%H:%M:%S')}</i>"
+            f"<i>⏱ Son Güncelleme: {suankiZamaniAl().strftime('%H:%M:%S')}</i>"
         )
     except Exception as e:
         return f"❌ <b>API Hatası:</b> {e}"
@@ -620,7 +625,7 @@ def hesapMakinesi_impl(orijinalMetin: str) -> str:
     usdtKarsiligi = netKasaTl / kur if kur > 0 else 0
     duzUsdt = int(round(usdtKarsiligi))
     
-    islemZamani = datetime.datetime.now().strftime("%d.%m.%Y | %H:%M")
+    islemZamani = suankiZamaniAl().strftime("%d.%m.%Y | %H:%M")
     mesaj = (
         f"🧮 <b>HESAP KESİM RAPORU</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -694,7 +699,7 @@ def yenigun_baslat_mesaji():
         ]
     }
     return (
-        "🌅 <b>YENİ GÜN DEVİR İŞLEMİ</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"🌅 <b>YENİ GÜN DEVİR İŞLEMİ ({bugununTarihiniAl()})</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
         "Bugünün sayfası açılacak, dün kalan bakiyeler **Devir** sütununa otomatik aktarılacaktır.\n\n"
         "Lütfen masraf tercihinizi seçin:",
         klavye
@@ -706,40 +711,64 @@ def yenigun_gerceklestir_impl(masraflari_sil: bool) -> str:
     
     try:
         sh.worksheet(yeniTarih)
-        return f"⚠️ <b>{yeniTarih}</b> tarihli sayfa zaten mevcut! Yeniden oluşturulamaz."
+        return f"⚠️ <b>{yeniTarih}</b> tarihli sayfa zaten mevcut! Gün içinde mükerrer sayfa açılamaz."
     except gspread.exceptions.WorksheetNotFound:
         pass
         
     tum_sayfalar = sh.worksheets()
     kaynak_sayfa = None
+    
+    # Tarih formatında (GG.AA.YYYY) olan en son sayfayı kaynak (dünkü sayfa) olarak seç
+    tarih_sayfalari = []
     for ws in tum_sayfalar:
-        if ws.title not in [LOG_SAYFASI, "NOTLAR", "YEDEK", ADMIN_SAYFASI]:
-            kaynak_sayfa = ws
-            break
+        if re.match(r'^\d{2}\.\d{2}\.\d{4}$', ws.title):
+            try:
+                t_obj = datetime.datetime.strptime(ws.title, "%d.%m.%Y")
+                tarih_sayfalari.append((t_obj, ws))
+            except: pass
+            
+    if tarih_sayfalari:
+        tarih_sayfalari.sort(key=lambda x: x[0], reverse=True)
+        kaynak_sayfa = tarih_sayfalari[0][1]
+    else:
+        for ws in tum_sayfalar:
+            if ws.title not in [LOG_SAYFASI, "NOTLAR", "YEDEK", ADMIN_SAYFASI]:
+                kaynak_sayfa = ws
+                break
             
     if not kaynak_sayfa:
-        return "❌ Kopyalanacak şablon sayfa bulunamadı!"
+        return "❌ Kopyalanacak dünkü şablon sayfa bulunamadı!"
         
     yeni_sayfa = kaynak_sayfa.duplicate(new_sheet_name=yeniTarih)
     veriler = yeni_sayfa.get_all_values()
     
+    toplam_devir = 0.0
     for r_idx, row in enumerate(veriler[1:], start=2):
-        if r_idx > 43: break
+        if r_idx > 42: break
         if len(row) >= 7:
             grup = row[1].strip()
             if grup and grup != "*" and "GENEL TOPLAM" not in grup.upper():
-                dunun_kalani = guvenliSayi(row[6])
-                yeni_sayfa.update_cell(r_idx, 3, dunun_kalani)
-                yeni_sayfa.update_cell(r_idx, 4, 0)
-                yeni_sayfa.update_cell(r_idx, 5, 0)
+                dunun_kalani = guvenliSayi(row[6]) # G Sütunu (Dünkü Kalan)
+                yeni_sayfa.update_cell(r_idx, 3, dunun_kalani) # C Sütunu (Bugünkü Devir)
+                yeni_sayfa.update_cell(r_idx, 4, 0) # D Sütunu (Kasa Sıfırla)
+                yeni_sayfa.update_cell(r_idx, 5, 0) # E Sütunu (Ödenen Sıfırla)
+                toplam_devir += dunun_kalani
                 
     if masraflari_sil:
         for r_idx in range(2, 40):
             yeni_sayfa.update_cell(r_idx, 9, "")
             yeni_sayfa.update_cell(r_idx, 10, "")
             
-    sistemeLogYaz("Yeni Gün Geçişi", f"Yeni gün sayfası ({yeniTarih}) açıldı.")
-    return f"🌅 <b>{yeniTarih} GÜNÜ BAŞARIYLA AÇILDI!</b>\n\n🔄 Dünün tüm kalan bakiyeleri Devir sütununa aktarıldı.\n💰 Kasa ve Ödenen alanları sıfırlandı.\n\nİyi çalışmalar dileriz! 🚀"
+    sistemeLogYaz("Yeni Gün Geçişi", f"Yeni gün sayfası ({yeniTarih}) açıldı. Devir: {paraFormatla(toplam_devir)}")
+    return (
+        f"🌅 <b>{yeniTarih} GÜNÜ BAŞARIYLA AÇILDI!</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📁 <b>Kaynak Sayfa:</b> {kaynak_sayfa.title}\n"
+        f"🔄 <b>Aktarılan Toplam Devir:</b> {paraFormatla(toplam_devir)}\n"
+        f"💰 <b>Kasa ve Ödenen:</b> Sıfırlandı (Yeni güne hazır)\n"
+        f"📉 <b>Masraflar:</b> {'Temizlendi' if masraflari_sil else 'Korundu'}\n\n"
+        f"İyi çalışmalar ve bol kazançlar dileriz! 🚀"
+    )
 
 # --- ADMİN YÖNETİM FONKSİYONLARI ---
 def admin_ekle_impl(komut_metni: str, ekleyen_id: int) -> str:
@@ -986,7 +1015,7 @@ def process_telegram_update(update: dict):
                 sh = get_spreadsheet()
                 try: not_sayfasi = sh.worksheet("NOTLAR")
                 except: not_sayfasi = sh.add_worksheet(title="NOTLAR", rows=500, cols=3)
-                now_str = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
+                now_str = suankiZamaniAl().strftime("%d.%m.%Y %H:%M")
                 not_sayfasi.append_row([now_str, not_metni])
                 return f"📓 <b>NOT KAYDEDİLDİ</b>\n🕒 {now_str}\n📝 <i>{not_metni}</i>"
             islemi_analiz_bildirimiyle_yap(chat_id, not_ekle_impl)
