@@ -728,7 +728,7 @@ def metinCevir_impl(gelenMetin: str) -> str:
     except Exception as e:
         return f"❌ <b>Çeviri Hatası:</b> {e}"
 
-# --- YENİ GÜN GEÇİŞİ (TEK SEFERDE TOPLU YAZMA - 429 KOTA KORUMALI) ---
+# --- YENİ GÜN GEÇİŞİ (KUSURSUZ MATEMATİK & KOTA KORUMALI) ---
 def yenigun_baslat_mesaji():
     sh = get_spreadsheet()
     kaynak_sayfa = get_active_daily_sheet(sh)
@@ -753,7 +753,7 @@ def yenigun_baslat_mesaji():
         f"📁 <b>Kaynak Sayfa:</b> <code>{kaynak_sayfa.title}</code>\n"
         f"📅 <b>Açılacak Yeni Sayfa:</b> <code>{hedef_tarih}</code>\n\n"
         "1. Dünkü <b>Kalan Kasa</b> (G sütunu) tutarları bugünkü <b>Devir</b> (C sütunu) hanesine aktarılacaktır.\n"
-        "2. <b>Güncel Kasa</b> (D) ve <b>Ödenen</b> (E) sütunları sıfırlanacaktır (2-42. Satırlar).\n\n"
+        "2. <b>Güncel Kasa (D), Ödenen (E) ve Komisyon (F)</b> sütunları tamamen sıfırlanacaktır (2-42. Satırlar).\n\n"
         "Lütfen masraf tercihinizi seçin:",
         klavye
     )
@@ -789,9 +789,10 @@ def yenigun_gerceklestir_impl(masraflari_sil: bool) -> str:
     
     toplam_devir = 0.0
     
-    # 4. TEK SEFERDE TOPLU MATRİS OLUŞTURMA (Batch Update - 429 Kota Hatasını %100 Önler)
-    # C2:E42 aralığı için 41 satırlık [Devir, Kasa, Ödenen] matrisi
-    matrix_c_e = []
+    # 4. KUSURSUZ MATEMATİKSEL DEVİR & SIFIRLAMA MATRİSİ: C2:F42 (4 Sütun: Devir, Kasa, Ödenen, Komisyon)
+    # Devir = Dünün Kalanı (G Sütunu), Kasa = 0, Ödenen = 0, Komisyon = 0
+    # Böylece Kalan formülü (=C+D-E-F) doğrudan Devir'e eşitlenir; dünün komisyonu mükerrer düşmez!
+    matrix_c_f = []
     for r_idx in range(2, 43):
         dunun_kalani = 0.0
         if r_idx - 1 < len(veriler):
@@ -801,10 +802,10 @@ def yenigun_gerceklestir_impl(masraflari_sil: bool) -> str:
                 if grup and grup != "*" and "GENEL TOPLAM" not in grup.upper():
                     dunun_kalani = guvenliSayi(row[6]) if len(row) > 6 else 0.0
                     toplam_devir += dunun_kalani
-        matrix_c_e.append([dunun_kalani, 0, 0])
+        matrix_c_f.append([dunun_kalani, 0, 0, 0])
         
-    # Tek bir API çağrısıyla tüm 2-42 satırlarını anında güncelle
-    yeni_sayfa.update('C2:E42', matrix_c_e, value_input_option='USER_ENTERED')
+    # Tek seferde C2:F42 bloğunu güncelle (1 tek API çağrısı)
+    yeni_sayfa.update('C2:F42', matrix_c_f, value_input_option='USER_ENTERED')
                 
     # 5. Masrafları Temizleme Seçimi (I2:J42 tek seferde toplu temizleme)
     if masraflari_sil and yeni_sayfa.col_count >= 10:
@@ -818,7 +819,7 @@ def yenigun_gerceklestir_impl(masraflari_sil: bool) -> str:
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"📁 <b>Kaynak Alınan Gün:</b> <code>{kaynak_sayfa.title}</code>\n"
         f"🔄 <b>Devir'e Aktarılan Kalan Kasa:</b> {paraFormatla(toplam_devir)}\n"
-        f"💰 <b>Kasa ve Ödenen (2-42. Satırlar):</b> Sıfırlandı\n"
+        f"💰 <b>Kasa, Ödenen ve Komisyon (2-42. Satırlar):</b> Sıfırlandı (Temiz Başlangıç)\n"
         f"📉 <b>Masraflar:</b> {'Temizlendi' if masraflari_sil else 'Korundu'}\n\n"
         f"İyi çalışmalar ve bol kazançlar dileriz! 🚀"
     )
