@@ -335,7 +335,7 @@ def rehber_metni():
         "• <code>/ozet</code> : Kasa, Masraf ve Ödenen hızlı finans özeti.\n"
         "• <code>/log</code> veya <code>/son5</code> : Yapılan son işlemleri listeler.\n\n"
         "🌍 <b>EKSTRA ARAÇLAR & KRİPTO</b>\n"
-        "• <code>/qr [Cüzdan Adresi]</code> : ⚡ Borsa/Tron cüzdan adresini anında QR koda çevirir.\n"
+        "• <code>/qr [Cüzdan Adresi]</code> : ⚡ QR kod üretir ve canlı TRX/USDT bakiyesini getirir.\n"
         "• <code>/kur</code> : 🟡 Anlık USDT kurlarını listeler (Binance, Paribu, BtcTurk, WhiteBIT, OKX).\n"
         "• <code>/canlikur</code> : 🌍 Dünya borsalarını ve döviz kurlarını getirir.\n"
         "• <code>/iban</code> : 🏦 Kullanımdaki ve boşta olan İBAN'ları listeler.\n"
@@ -691,6 +691,32 @@ def canliKurSorgula_impl() -> str:
     except Exception as e:
         return f"❌ <b>API Hatası:</b> {e}"
 
+def get_tron_balances(address: str) -> Tuple[float, float, float]:
+    """Tronscan resmi API üzerinden adresteki TRX, USDT ve toplam USD bakiyesini çeker."""
+    url = f"https://apilist.tronscan.org/api/account/token_asset_overview?address={address}"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+    trx_bakiye = 0.0
+    usdt_bakiye = 0.0
+    toplam_usd = 0.0
+    try:
+        with urllib.request.urlopen(req, timeout=7) as res:
+            data = json.loads(res.read().decode())
+            toplam_usd = float(data.get("totalAssetInUsd", 0))
+            for item in data.get("data", []):
+                sym = item.get("tokenAbbr", "").upper()
+                t_id = item.get("tokenId", "")
+                dec = int(item.get("tokenDecimal", 6))
+                raw_bal = float(item.get("balance", 0))
+                bal = raw_bal / (10 ** dec)
+                
+                if sym == "TRX" or t_id == "_":
+                    trx_bakiye = bal
+                elif sym == "USDT" or t_id == "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t":
+                    usdt_bakiye = bal
+    except Exception as e:
+        print(f"Tronscan bakiye okuma hatası ({address}): {e}")
+    return trx_bakiye, usdt_bakiye, toplam_usd
+
 def cuzdanQrUret_impl(chat_id: int, komut_metni: str):
     parcalar = komut_metni.strip().split()
     if len(parcalar) < 2:
@@ -715,16 +741,28 @@ def cuzdanQrUret_impl(chat_id: int, komut_metni: str):
     ag_adi = "TRON (TRC20)" if is_tron else ("Ethereum / BSC (EVM)" if is_evm else "Kripto Cüzdanı")
     kesif_url = f"https://tronscan.org/#/address/{cuzdan_adresi}" if is_tron else (f"https://etherscan.io/address/{cuzdan_adresi}" if is_evm else f"https://tronscan.org/#/address/{cuzdan_adresi}")
     
+    # Tronscan'den canlı bakiye çek
+    bakiye_metni = ""
+    if is_tron:
+        trx_bal, usdt_bal, total_usd = get_tron_balances(cuzdan_adresi)
+        bakiye_metni = (
+            f"💰 <b>HESAPTAKİ ANLIK VARLIKLAR:</b>\n"
+            f"💵 <b>USDT (TRC20):</b> <code>{usdt_bal:,.2f} USDT</code>\n"
+            f"🪙 <b>TRX Bakiyesi:</b> <code>{trx_bal:,.2f} TRX</code>\n"
+            f"📊 <b>Toplam Cüzdan Değeri:</b> <code>~{total_usd:,.2f} $</code>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+        )
+
     qr_foto_url = f"https://api.qrserver.com/v1/create-qr-code/?size=500x500&data={urllib.parse.quote(cuzdan_adresi)}&margin=15"
     
     caption = (
-        f"⚡ <b>CÜZDAN ADRESİ QR KODU</b>\n"
+        f"⚡ <b>CÜZDAN ADRESİ & CANLI BAKİYE</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"🌐 <b>Ağ Türü:</b> {ag_adi}\n\n"
         f"📌 <b>Cüzdan Adresi:</b>\n"
         f"<code>{cuzdan_adresi}</code>\n\n"
+        f"{bakiye_metni}"
         f"🔍 <b>Ağ İnceleme:</b> <a href=\"{kesif_url}\">Tronscan Explorer</a>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
         f"💡 <i>Adresi kopyalamak için üzerine dokunabilirsiniz.</i>"
     )
     
@@ -736,7 +774,6 @@ def cuzdanQrUret_impl(chat_id: int, komut_metni: str):
     
     res = telegramFotoGonder(chat_id, qr_foto_url, caption, klavye)
     if not res.get("ok"):
-        # Yedek QR servisi
         fallback_qr = f"https://quickchart.io/qr?text={urllib.parse.quote(cuzdan_adresi)}&size=500&margin=2"
         telegramFotoGonder(chat_id, fallback_qr, caption, klavye)
 
@@ -1103,7 +1140,7 @@ def process_telegram_update(update: dict):
         is_group = chat_id < 0
 
         if not text.startswith("/"):
-            # Kullanıcı doğrudan Tron adresi yapıştırdıysa otomatik QR oluştur
+            # Kullanıcı doğrudan Tron adresi yapıştırdıysa otomatik QR oluştur ve bakiye göster
             if (text.startswith("T") and len(text) == 34) or (text.startswith("0x") and len(text) == 42):
                 if yetkili_mi(user_id):
                     cuzdanQrUret_impl(chat_id, f"/qr {text}")
