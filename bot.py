@@ -691,6 +691,36 @@ def canliKurSorgula_impl() -> str:
     except Exception as e:
         return f"❌ <b>API Hatası:</b> {e}"
 
+def analyze_tron_wallet(address: str) -> str:
+    """Cüzdanın resmi borsa hesabı mı, ilişkili borsa fon akışı mı yoksa bireysel cüzdan mı olduğunu tespit eder."""
+    try:
+        url = f"https://apilist.tronscan.org/api/account?address={address}"
+        d = http_get_json(url)
+        tag = d.get("addressTag") or d.get("publicTag") or d.get("name")
+        if tag and str(tag).strip() and str(tag).lower() != "none":
+            return f"🏦 <b>Resmi Borsa / Kurum:</b> <code>{tag}</code>"
+    except Exception:
+        pass
+        
+    try:
+        tx_url = f"https://apilist.tronscan.org/api/token_trc20/transfers?limit=8&start=0&sort=-timestamp&relatedAddress={address}"
+        tx_data = http_get_json(tx_url)
+        for tx in tx_data.get("token_transfers", []):
+            to_tag = tx.get("to_address_tag")
+            from_tag = tx.get("from_address_tag")
+            
+            for t in [to_tag, from_tag]:
+                if isinstance(t, str) and len(t) > 1 and t.lower() != "none":
+                    return f"🔄 <b>İlişkili Borsa Fon Akışı:</b> <code>{t}</code>"
+                elif isinstance(t, dict):
+                    name = t.get("name") or t.get("tag") or t.get("addressTag")
+                    if name and str(name).strip() and str(name).lower() != "none":
+                        return f"🔄 <b>İlişkili Borsa Fon Akışı:</b> <code>{name}</code>"
+    except Exception:
+        pass
+        
+    return "👤 <b>Cüzdan Türü:</b> Bireysel / Şahsi Cüzdan <i>(Trust Wallet, TronLink, Ledger)</i>"
+
 def get_tron_balances(address: str) -> Tuple[float, float, float]:
     """Tronscan resmi API üzerinden adresteki TRX, USDT ve toplam USD bakiyesini çeker."""
     url = f"https://apilist.tronscan.org/api/account/token_asset_overview?address={address}"
@@ -741,10 +771,13 @@ def cuzdanQrUret_impl(chat_id: int, komut_metni: str):
     ag_adi = "TRON (TRC20)" if is_tron else ("Ethereum / BSC (EVM)" if is_evm else "Kripto Cüzdanı")
     kesif_url = f"https://tronscan.org/#/address/{cuzdan_adresi}" if is_tron else (f"https://etherscan.io/address/{cuzdan_adresi}" if is_evm else f"https://tronscan.org/#/address/{cuzdan_adresi}")
     
-    # Tronscan'den canlı bakiye çek
+    # Tronscan'den canlı bakiye ve borsa/istihbarat tespiti çek
     bakiye_metni = ""
+    borsa_metni = ""
     if is_tron:
         trx_bal, usdt_bal, total_usd = get_tron_balances(cuzdan_adresi)
+        borsa_analiz = analyze_tron_wallet(cuzdan_adresi)
+        borsa_metni = f"{borsa_analiz}\n"
         bakiye_metni = (
             f"💰 <b>HESAPTAKİ ANLIK VARLIKLAR:</b>\n"
             f"💵 <b>USDT (TRC20):</b> <code>{usdt_bal:,.2f} USDT</code>\n"
@@ -758,7 +791,8 @@ def cuzdanQrUret_impl(chat_id: int, komut_metni: str):
     caption = (
         f"⚡ <b>CÜZDAN ADRESİ & CANLI BAKİYE</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"🌐 <b>Ağ Türü:</b> {ag_adi}\n\n"
+        f"🌐 <b>Ağ Türü:</b> {ag_adi}\n"
+        f"{borsa_metni}"
         f"📌 <b>Cüzdan Adresi:</b>\n"
         f"<code>{cuzdan_adresi}</code>\n\n"
         f"{bakiye_metni}"
@@ -766,9 +800,14 @@ def cuzdanQrUret_impl(chat_id: int, komut_metni: str):
         f"💡 <i>Adresi kopyalamak için üzerine dokunabilirsiniz.</i>"
     )
     
+    arkham_url = f"https://platform.arkhamintelligence.com/explorer/address/{cuzdan_adresi}"
+    misttrack_url = f"https://misttrack.io/address/TRON/{cuzdan_adresi}" if is_tron else f"https://misttrack.io/address/ETH/{cuzdan_adresi}"
+    
     klavye = {
         "inline_keyboard": [
-            [{"text": "🔍 Tronscan'de İncele", "url": kesif_url}]
+            [{"text": "🔍 Tronscan'de İncele", "url": kesif_url}],
+            [{"text": "🌐 Arkham İstihbarat", "url": arkham_url}],
+            [{"text": "🛡️ MistTrack AML Takip", "url": misttrack_url}]
         ]
     }
     
