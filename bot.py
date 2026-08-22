@@ -1140,10 +1140,6 @@ def process_telegram_update(update: dict):
         is_group = chat_id < 0
 
         if not text.startswith("/"):
-            # Kullanıcı doğrudan Tron adresi yapıştırdıysa otomatik QR oluştur ve bakiye göster
-            if (text.startswith("T") and len(text) == 34) or (text.startswith("0x") and len(text) == 42):
-                if yetkili_mi(user_id):
-                    cuzdanQrUret_impl(chat_id, f"/qr {text}")
             return
 
         komut_parcalari = text.split()
