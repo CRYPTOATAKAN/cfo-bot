@@ -28,6 +28,7 @@ WEB_APP_URL = os.environ.get("WEB_APP_URL", "https://site--cfo-bot-servis--drx8q
 LOG_SAYFASI = "Guvenlik_Log"
 ADMIN_SAYFASI = "YONETICILER"
 BAGLANTI_SAYFASI = "GRUP_BAGLANTILARI"
+VARSAYILAN_TRC20_ADRES = os.environ.get("TRC20_WALLET_ADDRESS", "TQHuwJh5c4ygbKhfFoGqTZTahjQuJAX3iV")
 
 app_state = {
     "EK_ADMINLER": set(),
@@ -517,6 +518,7 @@ def rehber_metni():
         "• <code>/ozet</code> : Kasa, Masraf ve Ödenen hızlı finans özeti.\n"
         "• <code>/log</code> veya <code>/son5</code> : Yapılan son işlemleri listeler.\n\n"
         "🌍 <b>EKSTRA ARAÇLAR & KRİPTO</b>\n"
+        "• <code>/t</code> : 🏛️ Canlı TRC-20 rezerv ve varlık durumunu raporlar.\n"
         "• <code>/qr [Cüzdan Adresi]</code> : ⚡ QR kod üretir ve canlı TRX/USDT bakiyesini getirir.\n"
         "• <code>/kur</code> : 🟡 Anlık USDT kurlarını listeler (Binance, Paribu, BtcTurk, WhiteBIT, OKX).\n"
         "• <code>/canlikur</code> : 🌍 Dünya borsalarını ve döviz kurlarını getirir.\n"
@@ -929,6 +931,88 @@ def get_tron_balances(address: str) -> Tuple[float, float, float]:
         print(f"Tronscan bakiye okuma hatası ({address}): {e}")
     return trx_bakiye, usdt_bakiye, toplam_usd
 
+def get_borsa_kurlari_listesi() -> Tuple[str, float]:
+    borsalar = [
+        ("🟡 <b>BİNANCE</b>", "https://data-api.binance.vision/api/v3/ticker/price?symbol=USDTTRY", lambda r: float(r["price"])),
+        ("🔵 <b>PARİBU</b>", "https://www.paribu.com/ticker", lambda r: float(r["USDT_TL"]["last"])),
+        ("🟢 <b>BTCTÜRK</b>", "https://api.btcturk.com/api/v2/ticker?pairSymbol=USDT_TRY", lambda r: float(r["data"][0]["last"])),
+        ("⚪ <b>WHITEBIT</b>", "https://whitebit.com/api/v1/public/ticker?market=USDT_TRY", lambda r: float(r["result"]["last"])),
+        ("⚫ <b>OKX</b>", "https://www.okx.com/api/v5/market/ticker?instId=USDT-TRY", lambda r: float(r["data"][0]["last"]))
+    ]
+    
+    def format_sayi_yerel(val):
+        return f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    default_rate = 48.09
+    try:
+        fiat = http_get_json("https://api.exchangerate-api.com/v4/latest/USD")["rates"]
+        default_rate = float(fiat.get("TRY", 48.09))
+    except Exception:
+        pass
+
+    satirlar = []
+    fiyatlar = []
+    for isim, url, parser in borsalar:
+        try:
+            d = http_get_json(url)
+            val = parser(d)
+            satirlar.append(f"{isim} USDT/TRY - 💵 Anlık Kur: {format_sayi_yerel(val)} ₺")
+            fiyatlar.append(val)
+        except Exception:
+            satirlar.append(f"{isim} USDT/TRY - 💵 Anlık Kur: {format_sayi_yerel(default_rate)} ₺")
+            fiyatlar.append(default_rate)
+            
+    referans_kur = fiyatlar[0] if fiyatlar else default_rate
+    return "\n".join(satirlar), referans_kur
+
+def trc20_varlik_raporu_uret(cuzdan_adresi: str = VARSAYILAN_TRC20_ADRES) -> Tuple[str, dict]:
+    cuzdan_adresi = (cuzdan_adresi or "").strip()
+    if not cuzdan_adresi:
+        cuzdan_adresi = VARSAYILAN_TRC20_ADRES
+
+    trx_bal, usdt_bal, total_usd = get_tron_balances(cuzdan_adresi)
+    borsa_kurlari_metni, usdt_try_kur = get_borsa_kurlari_listesi()
+    usdt_tl_karsiligi = usdt_bal * usdt_try_kur
+
+    tarih_saat = suankiZamaniAl().strftime("%d.%m.%Y | %H:%M")
+
+    def format_sayi(val):
+        return f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    usdt_format = format_sayi(usdt_bal)
+    trx_format = format_sayi(trx_bal)
+    usd_format = format_sayi(total_usd)
+    usdt_tl_format = format_sayi(usdt_tl_karsiligi)
+    kur_format = format_sayi(usdt_try_kur)
+
+    mesaj = (
+        f"🏛️ <b>REZERV & CANLI VARLIK RAPORU</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📅 <b>Tarih/Saat:</b> {tarih_saat}\n"
+        f"🌐 <b>Ağ:</b> TRON (TRC-20)\n"
+        f"📌 <b>Cüzdan:</b> <code>{cuzdan_adresi}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"{borsa_kurlari_metni}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"💵 <b>USDT Bakiyesi:</b> <code>{usdt_format} USDT</code>\n"
+        f"⚡ <b>TRX Bakiyesi:</b> <code>{trx_format} TRX</code>\n"
+        f"🌍 <b>Toplam Varlık (USD):</b> <code>${usd_format}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🇹🇷 <b>USDT TÜRK LİRASI KARŞILIĞI:</b>\n"
+        f"💰 <b>{usdt_tl_format} ₺</b> <i>(1 USDT ≈ {kur_format} ₺)</i>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"⚡ <i>Canlı Blokzincir Verisi • Tronscan API</i>"
+    )
+
+    kesif_url = f"https://tronscan.org/#/address/{cuzdan_adresi}"
+    klavye = {
+        "inline_keyboard": [
+            [{"text": "🔍 Tronscan Explorer'da Doğrula ↗", "url": kesif_url}],
+            [{"text": "🔄 Canlı Yenile", "callback_data": f"t_yenile_{cuzdan_adresi}"}]
+        ]
+    }
+    return mesaj, klavye
+
 def cuzdanQrUret_impl(chat_id: int, komut_metni: str):
     parcalar = komut_metni.strip().split()
     if len(parcalar) < 2:
@@ -1302,6 +1386,11 @@ def process_telegram_update(update: dict):
         
         telegram_api("answerCallbackQuery", {"callback_query_id": cq["id"]})
         
+        if data.startswith("t_yenile_"):
+            cuzdan = data.replace("t_yenile_", "").strip()
+            islemi_analiz_bildirimiyle_yap(chat_id, trc20_varlik_raporu_uret, cuzdan)
+            return
+
         if not yetkili_mi(user_id):
             telegramMesajGonder(chat_id, "⛔ <b>Erişim Reddedildi!</b>\nBu işlem için yetkiniz bulunmamaktadır.")
             return
@@ -1353,6 +1442,12 @@ def process_telegram_update(update: dict):
                 f"💬 <b>Sohbet ID:</b> <code>{chat_id}</code>\n\n"
                 f"💡 <i>Botu kullanabilmek için bu ID numarasını yöneticiye iletiniz.</i>"
             )
+            return
+
+        # /t veya /rezerv veya /varlik (TRC-20 Canlı Rezerv & Varlık Raporu)
+        if ana_komut in ["/t", "/rezerv", "/varlik"]:
+            cuzdan = komut_parcalari[1].strip() if len(komut_parcalari) > 1 else VARSAYILAN_TRC20_ADRES
+            islemi_analiz_bildirimiyle_yap(chat_id, trc20_varlik_raporu_uret, cuzdan)
             return
 
         # /grupbagla veya /bagla
