@@ -8,6 +8,7 @@ import threading
 import unicodedata
 import urllib.request
 import urllib.parse
+import concurrent.futures
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Optional, Dict, Any, List, Tuple, Set
 
@@ -30,6 +31,10 @@ ADMIN_SAYFASI = "YONETICILER"
 BAGLANTI_SAYFASI = "GRUP_BAGLANTILARI"
 VARSAYILAN_TRC20_ADRES = os.environ.get("TRC20_WALLET_ADDRESS", "TQHuwJh5c4ygbKhfFoGqTZTahjQuJAX3iV")
 
+# --- PARALEL İŞ PARÇACIĞI HAVUZLARI (YÜKSEK PERFORMANS) ---
+_update_executor = concurrent.futures.ThreadPoolExecutor(max_workers=16, thread_name_prefix="UpdateWorker")
+_log_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="LogWorker")
+
 app_state = {
     "EK_ADMINLER": set(),
     "GRUP_BAGLANTILARI": {},
@@ -45,6 +50,12 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
+
+# --- GOOGLE SHEETS BAĞLANTI ÖNBELLEĞİ (CANLI INSTANCE CACHING) ---
+_cached_gc = None
+_cached_spreadsheet = None
+_cached_sh_time = 0
+_sh_lock = threading.Lock()
 
 def http_get_json(url: str, headers: dict = None) -> dict:
     req = urllib.request.Request(url, headers=headers or {"User-Agent": "Mozilla/5.0"})
@@ -80,12 +91,17 @@ def telegramMesajSil(chat_id, message_id):
     return telegram_api("deleteMessage", {"chat_id": chat_id, "message_id": message_id})
 
 def get_gspread_client():
+    global _cached_gc
+    if _cached_gc is not None:
+        return _cached_gc
+
     json_env = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
     if json_env and json_env.strip():
         try:
             info = json.loads(json_env.strip())
             creds = Credentials.from_service_account_info(info, scopes=SCOPES)
-            return gspread.authorize(creds)
+            _cached_gc = gspread.authorize(creds)
+            return _cached_gc
         except Exception as e:
             print(f"GOOGLE_SERVICE_ACCOUNT_JSON okunamadı: {e}")
 
@@ -99,15 +115,30 @@ def get_gspread_client():
         if os.path.exists(path):
             try:
                 creds = Credentials.from_service_account_file(path, scopes=SCOPES)
-                return gspread.authorize(creds)
+                _cached_gc = gspread.authorize(creds)
+                return _cached_gc
             except Exception as e:
                 print(f"{path} okunamadı: {e}")
 
     raise FileNotFoundError("Google Service Account anahtarı bulunamadı!")
 
-def get_spreadsheet():
-    gc = get_gspread_client()
-    return gc.open_by_key(SPREADSHEET_ID)
+def get_spreadsheet(force_refresh=False):
+    global _cached_spreadsheet, _cached_sh_time, _cached_gc
+    now = time.time()
+    with _sh_lock:
+        if not force_refresh and _cached_spreadsheet is not None and (now - _cached_sh_time < 300):
+            return _cached_spreadsheet
+        try:
+            gc = get_gspread_client()
+            _cached_spreadsheet = gc.open_by_key(SPREADSHEET_ID)
+            _cached_sh_time = now
+            return _cached_spreadsheet
+        except Exception as e:
+            _cached_gc = None
+            gc = get_gspread_client()
+            _cached_spreadsheet = gc.open_by_key(SPREADSHEET_ID)
+            _cached_sh_time = now
+            return _cached_spreadsheet
 
 def is_valid_daily_sheet(ws) -> bool:
     """Bir sayfanın gerçek ana kasa tablosu (en az 8 sütun ve 30 satır) olup olmadığını doğrular."""
@@ -235,7 +266,7 @@ def paraFormatla(deger) -> str:
     except:
         return "0,00 ₺"
 
-def sistemeLogYaz(islemAdi: str, detay: str):
+def _sistemeLogYaz_worker(islemAdi: str, detay: str):
     try:
         sh = get_spreadsheet()
         try:
@@ -247,6 +278,9 @@ def sistemeLogYaz(islemAdi: str, detay: str):
         logSayfasi.append_row([tarihSaat, islemAdi, detay])
     except Exception as e:
         print(f"Log hatası: {e}")
+
+def sistemeLogYaz(islemAdi: str, detay: str):
+    _log_executor.submit(_sistemeLogYaz_worker, islemAdi, detay)
 
 # --- YETKİ & ADMİN YÖNETİMİ ---
 def admin_listesini_guncelle():
@@ -1421,10 +1455,12 @@ def admin_listesi_impl() -> str:
     except Exception as e:
         return f"❌ <b>Hata:</b> {e}"
 
-# --- YARDIMCI: ANALİZ BİLDİRİMİ İLE ÇALIŞTIRICI ---
-def islemi_analiz_bildirimiyle_yap(chat_id: int, islem_fn, *args):
-    yukleniyor = telegramMesajGonder(chat_id, "⏳ <b>Veriler analiz ediliyor, lütfen bekleyin...</b>")
-    msg_id = yukleniyor.get("result", {}).get("message_id") if yukleniyor.get("ok") else None
+# --- YARDIMCI: HIZLI VE GÜVENLİ ÇALIŞTIRICI ---
+def islemi_analiz_bildirimiyle_yap(chat_id: int, islem_fn, *args, goster_bildirim: bool = False):
+    msg_id = None
+    if goster_bildirim:
+        yukleniyor = telegramMesajGonder(chat_id, "⏳ <b>Veriler analiz ediliyor, lütfen bekleyin...</b>")
+        msg_id = yukleniyor.get("result", {}).get("message_id") if yukleniyor.get("ok") else None
     
     try:
         sonuc = islem_fn(*args)
@@ -1510,7 +1546,7 @@ def process_telegram_update(update: dict):
         # /t veya /rezerv veya /varlik (TRC-20 Canlı Rezerv & Varlık Raporu)
         if ana_komut in ["/t", "/rezerv", "/varlik"]:
             cuzdan = komut_parcalari[1].strip() if len(komut_parcalari) > 1 else VARSAYILAN_TRC20_ADRES
-            islemi_analiz_bildirimiyle_yap(chat_id, trc20_varlik_raporu_uret, cuzdan)
+            islemi_analiz_bildirimiyle_yap(chat_id, trc20_varlik_raporu_uret, cuzdan, goster_bildirim=True)
             return
 
         # /grupbagla veya /bagla
@@ -1633,13 +1669,13 @@ def process_telegram_update(update: dict):
         elif ana_komut == "/ozet":
             islemi_analiz_bildirimiyle_yap(chat_id, hizliOzetUret_impl)
         elif ana_komut == "/rapor":
-            islemi_analiz_bildirimiyle_yap(chat_id, tumGruplarRaporu_impl)
+            islemi_analiz_bildirimiyle_yap(chat_id, tumGruplarRaporu_impl, goster_bildirim=True)
         elif ana_komut in ["/masraf", "/gider"]:
             islemi_analiz_bildirimiyle_yap(chat_id, masrafRaporuUret_impl)
         elif ana_komut == "/canlikur":
-            islemi_analiz_bildirimiyle_yap(chat_id, canliKurSorgula_impl)
+            islemi_analiz_bildirimiyle_yap(chat_id, canliKurSorgula_impl, goster_bildirim=True)
         elif ana_komut == "/kur":
-            islemi_analiz_bildirimiyle_yap(chat_id, kurRaporuUret_impl)
+            islemi_analiz_bildirimiyle_yap(chat_id, kurRaporuUret_impl, goster_bildirim=True)
         elif ana_komut == "/iban":
             islemi_analiz_bildirimiyle_yap(chat_id, ibanListesiGetir_impl)
         elif ana_komut == "/hesap":
@@ -1913,10 +1949,10 @@ def run_dashboard_server():
     server = HTTPServer(("0.0.0.0", port), LiveDashboardHandler)
     server.serve_forever()
 
-# --- MAIN LOOP (LONG POLLING) ---
+# --- MAIN LOOP (LONG POLLING WITH THREAD POOL) ---
 if __name__ == "__main__":
     threading.Thread(target=run_dashboard_server, daemon=True).start()
-    print("CFO Bot & Canlı Dashboard Başlatıldı (7/24 Kesintisiz)...")
+    print("CFO Bot & Canlı Dashboard Başlatıldı (7/24 Kesintisiz - Hızlı Paralel Motor)...")
     
     offset = 0
     while True:
@@ -1926,6 +1962,6 @@ if __name__ == "__main__":
             if res.get("ok"):
                 for upd in res.get("result", []):
                     offset = upd["update_id"] + 1
-                    process_telegram_update(upd)
+                    _update_executor.submit(process_telegram_update, upd)
         except Exception as e:
-            time.sleep(2)
+            time.sleep(1)
