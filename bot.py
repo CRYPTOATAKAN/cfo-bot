@@ -227,17 +227,11 @@ def paraFormatla(deger) -> str:
     """Matematiksel işaretleri (+/-) eksiksiz koruyan Türkçe para formatı: -50.000,00 ₺ veya 150.000,00 ₺"""
     try:
         val = float(deger)
-        if abs(val) < 0.0001:
+        if abs(val) < 0.00001:
             return "0,00 ₺"
         is_negative = val < 0
-        tam = int(abs(round(val, 2)))
-        tam_str = f"{tam:,}".replace(",", ".")
-        ondalik = f"{abs(val):.2f}".split(".")[1]
-        
-        if is_negative:
-            return f"-{tam_str},{ondalik} ₺"
-        else:
-            return f"{tam_str},{ondalik} ₺"
+        formatted = f"{abs(val):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        return f"-{formatted} ₺" if is_negative else f"{formatted} ₺"
     except:
         return "0,00 ₺"
 
@@ -538,19 +532,27 @@ def rehber_metni():
 
 def parse_grup_ve_tutar(parametreler: List[str]) -> Tuple[str, float]:
     if len(parametreler) < 2:
-        raise ValueError("Eksik bilgi! Örnek: <code>/kasa TİGER 1500</code>")
-    try:
-        tutar = float(parametreler[-1].replace(".", "").replace(",", "."))
-        grup = " ".join(parametreler[:-1]).strip()
-        return grup, tutar
-    except ValueError:
-        pass
-    try:
-        tutar = float(parametreler[0].replace(".", "").replace(",", "."))
-        grup = " ".join(parametreler[1:]).strip()
-        return grup, tutar
-    except ValueError:
-        raise ValueError("Lütfen geçerli bir sayısal tutar girin! Örnek: <code>/kasa TİGER 1500</code>")
+        raise ValueError("Eksik bilgi! Örnek: <code>/kasa TİGER 1500</code> veya <code>/masrafekle Yemek 500</code>")
+    
+    # 1. Sondaki parametre sayı mı kontrol et (Örn: /masrafekle Yemek 500 veya /masrafekle Ofis Gideri 1.250,50)
+    son_str = parametreler[-1].strip()
+    if re.search(r'\d', son_str):
+        tutar = guvenliSayi(son_str)
+        if tutar != 0.0 or son_str in ["0", "0,0", "0.0", "0,00", "0.00"]:
+            grup = " ".join(parametreler[:-1]).strip()
+            if grup:
+                return grup, tutar
+
+    # 2. Baştaki parametre sayı mı kontrol et (Örn: /masrafekle 500 Yemek)
+    ilk_str = parametreler[0].strip()
+    if re.search(r'\d', ilk_str):
+        tutar = guvenliSayi(ilk_str)
+        if tutar != 0.0 or ilk_str in ["0", "0,0", "0.0", "0,00", "0.00"]:
+            grup = " ".join(parametreler[1:]).strip()
+            if grup:
+                return grup, tutar
+
+    raise ValueError("Lütfen geçerli bir sayısal tutar girin! Örnek: <code>/kasa TİGER 1500</code> veya <code>/masrafekle Yemek 500</code>")
 
 def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int) -> str:
     parcalar = komut_metni.strip().split()[1:]
@@ -564,7 +566,7 @@ def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int) 
     for i, row in enumerate(tum_veriler[1:], start=2):
         if len(row) >= 2 and normalize_text(row[1]) == hedef_norm:
             mevcut_val = guvenliSayi(row[sutun_idx - 1]) if len(row) >= sutun_idx else 0.0
-            yeni_val = mevcut_val + (tutar * carp)
+            yeni_val = round(mevcut_val + (tutar * carp), 2)
             sayfa.update_cell(i, sutun_idx, yeni_val)
             
             app_state["SON_ISLEM"] = {
@@ -600,28 +602,89 @@ def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
     sayfa = get_active_daily_sheet(sh)
     tum_veriler = sayfa.get_all_values()
     
-    for i, row in enumerate(tum_veriler[1:], start=2):
-        col_i = row[8] if len(row) > 8 else ""
-        col_j = row[9] if len(row) > 9 else ""
-        if normalize_text(col_i) == hedef_norm:
-            mevcut = guvenliSayi(col_j)
-            yeni = mevcut + (tutar * carp)
-            sayfa.update_cell(i, 10, yeni)
-            app_state["SON_ISLEM"] = {"sayfa": sayfa.title, "satir": i, "sutun": 10, "eskiDeger": mevcut, "grupAdi": col_i, "islemTuru": isim}
-            sistemeLogYaz(isim, f"{col_i} | {paraFormatla(tutar * carp)}")
-            return f"✅ <b>{isim} Başarılı!</b>\n📉 Masraf Kalemi: <b>{col_i}</b>\n💵 İşlem Tutarı: <b>{paraFormatla(tutar * carp)}</b>\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
+    # 1. MASRAF EKLEME (carp == 1): Her zaman sonraki ilk boş satıra yeni kayıt olarak yazar (mevcut satırın üzerine toplamaz)
+    if carp > 0:
+        bos_satir = None
+        for i, row in enumerate(tum_veriler[1:], start=2):
+            col_i = row[8].strip() if len(row) > 8 else ""
+            col_j = row[9].strip() if len(row) > 9 else ""
+            if not col_i and not col_j:
+                bos_satir = i
+                break
+                
+        if bos_satir is None:
+            bos_satir = len(tum_veriler) + 1
+
+        tutar_yuvarlanmis = round(tutar, 2)
+        sayfa.update_cell(bos_satir, 9, masraf_ham.upper())
+        sayfa.update_cell(bos_satir, 10, tutar_yuvarlanmis)
+        
+        app_state["SON_ISLEM"] = {
+            "sayfa": sayfa.title, "satir": bos_satir, "sutun": 10,
+            "eskiDeger": 0, "grupAdi": masraf_ham.upper(),
+            "islemTuru": "Masraf Ekleme", "is_new_masraf": True
+        }
+        sistemeLogYaz("Masraf Ekleme", f"{masraf_ham.upper()} | {paraFormatla(tutar_yuvarlanmis)}")
+        
+        return (
+            f"✅ <b>Masraf Eklendi!</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+            f"📉 Masraf Kalemi: <b>{masraf_ham.upper()}</b>\n"
+            f"💵 Eklenen Tutar: <b>{paraFormatla(tutar_yuvarlanmis)}</b>\n"
+            f"📌 Excel Satırı: <b>Satır {bos_satir}</b>\n\n"
+            f"<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
+        )
+        
+    # 2. MASRAF SİLME (carp == -1): En son eklenen ilgili masraf kalemini (aşağıdan yukarıya) bulup düşer veya siler
+    else:
+        bulunan_i = None
+        bulunan_row = None
+        for i in range(len(tum_veriler) - 1, 0, -1):
+            row = tum_veriler[i]
+            col_i = row[8].strip() if len(row) > 8 else ""
+            if normalize_text(col_i) == hedef_norm:
+                bulunan_i = i + 1  # 1-based row index
+                bulunan_row = row
+                break
+                
+        if not bulunan_i:
+            raise ValueError(f"Tabloda '<b>{masraf_ham}</b>' adlı masraf kalemi bulunamadı.")
             
-    bos_satir = len(tum_veriler) + 1
-    for i, row in enumerate(tum_veriler[1:], start=2):
-        col_i = row[8] if len(row) > 8 else ""
-        if not col_i.strip():
-            bos_satir = i
-            break
-    sayfa.update_cell(bos_satir, 9, masraf_ham.upper())
-    sayfa.update_cell(bos_satir, 10, tutar)
-    app_state["SON_ISLEM"] = {"sayfa": sayfa.title, "satir": bos_satir, "sutun": 10, "eskiDeger": 0, "grupAdi": masraf_ham, "islemTuru": "Yeni Masraf Ekleme"}
-    sistemeLogYaz("Yeni Masraf Ekleme", f"{masraf_ham} | {paraFormatla(tutar)}")
-    return f"✅ <b>Yeni Masraf Oluşturuldu!</b>\n📉 Masraf Kalemi: <b>{masraf_ham.upper()}</b>\n💵 Tutar: <b>{paraFormatla(tutar)}</b>\n\n<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
+        col_i = bulunan_row[8].strip()
+        col_j = bulunan_row[9].strip() if len(bulunan_row) > 9 else ""
+        mevcut = guvenliSayi(col_j)
+        yeni = round(mevcut - tutar, 2)
+        
+        if yeni <= 0.0001:
+            sayfa.update_cell(bulunan_i, 9, "")
+            sayfa.update_cell(bulunan_i, 10, "")
+            app_state["SON_ISLEM"] = {
+                "sayfa": sayfa.title, "satir": bulunan_i, "sutun": 10,
+                "eskiDeger": mevcut, "eskiAd": col_i, "grupAdi": col_i,
+                "islemTuru": "Masraf Silme", "is_masraf_update": True
+            }
+            sistemeLogYaz("Masraf Silme", f"{col_i} | Tamamı Silindi ({paraFormatla(mevcut)})")
+            return (
+                f"🗑️ <b>Masraf Satırı Silindi!</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+                f"📉 Masraf Kalemi: <b>{col_i}</b>\n"
+                f"💵 Silinen Tutar: <b>{paraFormatla(mevcut)}</b>\n"
+                f"📌 Excel Satırı: <b>Satır {bulunan_i}</b>\n\n"
+                f"<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
+            )
+        else:
+            sayfa.update_cell(bulunan_i, 10, yeni)
+            app_state["SON_ISLEM"] = {
+                "sayfa": sayfa.title, "satir": bulunan_i, "sutun": 10,
+                "eskiDeger": mevcut, "eskiAd": col_i, "grupAdi": col_i,
+                "islemTuru": "Masraf Silme", "is_masraf_update": True
+            }
+            sistemeLogYaz("Masraf Silme", f"{col_i} | -{paraFormatla(tutar)} (Kalan: {paraFormatla(yeni)})")
+            return (
+                f"✅ <b>Masraf Tutarı Düşüldü!</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+                f"📉 Masraf Kalemi: <b>{col_i}</b>\n"
+                f"💵 Düşülen Tutar: <b>{paraFormatla(tutar)}</b>\n"
+                f"📊 Güncel Kalan Masraf: <b>{paraFormatla(yeni)}</b>\n\n"
+                f"<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
+            )
 
 def tablodan_finans_ozeti_hesapla(veriler: List[List[str]]) -> Dict[str, Any]:
     toplamDevir = toplamKasa = toplamOdenen = toplamKomisyon = toplamKalan = 0.0
@@ -1608,12 +1671,21 @@ def process_telegram_update(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, admin_listesi_impl)
         elif ana_komut == "/gerial":
             def gerial_impl():
-                if not app_state["SON_ISLEM"]:
+                if not app_state.get("SON_ISLEM"):
                     return "Hafıza Boş: Geri alınacak işlem yok."
                 last = app_state["SON_ISLEM"]
                 sh = get_spreadsheet()
                 sayfa = sh.worksheet(last["sayfa"])
-                sayfa.update_cell(last["satir"], last["sutun"], last["eskiDeger"])
+                
+                if last.get("is_new_masraf"):
+                    sayfa.update_cell(last["satir"], 9, "")
+                    sayfa.update_cell(last["satir"], 10, "")
+                elif last.get("is_masraf_update"):
+                    sayfa.update_cell(last["satir"], 9, last.get("eskiAd", last["grupAdi"]))
+                    sayfa.update_cell(last["satir"], 10, last["eskiDeger"])
+                else:
+                    sayfa.update_cell(last["satir"], last["sutun"], last["eskiDeger"])
+                    
                 app_state["SON_ISLEM"] = None
                 sistemeLogYaz("İptal Edilen İşlem", f"{last['grupAdi']} ({last['islemTuru']})")
                 return f"⏪ <b>ZAMAN GERİYE SARILDI!</b>\nHedef: <b>{last['grupAdi']}</b>\nEski haline döndürüldü."
