@@ -90,6 +90,12 @@ def telegramFotoGonder(chat_id, foto_url: str, caption: str = None, reply_markup
 def telegramMesajSil(chat_id, message_id):
     return telegram_api("deleteMessage", {"chat_id": chat_id, "message_id": message_id})
 
+def telegramMesajDuzenle(chat_id, message_id, metin: str, reply_markup=None):
+    payload = {"chat_id": chat_id, "message_id": message_id, "text": metin, "parse_mode": "HTML"}
+    if reply_markup is not None:
+        payload["reply_markup"] = reply_markup
+    return telegram_api("editMessageText", payload)
+
 def get_gspread_client():
     global _cached_gc
     if _cached_gc is not None:
@@ -521,48 +527,179 @@ def menuKlavyesiOlustur(isGroup: bool):
     keyboard.append([{"text": "🛠️ Komut Rehberi", "callback_data": "rehber"}])
     return {"inline_keyboard": keyboard}
 
-def rehber_metni():
+def rehber_ana_metni() -> str:
     return (
-        "📚 <b>SİSTEM KOMUT REHBERİ</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
-        "🏢 <b>KASA VE OPERASYON</b>\n"
-        "• <code>/kasa</code> : Bağlı grupta canlı durum fişini döker.\n"
-        "• <code>/kasa TİGER 1500</code> : Kasaya para ekler (büyük/küçük harf farketmez).\n"
-        "• <code>/kasasil TİGER 500</code> : Kasadan siler.\n"
-        "• <code>/odeme TİGER 1000</code> : Ödenen tutarı girer.\n"
-        "• <code>/odemesil TİGER 200</code> : Ödenen tutardan siler.\n"
-        "• <code>/devir TİGER 5000</code> : Devir bakiyesi ekler.\n"
-        "• <code>/devirsil TİGER 1000</code> : Devirden siler.\n"
-        "• <code>/masrafekle Yemek 500</code> : Günlük masraf işler.\n"
-        "• <code>/masrafsil Yemek 200</code> : Masraf siler.\n"
-        "• <code>/masraf</code> : Günlük masraf listesini döker.\n"
-        "• <code>/gerial</code> : En son işlemi geri alır.\n\n"
-        "👥 <b>GRUP VE CARİ EŞLEŞTİRME</b>\n"
-        "• <code>/grupbagla [Grup Adı]</code> : Bu Telegram grubunu Excel satırına bağlar.\n"
-        "• <code>/grupkopar</code> : Grubun Excel bağlantısını kaldırır.\n"
-        "• <code>/gruplar</code> : Bağlı Telegram gruplarını listeler.\n\n"
-        "📊 <b>GÜNLÜK DÖNGÜ VE RAPORLAR</b>\n"
-        "• <code>/yenigun</code> : 🌅 Yeni gün sayfasını açar, dünün Kalan Kasasını Devir'e aktarır.\n"
-        "• <code>/rapor</code> : Tüm grupların güncel durum raporu.\n"
-        "• <code>/ozet</code> : Kasa, Masraf ve Ödenen hızlı finans özeti.\n"
-        "• <code>/log</code> veya <code>/son5</code> : Yapılan son işlemleri listeler.\n\n"
-        "🌍 <b>EKSTRA ARAÇLAR & KRİPTO</b>\n"
-        "• <code>/t</code> : 🏛️ Canlı TRC-20 rezerv ve varlık durumunu raporlar.\n"
-        "• <code>/qr [Cüzdan Adresi]</code> : ⚡ QR kod üretir ve canlı TRX/USDT bakiyesini getirir.\n"
-        "• <code>/kur</code> : 🟡 Anlık USDT kurlarını listeler (Binance, Paribu, BtcTurk, WhiteBIT, OKX).\n"
-        "• <code>/canlikur</code> : 🌍 Dünya borsalarını ve döviz kurlarını getirir.\n"
-        "• <code>/iban</code> : 🏦 Kullanımdaki ve boşta olan İBAN'ları listeler.\n"
-        "• <code>/hesap SACİD 2 48.00</code> : Tether / Kasa hesap makinesi.\n"
-        "• <code>/çeviri [Metin]</code> : 🌐 Otomatik çeviri yapar.\n"
-        "• <code>/not [Metin]</code> : Şirket ajandasına not ekler.\n"
-        "• <code>/notlar</code> : Son notları listeler.\n"
-        "• <code>/panel</code> : Canlı CFO Web Dashboard linkini verir.\n"
-        "• <code>/id</code> : Kendi Telegram kullanıcı ID'nizi öğrenirsiniz.\n\n"
-        "🛡️ <b>YÖNETİCİ KONTROLLERİ</b>\n"
-        "• <code>/adminekle [ID] [İsim]</code> : Yeni yönetici ekler.\n"
-        "• <code>/adminsil [ID]</code> : Yöneticiyi siler.\n"
-        "• <code>/adminler</code> : Yetkili yöneticileri listeler.\n\n"
-        "💡 <i>Tüm işlemler arka planda güvenlik protokolüyle işlenmektedir.</i>"
+        "📚 <b>CFO BOT AKILLI KOMUT REHBERİ</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "Şirketinizin finans, kasa, masraf ve döviz operasyonlarını 7/24 kesintisiz yönetebilirsiniz.\n\n"
+        "👇 <b>Detaylı bilgi ve örnek kullanımlar için bir kategori seçin:</b>"
     )
+
+def rehber_ana_klavyesi():
+    return {
+        "inline_keyboard": [
+            [
+                {"text": "💰 Kasa & Ödeme", "callback_data": "rehber_kasa"},
+                {"text": "📉 Masraf Yönetimi", "callback_data": "rehber_masraf"}
+            ],
+            [
+                {"text": "🔗 Grup Bağlama", "callback_data": "rehber_grup"},
+                {"text": "📊 Günlük Raporlar", "callback_data": "rehber_rapor"}
+            ],
+            [
+                {"text": "🪙 Kripto & Döviz", "callback_data": "rehber_kripto"},
+                {"text": "🛡️ Yönetici Yetkileri", "callback_data": "rehber_admin"}
+            ],
+            [
+                {"text": "📜 Tüm Komutlar (Tek Liste)", "callback_data": "rehber_tumu"}
+            ]
+        ]
+    }
+
+def rehber_kategori_klavyesi():
+    return {
+        "inline_keyboard": [
+            [{"text": "⬅️ Ana Rehber Menüsü", "callback_data": "rehber_ana"}]
+        ]
+    }
+
+def rehber_kategori_metni(kategori: str) -> str:
+    if kategori == "kasa":
+        return (
+            "🏢 <b>KASA VE ÖDEME İŞLEMLERİ</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "• <code>/kasa</code>\n"
+            "  └ <i>Bağlı Telegram grubunda tek tuşla canlı kasa durum fişini döker.</i>\n\n"
+            "• <code>/kasa [Grup] [Tutar]</code>\n"
+            "  └ <i>Kasaya nakit ekler.</i>\n"
+            "  └ <i>Örnek:</i> <code>/kasa SACİD 500.000</code> veya <code>/kasa TİGER 1.250,50</code>\n\n"
+            "• <code>/kasasil [Grup] [Tutar]</code>\n"
+            "  └ <i>Kasa tutarından düşer.</i>\n"
+            "  └ <i>Örnek:</i> <code>/kasasil SACİD 50.000</code>\n\n"
+            "• <code>/odeme [Grup] [Tutar]</code>\n"
+            "  └ <i>Yapılan ödemeyi işler.</i>\n"
+            "  └ <i>Örnek:</i> <code>/odeme SACİD 100.000</code>\n\n"
+            "• <code>/odemesil [Grup] [Tutar]</code>\n"
+            "  └ <i>Ödenen tutardan düşer.</i>\n\n"
+            "• <code>/devir [Grup] [Tutar]</code>\n"
+            "  └ <i>Cari satırına devir / borç bakiyesi ekler.</i>\n"
+            "  └ <i>Örnek:</i> <code>/devir TİGER 250.000</code>\n\n"
+            "• <code>/devirsil [Grup] [Tutar]</code>\n"
+            "  └ <i>Devir tutarından düşer.</i>\n\n"
+            "• <code>/gerial</code>\n"
+            "  └ <i>En son yapılan hatalı işlemi hafızadan geri alır.</i>"
+        )
+    elif kategori == "masraf":
+        return (
+            "📉 <b>MASRAF VE GİDER YÖNETİMİ</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "• <code>/masrafekle [Kalem] [Tutar]</code>\n"
+            "  └ <i>Excel'deki ilk boş satıra yeni masraf kalemi olarak işler.</i>\n"
+            "  └ <i>Örnek:</i> <code>/masrafekle Yemek 1.250,50</code>\n"
+            "  └ <i>Örnek:</i> <code>/masrafekle ABI 500.000</code>\n\n"
+            "• <code>/masrafsil [Kalem] [Tutar]</code>\n"
+            "  └ <i>İlgili masrafı son eklenen satırdan siler veya tutarını düşer.</i>\n"
+            "  └ <i>Örnek:</i> <code>/masrafsil Yemek 250</code>\n\n"
+            "• <code>/masraf</code> veya <code>/gider</code>\n"
+            "  └ <i>Günün tüm masraf kalemlerini ve toplam gider bilançosunu listeler.</i>"
+        )
+    elif kategori == "grup":
+        return (
+            "👥 <b>GRUP VE CARİ EŞLEŞTİRME</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "• <code>/grupbagla [Grup Adı]</code>\n"
+            "  └ <i>Bu Telegram grubunu Excel'deki cari satırına bağlar (Grupta bir kez çalıştırılır).</i>\n"
+            "  └ <i>Örnek:</i> <code>/grupbagla SACİD</code>\n\n"
+            "• <code>/grupkopar</code>\n"
+            "  └ <i>İçinde bulunulan grubun Excel eşleştirmesini kaldırır.</i>\n\n"
+            "• <code>/gruplar</code>\n"
+            "  └ <i>Hangi Telegram grubunun hangi Excel carisine bağlı olduğunu listeler.</i>"
+        )
+    elif kategori == "rapor":
+        return (
+            "📊 <b>GÜNLÜK DÖNGÜ VE RAPORLAR</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "• <code>/ozet</code>\n"
+            "  └ <i>Toplam devir, kasa, ödeme, komisyon ve net kalan anlık şirket bilançosu.</i>\n\n"
+            "• <code>/rapor</code>\n"
+            "  └ <i>Tüm aktif grupların ayrıntılı döküm raporunu verir.</i>\n\n"
+            "• <code>/yenigun</code>\n"
+            "  └ <i>🌅 Gün sonu devir işlemi: Dünün net kalan kasasını yeni günün devrine aktarır, güncel kasa ve ödemeleri sıfırlayarak yeni sayfa açar.</i>"
+        )
+    elif kategori == "kripto":
+        return (
+            "🪙 <b>KRİPTO, KUR VE FİNANS ARAÇLARI</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "• <code>/kur</code>\n"
+            "  └ <i>Binance, Paribu, BtcTurk, WhiteBIT canlı USDT/TRY kurlarını listeler.</i>\n\n"
+            "• <code>/canlikur</code>\n"
+            "  └ <i>Dünya para birimleri (USD, EUR, GBP) ve global piyasa kurları.</i>\n\n"
+            "• <code>/hesap [Grup] [Komisyon%] [Kur]</code>\n"
+            "  └ <i>Tether / Komisyon hesap makinesi.</i>\n"
+            "  └ <i>Örnek:</i> <code>/hesap SACİD 2 48.00</code>\n\n"
+            "• <code>/iban</code>\n"
+            "  └ <i>Kullanımdaki ve boşta olan şirket İBAN'larını listeler.</i>\n\n"
+            "• <code>/t [Cüzdan Adresi]</code>\n"
+            "  └ <i>🏛️ TRC-20 canlı blokzincir USDT rezervini ve TL karşılığını raporlar.</i>\n\n"
+            "• <code>/qr [Cüzdan Adresi]</code>\n"
+            "  └ <i>⚡ Hızlı ödeme QR kodu üretir ve borsa/istihbarat analizi yapar.</i>"
+        )
+    elif kategori == "admin":
+        return (
+            "🛡️ <b>YÖNETİCİ KONTROLLERİ</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "• <code>/adminler</code>\n"
+            "  └ <i>Sistemde yetkilendirilmiş şirket yöneticilerini listeler.</i>\n\n"
+            "• <code>/adminekle [Telegram ID] [İsim]</code>\n"
+            "  └ <i>Botu kullanabilmesi için yeni bir yönetici yetkilendirir (Sadece Kurucu).</i>\n\n"
+            "• <code>/adminsil [Telegram ID]</code>\n"
+            "  └ <i>Yöneticinin bot yetkisini geri alır.</i>\n\n"
+            "• <code>/panel</code>\n"
+            "  └ <i>Canlı CFO Web Dashboard bağlantı linkini verir.</i>\n\n"
+            "• <code>/id</code>\n"
+            "  └ <i>Kendi Telegram kullanıcı ID numaranızı görüntüler.</i>"
+        )
+    else:  # "tumu"
+        return (
+            "📚 <b>TÜM SİSTEM KOMUTLARI</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🏢 <b>KASA VE OPERASYON</b>\n"
+            "• <code>/kasa</code> : Canlı durum fişi döker.\n"
+            "• <code>/kasa [Grup] [Tutar]</code> : Kasaya nakit ekler.\n"
+            "• <code>/kasasil [Grup] [Tutar]</code> : Kasadan tutar siler.\n"
+            "• <code>/odeme [Grup] [Tutar]</code> : Ödenen tutarı işler.\n"
+            "• <code>/odemesil [Grup] [Tutar]</code> : Ödenen tutardan düşer.\n"
+            "• <code>/devir [Grup] [Tutar]</code> : Devir bakiyesi ekler.\n"
+            "• <code>/devirsil [Grup] [Tutar]</code> : Devirden siler.\n"
+            "• <code>/masrafekle [Kalem] [Tutar]</code> : Sonraki boş satıra masraf işler.\n"
+            "• <code>/masrafsil [Kalem] [Tutar]</code> : Masraf siler/düşer.\n"
+            "• <code>/masraf</code> : Günlük masraf listesini döker.\n"
+            "• <code>/gerial</code> : En son işlemi geri alır.\n\n"
+            "👥 <b>GRUP VE CARİ EŞLEŞTİRME</b>\n"
+            "• <code>/grupbagla [Grup Adı]</code> : Grubu Excel satırına bağlar.\n"
+            "• <code>/grupkopar</code> : Grubun Excel bağlantısını kaldırır.\n"
+            "• <code>/gruplar</code> : Bağlı grupları listeler.\n\n"
+            "📊 <b>GÜNLÜK DÖNGÜ VE RAPORLAR</b>\n"
+            "• <code>/ozet</code> : Kasa, masraf ve ödenen bilanço özeti.\n"
+            "• <code>/rapor</code> : Tüm grupların detaylı durum raporu.\n"
+            "• <code>/yenigun</code> : 🌅 Kalan kasayı devire aktararak yeni günü açar.\n\n"
+            "🪙 <b>KRİPTO, KUR VE FİNANS ARAÇLARI</b>\n"
+            "• <code>/kur</code> : Canlı borsa USDT/TRY kurları.\n"
+            "• <code>/hesap [Grup] [Kom%] [Kur]</code> : Tether hesap makinesi.\n"
+            "• <code>/iban</code> : Şirket İBAN listesi.\n"
+            "• <code>/t</code> : Canlı TRC-20 rezerv ve bakiye raporu.\n"
+            "• <code>/qr [Cüzdan]</code> : Cüzdan QR kodu ve istihbarat analizi.\n"
+            "• <code>/canlikur</code> : Dünya borsaları ve döviz kurları.\n\n"
+            "🛡️ <b>YÖNETİCİ KONTROLLERİ</b>\n"
+            "• <code>/adminler</code> : Yetkili yöneticileri listeler.\n"
+            "• <code>/adminekle [ID] [İsim]</code> : Yeni yönetici ekler.\n"
+            "• <code>/adminsil [ID]</code> : Yöneticiyi siler.\n"
+            "• <code>/panel</code> : Canlı Web Dashboard linki.\n"
+            "• <code>/id</code> : Telegram kullanıcı ID'nizi gösterir."
+        )
+
+def rehber_metni():
+    return rehber_kategori_metni("tumu")
 
 def parse_grup_ve_tutar(parametreler: List[str]) -> Tuple[str, float]:
     if len(parametreler) < 2:
@@ -1494,14 +1631,25 @@ def process_telegram_update(update: dict):
             telegramMesajGonder(chat_id, "⛔ <b>Erişim Reddedildi!</b>\nBu işlem için yetkiniz bulunmamaktadır.")
             return
             
-        if data == "rehber":
-            telegramMesajGonder(chat_id, rehber_metni())
+        if data in ["rehber", "rehber_ana"]:
+            msg_id = cq.get("message", {}).get("message_id")
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, rehber_ana_metni(), rehber_ana_klavyesi())
+            else:
+                telegramMesajGonder(chat_id, rehber_ana_metni(), rehber_ana_klavyesi())
+        elif data.startswith("rehber_"):
+            kat = data.replace("rehber_", "")
+            msg_id = cq.get("message", {}).get("message_id")
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, rehber_kategori_metni(kat), rehber_kategori_klavyesi())
+            else:
+                telegramMesajGonder(chat_id, rehber_kategori_metni(kat), rehber_kategori_klavyesi())
         elif data == "rapor_ozet":
             islemi_analiz_bildirimiyle_yap(chat_id, hizliOzetUret_impl)
         elif data == "rapor_masraf":
             islemi_analiz_bildirimiyle_yap(chat_id, masrafRaporuUret_impl)
         elif data == "rapor_tumu":
-            islemi_analiz_bildirimiyle_yap(chat_id, tumGruplarRaporu_impl)
+            islemi_analiz_bildirimiyle_yap(chat_id, tumGruplarRaporu_impl, goster_bildirim=True)
         elif data == "menu_yenigun":
             metin, klavye = yenigun_baslat_mesaji()
             telegramMesajGonder(chat_id, metin, klavye)
@@ -1654,7 +1802,7 @@ def process_telegram_update(update: dict):
         if ana_komut in ["/start", "/menu", "/menü"]:
             telegramMesajGonder(chat_id, "👋 <b>CFO ve Finans Yönetim Botu</b>\nLütfen bir işlem seçin:\n\n👨💻 <i>Yazılım: @CRYPTOATAKAN © 2026</i>", menuKlavyesiOlustur(is_group))
         elif ana_komut in ["/rehber", "/komutlar", "/yardim", "/yardım"]:
-            telegramMesajGonder(chat_id, rehber_metni())
+            telegramMesajGonder(chat_id, rehber_ana_metni(), rehber_ana_klavyesi())
         elif ana_komut in ["/qr", "/tronqr", "/tron", "/cuzdan", "/cüzdan", "/adres"]:
             cuzdanQrUret_impl(chat_id, text)
         elif ana_komut == "/panel":
