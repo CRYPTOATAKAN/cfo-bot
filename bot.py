@@ -43,7 +43,9 @@ app_state = {
     "CIRO_HEDEFI": None,
     "SON_ISLEM": None,
     "LOG_HAFTASI": None,
-    "ADMIN_CACHE_TIME": 0
+    "ADMIN_CACHE_TIME": 0,
+    "KAPANIS_SAATI": os.environ.get("KAPANIS_SAATI", "23:00"),
+    "SON_KAPANIS_TARIHI": None
 }
 
 SCOPES = [
@@ -654,6 +656,10 @@ def rehber_kategori_metni(kategori: str) -> str:
             "  └ <i>Botu kullanabilmesi için yeni bir yönetici yetkilendirir (Sadece Kurucu).</i>\n\n"
             "• <code>/adminsil [Telegram ID]</code>\n"
             "  └ <i>Yöneticinin bot yetkisini geri alır.</i>\n\n"
+            "• <code>/kapanis</code>\n"
+            "  └ <i>🌙 Gün sonu kapanış bilançosunu anında özelinize gönderir (Sadece Kurucu).</i>\n\n"
+            "• <code>/kapanissaati [SS:DD]</code>\n"
+            "  └ <i>Otomatik gün sonu bildirim saatini ayarlar (Örn: /kapanissaati 23:00).</i>\n\n"
             "• <code>/panel</code>\n"
             "  └ <i>Canlı CFO Web Dashboard bağlantı linkini verir.</i>\n\n"
             "• <code>/id</code>\n"
@@ -682,7 +688,8 @@ def rehber_kategori_metni(kategori: str) -> str:
             "📊 <b>GÜNLÜK DÖNGÜ VE RAPORLAR</b>\n"
             "• <code>/ozet</code> : Kasa, masraf ve ödenen bilanço özeti.\n"
             "• <code>/rapor</code> : Tüm grupların detaylı durum raporu.\n"
-            "• <code>/yenigun</code> : 🌅 Kalan kasayı devire aktararak yeni günü açar.\n\n"
+            "• <code>/yenigun</code> : 🌅 Kalan kasayı devire aktararak yeni günü açar.\n"
+            "• <code>/kapanis</code> : 🌙 Kurucuya özel gün sonu kapanış bilançosu.\n\n"
             "🪙 <b>KRİPTO, KUR VE FİNANS ARAÇLARI</b>\n"
             "• <code>/kur</code> : Canlı borsa USDT/TRY kurları.\n"
             "• <code>/hesap [Grup] [Kom%] [Kur]</code> : Tether hesap makinesi.\n"
@@ -694,6 +701,7 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/adminler</code> : Yetkili yöneticileri listeler.\n"
             "• <code>/adminekle [ID] [İsim]</code> : Yeni yönetici ekler.\n"
             "• <code>/adminsil [ID]</code> : Yöneticiyi siler.\n"
+            "• <code>/kapanissaati [SS:DD]</code> : Otomatik rapor saatini ayarlar.\n"
             "• <code>/panel</code> : Canlı Web Dashboard linki.\n"
             "• <code>/id</code> : Telegram kullanıcı ID'nizi gösterir."
         )
@@ -1006,6 +1014,71 @@ def masrafRaporuUret_impl() -> str:
         f"━━━━━━━━━━━━━━━━━━━━"
     )
     return mesaj
+
+def gun_sonu_kapanis_raporu_uret() -> str:
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    veriler = sayfa.get_all_values()
+    finans = tablodan_finans_ozeti_hesapla(veriler)
+    
+    # Masraflar
+    masraflar = []
+    toplam_masraf = 0.0
+    for row in veriler[1:]:
+        if len(row) >= 10:
+            ad = row[8].strip()
+            if ad and "GENEL TOPLAM" not in ad.upper() and ad != "-":
+                fiyat = guvenliSayi(row[9])
+                if abs(fiyat) > 0.001:
+                    toplam_masraf += fiyat
+                    masraflar.append({"ad": ad, "fiyat": fiyat})
+    masraflar.sort(key=lambda x: x["fiyat"], reverse=True)
+    
+    # Anlık USDT kuru
+    anlik_kur_str = ""
+    try:
+        b_usdt = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=USDTTRY")
+        anlik_kur_str = f"🟡 <b>Binance USDT/TRY:</b> <code>{float(b_usdt['price']):.2f} ₺</code>\n"
+    except:
+        pass
+
+    tarih = sayfa.title
+    saat = suankiZamaniAl().strftime("%H:%M")
+    
+    rapor = (
+        f"🌙 <b>GÜN SONU FİNANS VE KASA BİLANÇOSU</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📅 <b>Tarih:</b> {tarih} | ⏰ <b>Saat:</b> {saat}\n"
+        f"🏢 <b>İşlem Gören Grup:</b> {len(finans['aktif_gruplar'])} Adet\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"🔄 <b>Toplam Devir:</b> {paraFormatla(finans['devir'])}\n"
+        f"💰 <b>Eklenen Kasa:</b> {paraFormatla(finans['kasa'])}\n"
+        f"💸 <b>Toplam Ödeme:</b> {paraFormatla(finans['odenen'])}\n"
+        f"✂️ <b>Toplam Komisyon:</b> {paraFormatla(finans['komisyon'])}\n"
+        f"📉 <b>Toplam Masraf:</b> {paraFormatla(toplam_masraf)} <i>({len(masraflar)} Kalem)</i>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🏦 <b>GÜN SONU NET KALAN: {paraFormatla(finans['kalan'])}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+    )
+    
+    if finans['aktif_gruplar']:
+        rapor += "👥 <b>GRUP DURUMLARI:</b>\n"
+        for g in finans['aktif_gruplar']:
+            emoji = grupEmojisiBul(g["ad"])
+            rapor += f"{emoji} <b>{g['ad'].upper()}:</b> Kasa: {paraFormatla(g['kasa'])} | Ödeme: {paraFormatla(g['odenen'])} | <b>Kalan: {paraFormatla(g['kalan'])}</b>\n"
+        rapor += "\n"
+        
+    if masraflar:
+        rapor += "📉 <b>ÖNE ÇIKAN MASRAFLAR:</b>\n"
+        for m in masraflar[:5]:
+            rapor += f"🔹 {m['ad']}: {paraFormatla(m['fiyat'])}\n"
+        rapor += "\n"
+        
+    if anlik_kur_str:
+        rapor += f"━━━━━━━━━━━━━━━━━━━━\n{anlik_kur_str}"
+        
+    rapor += "━━━━━━━━━━━━━━━━━━━━\n💡 <i>Yeni güne devretmek için: /yenigun</i>"
+    return rapor
 
 def f_tl(val) -> str:
     try:
@@ -1443,7 +1516,8 @@ def yenigun_baslat_mesaji():
         f"📁 <b>Kaynak Sayfa:</b> <code>{kaynak_sayfa.title}</code>\n"
         f"📅 <b>Açılacak Yeni Sayfa:</b> <code>{hedef_tarih}</code>\n\n"
         "1. Dünkü <b>Kalan Kasa</b> (G sütunu) tutarları (+/- işaretleri ve kuruşları korunarak) yeni günün <b>Devir/Borç</b> (C sütunu) hanesine aktarılacaktır.\n"
-        "2. <b>Güncel Kasa</b> (D) ve <b>Ödenen</b> (E) sütunları sıfırlanacaktır (2-42. Satırlar).\n\n"
+        "2. <b>Güncel Kasa</b> (D) ve <b>Ödenen</b> (E) sütunları sıfırlanacaktır (2-42. Satırlar).\n"
+        "3. <b>G45 Kalan Fark:</b> Dünün G45 nihai kapanış bakiyesi (+/- korunarak) yeni günün <code>=FARK+F43-J43</code> formülüne otomatik aktarılacaktır.\n\n"
         "Lütfen masraf tercihinizi seçin:",
         klavye
     )
@@ -1463,11 +1537,11 @@ def yenigun_gerceklestir_impl(masraflari_sil: bool) -> str:
     # 2. Eğer hedef sayfa adı önceden bozuk/yarım açılmışsa temizle
     try:
         mevcut_sayfa = sh.worksheet(hedef_yeni_tarih)
-        if mevcut_sayfa.col_count < 8 or mevcut_sayfa.row_count < 30:
+        if isinstance(mevcut_sayfa.col_count, int) and (mevcut_sayfa.col_count < 8 or mevcut_sayfa.row_count < 30):
             sh.del_worksheet(mevcut_sayfa)
         else:
             return f"⚠️ <b>{hedef_yeni_tarih}</b> tarihli sayfa zaten mevcut ve kullanımda!"
-    except gspread.exceptions.WorksheetNotFound:
+    except Exception:
         pass
         
     if not is_valid_daily_sheet(kaynak_sayfa):
@@ -1487,10 +1561,20 @@ def yenigun_gerceklestir_impl(masraflari_sil: bool) -> str:
                 kalan_val = guvenliSayi(row[6]) if len(row) > 6 else 0.0
                 grup_dunku_kalanlar[g_norm] = kalan_val
 
-    # 4. Gerçek tam finans sayfasını yeni gün adıyla kopyala
+    # 4. G45 Dünkü Kalan Fark Değerini Oku (+/- işaretleri ve kuruşları eksiksiz al)
+    dunku_g45_val = 0.0
+    if len(dunku_veriler) >= 45 and len(dunku_veriler[44]) > 6:
+        dunku_g45_val = guvenliSayi(dunku_veriler[44][6])
+    else:
+        try:
+            dunku_g45_val = guvenliSayi(kaynak_sayfa.acell('G45').value)
+        except Exception:
+            pass
+
+    # 5. Gerçek tam finans sayfasını yeni gün adıyla kopyala
     yeni_sayfa = kaynak_sayfa.duplicate(new_sheet_name=hedef_yeni_tarih)
     
-    # 5. GRUP BAZLI DEVİR AKTARIMI VE SIFIRLAMA MATRİSİ: C2:E42 (Devir = G sütunu, Kasa = 0, Ödenen = 0)
+    # 6. GRUP BAZLI DEVİR AKTARIMI VE SIFIRLAMA MATRİSİ: C2:E42 (Devir = G sütunu, Kasa = 0, Ödenen = 0)
     matrix_c_e = []
     toplam_devir = 0.0
     
@@ -1512,12 +1596,29 @@ def yenigun_gerceklestir_impl(masraflari_sil: bool) -> str:
     # Tek seferde C2:E42 bloğunu güncelle (1 tek API çağrısıyla anında yazar)
     yeni_sayfa.update('C2:E42', matrix_c_e, value_input_option='USER_ENTERED')
                 
-    # 6. Masrafları Temizleme Seçimi (I2:J42 tek seferde toplu temizleme)
+    # 7. Masrafları Temizleme Seçimi (I2:J42 tek seferde toplu temizleme)
     if masraflari_sil and yeni_sayfa.col_count >= 10:
         empty_masraf = [['', ''] for _ in range(41)]
         yeni_sayfa.update('I2:J42', empty_masraf)
+
+    # 8. G45 Hücresine Dünkü Kapanış Farkını İçeren Yeni Formülü Yaz
+    # Format: =DEĞER+F43-J43 (+/- işaretleri ve ondalık kuruşlar bozulmadan korunur)
+    if abs(dunku_g45_val - round(dunku_g45_val)) < 0.00001:
+        val_str = str(int(round(dunku_g45_val)))
+    else:
+        val_str = f"{dunku_g45_val:.2f}".rstrip('0').rstrip('.')
+
+    yeni_g45_formulu = f"={val_str}+F43-J43"
+    try:
+        yeni_sayfa.update('G45', [[yeni_g45_formulu]], value_input_option='USER_ENTERED')
+    except Exception as e:
+        print(f"G45 formül güncelleme hatası: {e}")
+        try:
+            yeni_sayfa.update_acell('G45', yeni_g45_formulu)
+        except Exception:
+            pass
             
-    sistemeLogYaz("Yeni Gün Geçişi", f"Yeni gün ({hedef_yeni_tarih}) açıldı. Kaynak: {kaynak_sayfa.title} | Devir: {paraFormatla(toplam_devir)}")
+    sistemeLogYaz("Yeni Gün Geçişi", f"Yeni gün ({hedef_yeni_tarih}) açıldı. Kaynak: {kaynak_sayfa.title} | Devir: {paraFormatla(toplam_devir)} | G45: {yeni_g45_formulu}")
     
     return (
         f"🌅 <b>{hedef_yeni_tarih} GÜNÜ BAŞARIYLA AÇILDI!</b>\n"
@@ -1525,7 +1626,9 @@ def yenigun_gerceklestir_impl(masraflari_sil: bool) -> str:
         f"📁 <b>Kaynak Alınan Gün:</b> <code>{kaynak_sayfa.title}</code>\n"
         f"🔄 <b>Devir'e (C) Aktarılan Kalan Kasa (G):</b> {paraFormatla(toplam_devir)}\n"
         f"💰 <b>Güncel Kasa (D) ve Ödenen (E):</b> Sıfırlandı (2-42. Satırlar)\n"
+        f"📊 <b>G45 Kalan Fark:</b> {paraFormatla(dunku_g45_val)} yeni güne aktarıldı (Formül: <code>{yeni_g45_formulu}</code>)\n"
         f"📉 <b>Masraflar:</b> {'Temizlendi' if masraflari_sil else 'Korundu'}\n\n"
+        f"⚠️ <i>Lütfen tablodan devirleri ve G45 farkını kontrol ediniz.</i>\n"
         f"İyi çalışmalar ve bol kazançlar dileriz! 🚀"
     )
 
@@ -1853,6 +1956,38 @@ def process_telegram_update(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, admin_sil_impl, text, user_id)
         elif ana_komut in ["/adminler", "/yoneticiler"]:
             islemi_analiz_bildirimiyle_yap(chat_id, admin_listesi_impl)
+        elif ana_komut in ["/kapanis", "/gunsonu"]:
+            if user_id != KURUCU_ID:
+                telegramMesajGonder(chat_id, "⛔ <b>Yetkisiz İşlem:</b> Gün sonu kapanış raporunu alma yetkisi sadece Şirket Kurucusuna aittir.")
+                return
+            islemi_analiz_bildirimiyle_yap(chat_id, gun_sonu_kapanis_raporu_uret, goster_bildirim=True)
+        elif ana_komut in ["/kapanissaati", "/saatayar"]:
+            if user_id != KURUCU_ID:
+                telegramMesajGonder(chat_id, "⛔ <b>Yetkisiz İşlem:</b> Bu ayar sadece Şirket Kurucusuna aittir.")
+                return
+            p_args = text.split()[1:]
+            if not p_args:
+                telegramMesajGonder(
+                    chat_id,
+                    f"🕒 <b>Otomatik Kapanış Rapor Saati:</b> <code>{app_state.get('KAPANIS_SAATI', '23:00')}</code>\n\n"
+                    f"💡 Saati güncellemek için: <code>/kapanissaati 22:30</code>"
+                )
+                return
+            yeni_saat = p_args[0].strip()
+            if re.match(r"^\d{1,2}:\d{2}$", yeni_saat):
+                parts = yeni_saat.split(":")
+                h, m = int(parts[0]), int(parts[1])
+                if 0 <= h <= 23 and 0 <= m <= 59:
+                    fmt_saat = f"{h:02d}:{m:02d}"
+                    app_state["KAPANIS_SAATI"] = fmt_saat
+                    sistemeLogYaz("Kapanış Saati Güncellendi", f"Yeni Saat: {fmt_saat}")
+                    telegramMesajGonder(
+                        chat_id,
+                        f"✅ <b>Kapanış Rapor Saati Güncellendi!</b>\n"
+                        f"Her akşam saat <b>{fmt_saat}</b>'de günün detaylı bilançosu otomatik olarak özelinize gönderilecektir."
+                    )
+                    return
+            telegramMesajGonder(chat_id, "⚠️ <b>Geçersiz Saat Formatı!</b>\nLütfen <code>SS:DD</code> formatında girin. Örnek: <code>/kapanissaati 23:00</code>")
         elif ana_komut == "/gerial":
             def gerial_impl():
                 if not app_state.get("SON_ISLEM"):
@@ -2097,10 +2232,32 @@ def run_dashboard_server():
     server = HTTPServer(("0.0.0.0", port), LiveDashboardHandler)
     server.serve_forever()
 
+def run_kapanis_scheduler():
+    """Her akşam belirlenen saatte (varsayılan 23:00) otomatik gün sonu bilançosunu sadece Kurucuya iletir."""
+    while True:
+        try:
+            simdi = suankiZamaniAl()
+            saat_dakika = simdi.strftime("%H:%M")
+            bugun_str = simdi.strftime("%d.%m.%Y")
+            hedef_saat = app_state.get("KAPANIS_SAATI", "23:00")
+            
+            if saat_dakika == hedef_saat and app_state.get("SON_KAPANIS_TARIHI") != bugun_str:
+                try:
+                    rapor_metni = gun_sonu_kapanis_raporu_uret()
+                    telegramMesajGonder(KURUCU_ID, rapor_metni)
+                    app_state["SON_KAPANIS_TARIHI"] = bugun_str
+                    sistemeLogYaz("Otomatik Gün Sonu Raporu", f"Kurucuya ({KURUCU_ID}) gün sonu bilançosu iletildi.")
+                except Exception as e:
+                    print(f"Otomatik kapanış raporu gönderme hatası: {e}")
+        except Exception as e:
+            print(f"Kapanış scheduler hatası: {e}")
+        time.sleep(30)
+
 # --- MAIN LOOP (LONG POLLING WITH THREAD POOL) ---
 if __name__ == "__main__":
     threading.Thread(target=run_dashboard_server, daemon=True).start()
-    print("CFO Bot & Canlı Dashboard Başlatıldı (7/24 Kesintisiz - Hızlı Paralel Motor)...")
+    threading.Thread(target=run_kapanis_scheduler, daemon=True).start()
+    print(f"CFO Bot & Canlı Dashboard Başlatıldı (7/24 Kesintisiz - Otomatik Kapanış Saati: {app_state.get('KAPANIS_SAATI', '23:00')})...")
     
     offset = 0
     while True:
