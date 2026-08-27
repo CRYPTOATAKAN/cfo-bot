@@ -1602,11 +1602,11 @@ def yenigun_gerceklestir_impl(masraflari_sil: bool) -> str:
         yeni_sayfa.update('I2:J42', empty_masraf)
 
     # 8. G45 Hücresine Dünkü Kapanış Farkını İçeren Yeni Formülü Yaz
-    # Format: =DEĞER+F43-J43 (+/- işaretleri ve ondalık kuruşlar bozulmadan korunur)
+    # Türkçe Google Sheets yerel ayarına uygun olarak ondalık ayracı virgül (,) yapılır (Örn: =6979160,83+F43-J43)
     if abs(dunku_g45_val - round(dunku_g45_val)) < 0.00001:
         val_str = str(int(round(dunku_g45_val)))
     else:
-        val_str = f"{dunku_g45_val:.2f}".rstrip('0').rstrip('.')
+        val_str = f"{dunku_g45_val:.2f}".rstrip('0').rstrip('.').replace(".", ",")
 
     yeni_g45_formulu = f"={val_str}+F43-J43"
     try:
