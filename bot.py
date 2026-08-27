@@ -1065,7 +1065,19 @@ def gun_sonu_kapanis_raporu_uret() -> str:
         rapor += "👥 <b>GRUP DURUMLARI:</b>\n"
         for g in finans['aktif_gruplar']:
             emoji = grupEmojisiBul(g["ad"])
-            rapor += f"{emoji} <b>{g['ad'].upper()}:</b> Kasa: {paraFormatla(g['kasa'])} | Ödeme: {paraFormatla(g['odenen'])} | <b>Kalan: {paraFormatla(g['kalan'])}</b>\n"
+            grup_adi = g["ad"].upper()
+            kalan_str = paraFormatla(g["kalan"])
+            rapor += f"{emoji} <b>{grup_adi}:</b> 🏦 <code>{kalan_str}</code>\n"
+            
+            has_kasa = abs(g["kasa"]) > 0.001
+            has_odenen = abs(g["odenen"]) > 0.001
+            if has_kasa or has_odenen:
+                detay_parts = []
+                if has_kasa:
+                    detay_parts.append(f"💰 Kasa: +{paraFormatla(g['kasa'])}")
+                if has_odenen:
+                    detay_parts.append(f"💸 Ödeme: -{paraFormatla(g['odenen'])}")
+                rapor += f"   └ <i>({' | '.join(detay_parts)})</i>\n"
         rapor += "\n"
         
     if masraflar:
