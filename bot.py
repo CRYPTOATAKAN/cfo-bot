@@ -641,6 +641,8 @@ def rehber_kategori_metni(kategori: str) -> str:
             "  └ <i>Örnek:</i> <code>/hesap SACİD 2 48.00</code>\n\n"
             "• <code>/iban</code>\n"
             "  └ <i>Kullanımdaki ve boşta olan şirket İBAN'larını listeler.</i>\n\n"
+            "• <code>/ibancoz [İBAN]</code>\n"
+            "  └ <i>İBAN'ı doğrular (MOD-97), bankasını bulur ve temiz kopyalama formatı üretir.</i>\n\n"
             "• <code>/t [Cüzdan Adresi]</code>\n"
             "  └ <i>🏛️ TRC-20 canlı blokzincir USDT rezervini ve TL karşılığını raporlar.</i>\n\n"
             "• <code>/qr [Cüzdan Adresi]</code>\n"
@@ -694,6 +696,7 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/kur</code> : Canlı borsa USDT/TRY kurları.\n"
             "• <code>/hesap [Grup] [Kom%] [Kur]</code> : Tether hesap makinesi.\n"
             "• <code>/iban</code> : Şirket İBAN listesi.\n"
+            "• <code>/ibancoz [İBAN]</code> : İBAN doğrulama ve banka tespiti.\n"
             "• <code>/t</code> : Canlı TRC-20 rezerv ve bakiye raporu.\n"
             "• <code>/qr [Cüzdan]</code> : Cüzdan QR kodu ve istihbarat analizi.\n"
             "• <code>/canlikur</code> : Dünya borsaları ve döviz kurları.\n\n"
@@ -1493,6 +1496,193 @@ def hesapMakinesi_impl(orijinalMetin: str) -> str:
     )
     return mesaj
 
+# --- TÜRKİYE BANKA KODLARI LİSTESİ (TCMB) ---
+BANKA_KODLARI = {
+    "00001": "T.C. Merkez Bankası",
+    "00010": "T.C. Ziraat Bankası",
+    "00012": "Türkiye Halk Bankası (Halkbank)",
+    "00015": "Türkiye Vakıflar Bankası (VakıfBank)",
+    "00032": "Türk Ekonomi Bankası (TEB)",
+    "00046": "Akbank",
+    "00059": "Şekerbank",
+    "00062": "Garanti BBVA",
+    "00064": "Türkiye İş Bankası",
+    "00067": "Yapı ve Kredi Bankası",
+    "00091": "Arap Türk Bankası",
+    "00092": "Citibank",
+    "00096": "Turkish Bank",
+    "00099": "ING Bank",
+    "00100": "Adabank",
+    "00103": "Fibabanka",
+    "00108": "Turkland Bank (T-Bank)",
+    "00109": "ICBC Turkey Bank",
+    "00111": "QNB Finansbank",
+    "00115": "Deutsche Bank",
+    "00121": "Standard Chartered Yatırım",
+    "00122": "Societe Generale",
+    "00123": "HSBC Bank",
+    "00124": "Alternatif Bank",
+    "00125": "Burgan Bank",
+    "00134": "DenizBank",
+    "00135": "Anadolubank",
+    "00137": "Rabobank",
+    "00138": "Diler Yatırım Bankası",
+    "00139": "GSD Yatırım Bankası",
+    "00140": "Credit Agricole Yatırım Bankası",
+    "00141": "Nurol Yatırım Bankası",
+    "00142": "BankPozitif Kredi ve Kalkınma",
+    "00143": "Aktif Yatırım Bankası (Aktif Bank)",
+    "00144": "Merrill Lynch Yatırım Bank",
+    "00145": "Morgan Stanley Menkul Değerler",
+    "00146": "Odea Bank",
+    "00147": "MUFG Bank Turkey",
+    "00148": "Intesa Sanpaolo",
+    "00150": "İller Bankası",
+    "00151": "Türk Eximbank",
+    "00152": "Türkiye Kalkınma ve Yatırım Bankası",
+    "00153": "İstanbul Takas ve Saklama Bankası",
+    "00156": "Pashabank",
+    "00158": "Destek Yatırım Bankası",
+    "00159": "Golden Global Yatırım Bankası",
+    "00160": "Q Yatırım Bankası",
+    "00203": "Albaraka Türk Katılım Bankası",
+    "00205": "Kuveyt Türk Katılım Bankası",
+    "00206": "Türkiye Finans Katılım Bankası",
+    "00208": "Asya Katılım Bankası",
+    "00209": "Ziraat Katılım Bankası",
+    "00210": "Vakıf Katılım Bankası",
+    "00211": "Türkiye Emlak Katılım Bankası",
+    "00212": "Hayat Finans Katılım Bankası",
+    "00213": "TOM Katılım Bankası",
+    "00801": "Papara Elektronik Para",
+    "00802": "Payfix Elektronik Para",
+    "00803": "İninal Ödeme ve Elektronik Para",
+    "00804": "PeP / Paladyum Elektronik Para",
+    "00805": "Moka Ödeme Kuruluşu"
+}
+
+def validate_iban(iban: str) -> bool:
+    """MOD-97 (ISO 7064) algoritmasıyla İBAN matematiksel doğrulama testi."""
+    raw = re.sub(r'[^A-Z0-9]', '', str(iban).upper())
+    if len(raw) < 15 or len(raw) > 34:
+        return False
+    rearranged = raw[4:] + raw[:4]
+    digits = ""
+    for ch in rearranged:
+        if ch.isdigit():
+            digits += ch
+        else:
+            digits += str(ord(ch) - 55)
+    try:
+        return int(digits) % 97 == 1
+    except ValueError:
+        return False
+
+def ibanCozumle_impl(ham_metin: str) -> str:
+    temiz = re.sub(r'^/(?:ibancoz|iban|coz|ibandoğrula|ibandogrula)(?:@\w+)?\s*', '', ham_metin, flags=re.IGNORECASE).strip()
+    
+    match = re.search(r'\bTR\s*(?:[0-9A-Z]\s*){24}\b', temiz, re.IGNORECASE)
+    if not match:
+        raw_clean = re.sub(r'[^A-Z0-9]', '', temiz.upper())
+        if raw_clean.startswith("TR") and len(raw_clean) == 26:
+            iban_raw = raw_clean
+        elif len(raw_clean) == 24 and raw_clean.isdigit():
+            iban_raw = "TR" + raw_clean
+        elif len(raw_clean) >= 15:
+            iban_raw = raw_clean
+        else:
+            return (
+                "⚠️ <b>Geçersiz veya Eksik İBAN!</b>\n"
+                "Lütfen çözümlemek istediğiniz Türkiye İBAN numarasını girin.\n\n"
+                "📌 <b>Örnek Kullanım:</b>\n"
+                "<code>/ibancoz TR12 0006 2000 0001 2345 6789 01</code>\n"
+                "veya doğrudan: <code>/ibancoz TR120006200000012345678901</code>"
+            )
+    else:
+        iban_raw = re.sub(r'[^A-Z0-9]', '', match.group(0).upper())
+
+    is_tr = iban_raw.startswith("TR") and len(iban_raw) == 26
+    is_valid = validate_iban(iban_raw)
+    
+    banka_adi = "Bilinmeyen / Özel Finans Kurumu"
+    banka_kodu = ""
+    sube_hesap = ""
+    
+    if is_tr:
+        banka_kodu = iban_raw[4:9]
+        sube_hesap = iban_raw[9:]
+        banka_adi = BANKA_KODLARI.get(banka_kodu, f"Diğer Finans Kurumu (Kod: {banka_kodu})")
+        
+        b_emoji = "🏛️"
+        u_ad = banka_adi.upper()
+        if "VAKIF" in u_ad: b_emoji = "🟡"
+        elif "GARANTİ" in u_ad or "GARANTI" in u_ad: b_emoji = "🟢"
+        elif "ZİRAAT" in u_ad or "ZIRAAT" in u_ad: b_emoji = "🔴"
+        elif "İŞ BANKASI" in u_ad or "IS BANKASI" in u_ad: b_emoji = "🔵"
+        elif "YAPI" in u_ad: b_emoji = "🔷"
+        elif "KUVEYT" in u_ad: b_emoji = "🌿"
+        elif "QNB" in u_ad: b_emoji = "🟣"
+        elif "HALK" in u_ad: b_emoji = "🔵"
+        elif "AKBANK" in u_ad: b_emoji = "🔴"
+        elif "PAPARA" in u_ad: b_emoji = "💳"
+        elif "PAYFIX" in u_ad: b_emoji = "⚡"
+        
+        banka_adi_str = f"{b_emoji} <b>{banka_adi}</b>"
+    else:
+        banka_adi_str = f"🌐 <b>Uluslararası İBAN ({iban_raw[:2]})</b>"
+
+    bosluklu_iban = " ".join([iban_raw[i:i+4] for i in range(0, len(iban_raw), 4)])
+    bitisik_iban = iban_raw
+    
+    sirket_durumu = "🔹 <i>Harici Cari / Müşteri Hesabı</i>"
+    try:
+        sh = get_spreadsheet()
+        sayfa = get_active_daily_sheet(sh)
+        veriler = sayfa.get_all_values()
+        temiz_hedef = re.sub(r'[^A-Z0-9]', '', iban_raw)
+        
+        for row in veriler[1:]:
+            if len(row) > 11:
+                ib1 = re.sub(r'[^A-Z0-9]', '', row[11].strip().upper())
+                if ib1 and (ib1 == temiz_hedef or temiz_hedef.endswith(ib1) or ib1.endswith(temiz_hedef)):
+                    not1 = row[14].strip() if len(row) > 14 else ""
+                    sirket_durumu = f"🏢 <b>ŞİRKET İÇİ HESAP!</b> (CYL/HSY: <code>{row[11].strip()}</code>" + (f" - Cari: <b>{not1}</b>" if not1 else " - 🟢 <b>Boşta</b>") + ")"
+                    break
+            if len(row) > 15:
+                ib2 = re.sub(r'[^A-Z0-9]', '', row[15].strip().upper())
+                if ib2 and (ib2 == temiz_hedef or temiz_hedef.endswith(ib2) or ib2.endswith(temiz_hedef)):
+                    not2 = row[17].strip() if len(row) > 17 else ""
+                    sirket_durumu = f"🏢 <b>ŞİRKET İÇİ HESAP!</b> (ARS/SRGL: <code>{row[15].strip()}</code>" + (f" - Cari: <b>{not2}</b>" if not2 else " - 🟢 <b>Boşta</b>") + ")"
+                    break
+    except Exception as e:
+        print(f"İBAN envanter kontrolü hatası: {e}")
+
+    durum_str = "✅ <b>Geçerli ve Onaylı Türk İBAN'ı (MOD-97)</b>" if (is_valid and is_tr) else ("✅ <b>Geçerli Uluslararası İBAN</b>" if is_valid else "⚠️ <b>GEÇERSİZ İBAN! (Rakamları/Haneyi Kontrol Ediniz)</b>")
+
+    mesaj = (
+        f"🔍 <b>İBAN ÇÖZÜMLEME & DOĞRULAMA</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🏦 <b>Banka:</b> {banka_adi_str}\n"
+        f"📊 <b>Durum:</b> {durum_str}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📌 <b>Okunabilir Format (Boşluklu):</b>\n"
+        f"<code>{bosluklu_iban}</code>\n\n"
+        f"⚡ <b>Hızlı Kopyala (Mobil Bankacılık):</b>\n"
+        f"<code>{bitisik_iban}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+    )
+    if banka_kodu:
+        mesaj += (
+            f"🏛️ <b>Banka Kodu:</b> <code>{banka_kodu}</code>\n"
+            f"🏢 <b>Şube / Hesap No:</b> <code>{sube_hesap}</code>\n"
+        )
+    mesaj += (
+        f"📑 <b>Şirket Envanteri:</b> {sirket_durumu}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 <i>Kopyalamak için numaranın üzerine dokunabilirsiniz.</i>"
+    )
+    return mesaj
+
 def ibanListesiGetir_impl() -> str:
     sh = get_spreadsheet()
     sayfa = get_active_daily_sheet(sh)
@@ -1970,8 +2160,12 @@ def process_telegram_update(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, canliKurSorgula_impl, goster_bildirim=True)
         elif ana_komut == "/kur":
             islemi_analiz_bildirimiyle_yap(chat_id, kurRaporuUret_impl, goster_bildirim=True)
-        elif ana_komut == "/iban":
-            islemi_analiz_bildirimiyle_yap(chat_id, ibanListesiGetir_impl)
+        elif ana_komut in ["/iban", "/ibancoz", "/coz", "/ibandoğrula", "/ibandogrula"]:
+            args = komut_parcalari[1:]
+            if len(args) == 0 and ana_komut == "/iban":
+                islemi_analiz_bildirimiyle_yap(chat_id, ibanListesiGetir_impl)
+            else:
+                islemi_analiz_bildirimiyle_yap(chat_id, ibanCozumle_impl, text)
         elif ana_komut == "/hesap":
             islemi_analiz_bildirimiyle_yap(chat_id, hesapMakinesi_impl, text)
         elif ana_komut in ["/çeviri", "/ceviri"]:
