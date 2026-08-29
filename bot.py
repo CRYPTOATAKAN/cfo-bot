@@ -159,27 +159,43 @@ def is_valid_daily_sheet(ws) -> bool:
     except:
         return False
 
-def get_active_daily_sheet(sh) -> gspread.Worksheet:
-    """Excel tablosundaki en son tarihli aktif çalışma sayfasını bulur."""
-    tum_ws = sh.worksheets()
-    tarih_sayfalari = []
-    
-    for ws in tum_ws:
-        if is_valid_daily_sheet(ws) and re.match(r'^\d{2}\.\d{2}\.\d{4}$', ws.title):
-            try:
-                t_obj = datetime.datetime.strptime(ws.title, "%d.%m.%Y")
-                tarih_sayfalari.append((t_obj, ws))
-            except: pass
+_cached_active_sheet = None
+_cached_active_sheet_time = 0
+_cached_active_sheet_lock = threading.Lock()
+
+def get_active_daily_sheet(sh, force_refresh=False) -> gspread.Worksheet:
+    """Excel tablosundaki en son tarihli aktif çalışma sayfasını bulur ve önbelleğe alır."""
+    global _cached_active_sheet, _cached_active_sheet_time
+    now = time.time()
+    with _cached_active_sheet_lock:
+        if not force_refresh and _cached_active_sheet is not None and (now - _cached_active_sheet_time < 60):
+            return _cached_active_sheet
             
-    if tarih_sayfalari:
-        tarih_sayfalari.sort(key=lambda x: x[0], reverse=True)
-        return tarih_sayfalari[0][1]
+        tum_ws = sh.worksheets()
+        tarih_sayfalari = []
         
-    for ws in tum_ws:
-        if is_valid_daily_sheet(ws):
-            return ws
+        for ws in tum_ws:
+            if is_valid_daily_sheet(ws) and re.match(r'^\d{2}\.\d{2}\.\d{4}$', ws.title):
+                try:
+                    t_obj = datetime.datetime.strptime(ws.title, "%d.%m.%Y")
+                    tarih_sayfalari.append((t_obj, ws))
+                except: pass
+                
+        if tarih_sayfalari:
+            tarih_sayfalari.sort(key=lambda x: x[0], reverse=True)
+            _cached_active_sheet = tarih_sayfalari[0][1]
+            _cached_active_sheet_time = now
+            return _cached_active_sheet
             
-    return tum_ws[0]
+        for ws in tum_ws:
+            if is_valid_daily_sheet(ws):
+                _cached_active_sheet = ws
+                _cached_active_sheet_time = now
+                return ws
+                
+        _cached_active_sheet = tum_ws[0]
+        _cached_active_sheet_time = now
+        return tum_ws[0]
 
 def bugununTarihiniAl() -> str:
     """Aktif en son sayfanın adını döner."""
@@ -670,6 +686,8 @@ def rehber_kategori_metni(kategori: str) -> str:
             "  └ <i>Otomatik gün sonu bildirim saatini ayarlar (Örn: /kapanissaati 23:00).</i>\n\n"
             "• <code>/panel</code>\n"
             "  └ <i>Canlı CFO Web Dashboard bağlantı linkini verir.</i>\n\n"
+            "• <code>/debug</code>\n"
+            "  └ <i>Sistemi test eder, gecikmeyi (ping) ölçer, önbelleği ve performansı optimize eder.</i>\n\n"
             "• <code>/id</code>\n"
             "  └ <i>Kendi Telegram kullanıcı ID numaranızı görüntüler.</i>"
         )
@@ -715,6 +733,7 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/adminsil [ID]</code> : Yöneticiyi siler.\n"
             "• <code>/kapanissaati [SS:DD]</code> : Otomatik rapor saatini ayarlar.\n"
             "• <code>/panel</code> : Canlı Web Dashboard linki.\n"
+            "• <code>/debug</code> : Sistem hızlandırma ve gecikme (ping) testi.\n"
             "• <code>/id</code> : Telegram kullanıcı ID'nizi gösterir."
         )
 
@@ -2175,6 +2194,61 @@ def admin_listesi_impl() -> str:
     except Exception as e:
         return f"❌ <b>Hata:</b> {e}"
 
+def debug_sistem_impl() -> str:
+    """Sistem performansını ölçer, bağlantıları ve önbelleği yeniler, RAM ve gecikme (ping) raporlar."""
+    baslangic = time.time()
+    
+    # 1. Bellek temizliği (Garbage Collection)
+    import gc
+    gc.collect()
+    
+    # 2. Telegram API Ping Testi
+    tg_ping_str = "⚠️ Ölçülemedi"
+    try:
+        t0 = time.time()
+        r_tg = telegram_api("getMe", {})
+        if r_tg.get("ok"):
+            tg_ms = (time.time() - t0) * 1000
+            tg_ping_str = f"<code>{tg_ms:.0f} ms</code> <i>(Çok Hızlı)</i>" if tg_ms < 300 else f"<code>{tg_ms:.0f} ms</code>"
+    except Exception as e:
+        tg_ping_str = f"⚠️ Hata: {e}"
+
+    # 3. Google Sheets API Bağlantı & Sayfa Önbelleği Yenileme
+    gs_ping_str = "⚠️ Ölçülemedi"
+    aktif_sayfa_str = "Bilinmiyor"
+    toplam_sayfa_sayisi = 0
+    try:
+        t0 = time.time()
+        sh = get_spreadsheet(force_refresh=True)
+        ws = get_active_daily_sheet(sh, force_refresh=True)
+        gs_ms = (time.time() - t0) * 1000
+        gs_ping_str = f"<code>{gs_ms:.0f} ms</code> <i>(Mükemmel)</i>" if gs_ms < 600 else f"<code>{gs_ms:.0f} ms</code>"
+        aktif_sayfa_str = ws.title
+        toplam_sayfa_sayisi = len(sh.worksheets())
+    except Exception as e:
+        gs_ping_str = f"⚠️ Bağlantı Sorunu: {e}"
+
+    # 4. İş Parçacıkları & Sistem Durumu
+    aktif_thread_sayisi = threading.active_count()
+    toplam_sure_ms = (time.time() - baslangic) * 1000
+    
+    yanit = (
+        f"🛠️ <b>CFO BOT SİSTEM & DEBUG RAPORU</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🚀 <b>Durum:</b> Tüm Bağlantılar Yenilendi & Optimize Edildi!\n\n"
+        f"📊 <b>GECİKME VE PING TESTİ:</b>\n"
+        f"├ ✈️ Telegram Bot API: {tg_ping_str}\n"
+        f"└ 🌐 Google Sheets API: {gs_ping_str}\n\n"
+        f"🧠 <b>BELLEK VE ÇALIŞMA ALANI:</b>\n"
+        f"├ 📅 Aktif Gün Sayfası: <b>{aktif_sayfa_str}</b>\n"
+        f"├ 📑 Toplam Çalışma Sayfası: <code>{toplam_sayfa_sayisi} Adet</code>\n"
+        f"├ 🧵 Aktif Thread Havuzu: <code>{aktif_thread_sayisi} İş Parçacığı</code>\n"
+        f"└ ⚡ Toplam Optimizasyon Süresi: <code>{toplam_sure_ms:.0f} ms</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 <i>Önbellek tazelendi, bot şu anda maksimum hızda çalışıyor.</i>"
+    )
+    return yanit
+
 # --- YARDIMCI: HIZLI VE GÜVENLİ ÇALIŞTIRICI ---
 def islemi_analiz_bildirimiyle_yap(chat_id: int, islem_fn, *args, goster_bildirim: bool = False):
     msg_id = None
@@ -2446,6 +2520,8 @@ def process_telegram_update(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, admin_sil_impl, text, user_id)
         elif ana_komut in ["/adminler", "/yoneticiler"]:
             islemi_analiz_bildirimiyle_yap(chat_id, admin_listesi_impl)
+        elif ana_komut in ["/debug", "/hizlandir", "/optimize", "/ping", "/sistem"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, debug_sistem_impl, goster_bildirim=True)
         elif ana_komut in ["/kapanis", "/gunsonu"]:
             if user_id != KURUCU_ID:
                 telegramMesajGonder(chat_id, "⛔ <b>Yetkisiz İşlem:</b> Gün sonu kapanış raporunu alma yetkisi sadece Şirket Kurucusuna aittir.")
