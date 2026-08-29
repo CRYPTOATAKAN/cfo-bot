@@ -667,6 +667,8 @@ def rehber_kategori_metni(kategori: str) -> str:
             "  └ <i>Örnek:</i> <code>/devir TİGER 250.000</code>\n\n"
             "• <code>/devirsil [Grup] [Tutar]</code>\n"
             "  └ <i>Devir tutarından düşer.</i>\n\n"
+            "• <code>/toplu</code>\n"
+            "  └ <i>⚡ Çoklu hızlı işlem: Birden fazla kasa, ödeme, masraf hareketini tek mesajda işler.</i>\n\n"
             "• <code>/gerial</code>\n"
             "  └ <i>En son yapılan hatalı işlemi hafızadan geri alır.</i>"
         )
@@ -704,6 +706,8 @@ def rehber_kategori_metni(kategori: str) -> str:
             "  └ <i>Toplam devir, kasa, ödeme, komisyon ve net kalan anlık şirket bilançosu.</i>\n\n"
             "• <code>/rapor</code>\n"
             "  └ <i>Tüm aktif grupların ayrıntılı döküm raporunu verir.</i>\n\n"
+            "• <code>/tarih [GG.AA.YYYY] [Cari (Opsiyonel)]</code>\n"
+            "  └ <i>📅 Geçmiş herhangi bir günün genel bilançosunu veya o tarihteki cari fişini döker.</i>\n\n"
             "• <code>/yenigun</code>\n"
             "  └ <i>🌅 Gün sonu devir işlemi: Dünün net kalan kasasını yeni günün devrine aktarır, güncel kasa ve ödemeleri sıfırlayarak yeni sayfa açar.</i>"
         )
@@ -766,6 +770,7 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/odemesil [Grup] [Tutar]</code> : Ödenen tutardan düşer.\n"
             "• <code>/devir [Grup] [Tutar]</code> : Devir bakiyesi ekler.\n"
             "• <code>/devirsil [Grup] [Tutar]</code> : Devirden siler.\n"
+            "• <code>/toplu</code> : ⚡ Çoklu hızlı işlem (+, -, Ö, D, M).\n"
             "• <code>/masrafekle [Kalem] [Tutar]</code> : Sonraki boş satıra masraf işler.\n"
             "• <code>/masrafsil [Kalem] [Tutar]</code> : Masraf siler/düşer.\n"
             "• <code>/masraf</code> : Günlük masraf listesini döker.\n"
@@ -777,6 +782,7 @@ def rehber_kategori_metni(kategori: str) -> str:
             "📊 <b>GÜNLÜK DÖNGÜ VE RAPORLAR</b>\n"
             "• <code>/ozet</code> : Kasa, masraf ve ödenen bilanço özeti.\n"
             "• <code>/rapor</code> : Tüm grupların detaylı durum raporu.\n"
+            "• <code>/tarih [GG.AA.YYYY]</code> : Geçmiş günün genel tablosu/cari fişi.\n"
             "• <code>/ekstre [Cari] [Gün]</code> : Çok günlük cari hesap ekstresi.\n"
             "• <code>/yenigun</code> : 🌅 Kalan kasayı devire aktararak yeni günü açar.\n"
             "• <code>/kapanis</code> : 🌙 Kurucuya özel gün sonu kapanış bilançosu.\n\n"
@@ -2041,6 +2047,274 @@ def cari_ekstre_impl(komut_metni: str) -> str:
     )
     return mesaj
 
+def toplu_islem_impl(komut_metni: str) -> str:
+    """
+    Birden fazla kasa, ödeme, devir ve masraf işlemini tek seferde alt alta işler.
+    Örnek:
+    /toplu
+    + SACİD 50000
+    - SACİD 20000
+    + TİGER 150000
+    Ö THY 75000
+    M Yemek 1250
+    """
+    satirlar = [s.strip() for s in komut_metni.strip().splitlines() if s.strip()]
+    if len(satirlar) <= 1:
+        ilk_satir = satirlar[0] if satirlar else ""
+        kalan_metin = re.sub(r'^/(?:toplu|topluislem|hizli)(?:@\w+)?\s*', '', ilk_satir, flags=re.IGNORECASE).strip()
+        if not kalan_metin:
+            return (
+                "⚡ <b>TOPLU HIZLI İŞLEM KULLANIMI</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "İşlemleri tek bir mesajda alt alta yazabilirsiniz:\n\n"
+                "<code>/toplu\n"
+                "+ SACİD 50000\n"
+                "- SACİD 20000\n"
+                "+ TİGER 150000\n"
+                "Ö THY 75000\n"
+                "M Yemek 1250</code>\n\n"
+                "📌 <b>Kısayol Sembolleri:</b>\n"
+                "• <code>+</code> veya <code>K</code> : Kasaya Ekle\n"
+                "• <code>-</code> : Kasadan Düş / Sil\n"
+                "• <code>Ö</code> veya <code>O</code> : Ödeme Yap\n"
+                "• <code>D</code> : Devir Ekle\n"
+                "• <code>M</code> veya <code>G</code> : Masraf/Gider Ekle\n"
+                "━━━━━━━━━━━━━━━━━━━━"
+            )
+        satirlar = [kalan_metin]
+    else:
+        ilk_satir = satirlar[0]
+        kalan_ilk = re.sub(r'^/(?:toplu|topluislem|hizli)(?:@\w+)?\s*', '', ilk_satir, flags=re.IGNORECASE).strip()
+        satirlar = ([kalan_ilk] if kalan_ilk else []) + satirlar[1:]
+
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    
+    islem_sonuclari = []
+    etkilenen_gruplar = set()
+    
+    for satir in satirlar:
+        if not satir.strip():
+            continue
+        p = satir.strip().split()
+        if len(p) < 2:
+            islem_sonuclari.append(f"├ ⚠️ <code>{satir}</code> <i>(Eksik parametre)</i>")
+            continue
+            
+        sembol = p[0].upper()
+        kalan_p = p[1:]
+        
+        # 1. Kasa Ekleme (+ veya K)
+        if sembol in ["+", "K", "KASA", "+KASA"]:
+            try:
+                grup, tutar = parse_grup_ve_tutar(kalan_p)
+                res = hucreyeVeriYaz_impl(f"/kasa {grup} {tutar}", 4, "Kasa Ekleme", 1)
+                etkilenen_gruplar.add(grup)
+                islem_sonuclari.append(f"├ 💰 <b>{grup.upper()}:</b> +{paraFormatla(tutar)} <i>(Kasa Girişi)</i>")
+            except Exception as e:
+                islem_sonuclari.append(f"├ ⚠️ <b>{satir}:</b> {e}")
+                
+        # 2. Kasa Silme (-)
+        elif sembol in ["-", "KASASIL", "-KASA"]:
+            try:
+                grup, tutar = parse_grup_ve_tutar(kalan_p)
+                res = hucreyeVeriYaz_impl(f"/kasasil {grup} {tutar}", 4, "Kasa Silme", -1)
+                etkilenen_gruplar.add(grup)
+                islem_sonuclari.append(f"├ 💸 <b>{grup.upper()}:</b> -{paraFormatla(tutar)} <i>(Kasa Çıkışı)</i>")
+            except Exception as e:
+                islem_sonuclari.append(f"├ ⚠️ <b>{satir}:</b> {e}")
+                
+        # 3. Ödeme Ekleme (Ö veya O)
+        elif sembol in ["Ö", "O", "ODEME", "ÖDEME", "+ODEME", "+ÖDEME"]:
+            try:
+                grup, tutar = parse_grup_ve_tutar(kalan_p)
+                res = hucreyeVeriYaz_impl(f"/odeme {grup} {tutar}", 5, "Ödenen Ekleme", 1)
+                etkilenen_gruplar.add(grup)
+                islem_sonuclari.append(f"├ 💸 <b>{grup.upper()}:</b> {paraFormatla(tutar)} <i>(Ödeme Yapıldı)</i>")
+            except Exception as e:
+                islem_sonuclari.append(f"├ ⚠️ <b>{satir}:</b> {e}")
+                
+        # 4. Devir Ekleme (D)
+        elif sembol in ["D", "DEVİR", "DEVIR", "+DEVIR"]:
+            try:
+                grup, tutar = parse_grup_ve_tutar(kalan_p)
+                res = hucreyeVeriYaz_impl(f"/devir {grup} {tutar}", 3, "Devir Ekleme", 1)
+                etkilenen_gruplar.add(grup)
+                islem_sonuclari.append(f"├ 🔄 <b>{grup.upper()}:</b> +{paraFormatla(tutar)} <i>(Devir)</i>")
+            except Exception as e:
+                islem_sonuclari.append(f"├ ⚠️ <b>{satir}:</b> {e}")
+                
+        # 5. Masraf Ekleme (M veya G)
+        elif sembol in ["M", "G", "MASRAF", "GİDER", "GIDER", "+MASRAF"]:
+            try:
+                masraf_adi, tutar = parse_grup_ve_tutar(kalan_p)
+                res = masrafVerisiYaz_impl(f"/masrafekle {masraf_adi} {tutar}", "Masraf Ekleme", 1)
+                islem_sonuclari.append(f"├ 📉 <b>Masraf ({masraf_adi}):</b> {paraFormatla(tutar)}")
+            except Exception as e:
+                islem_sonuclari.append(f"├ ⚠️ <b>{satir}:</b> {e}")
+        else:
+            try:
+                grup, tutar = parse_grup_ve_tutar(p)
+                res = hucreyeVeriYaz_impl(f"/kasa {grup} {tutar}", 4, "Kasa Ekleme", 1)
+                etkilenen_gruplar.add(grup)
+                islem_sonuclari.append(f"├ 💰 <b>{grup.upper()}:</b> +{paraFormatla(tutar)} <i>(Kasa Girişi)</i>")
+            except Exception as e:
+                islem_sonuclari.append(f"├ ❓ <code>{satir}</code> <i>(Tanınmayan format)</i>")
+
+    if not islem_sonuclari:
+        return "⚠️ İşlenecek geçerli bir işlem satırı bulunamadı."
+        
+    if islem_sonuclari:
+        son = islem_sonuclari[-1]
+        if son.startswith("├ "):
+            islem_sonuclari[-1] = "└ " + son[2:]
+            
+    guncel_veriler = get_sheet_values_fast(sayfa)
+    kalanlar_listesi = []
+    
+    for g_ham in sorted(etkilenen_gruplar):
+        g_norm = normalize_text(g_ham)
+        for r in guncel_veriler[1:43]:
+            if len(r) >= 7 and normalize_text(r[1]) == g_norm:
+                emoji = grupEmojisiBul(r[1])
+                kalan_bakiye = guvenliSayi(r[6])
+                kalanlar_listesi.append(f"{emoji} <b>{r[1].upper()}:</b> 🏦 <b>{paraFormatla(kalan_bakiye)}</b>")
+                break
+                
+    saat = suankiZamaniAl().strftime("%H:%M")
+    mesaj = (
+        f"⚡ <b>TOPLU İŞLEM RAPORU</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📅 Tarih: {sayfa.title} | ⏰ Saat: {saat}\n"
+        f"📋 İşlenen Kalem: <b>{len(islem_sonuclari)} Adet</b>\n\n"
+        f"✅ <b>İŞLEM DETAYLARI:</b>\n"
+        + "\n".join(islem_sonuclari) + "\n\n"
+    )
+    
+    if kalanlar_listesi:
+        mesaj += (
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📊 <b>İŞLEM SONRASI GÜNCEL KALANLAR:</b>\n"
+            + "\n".join(kalanlar_listesi) + "\n"
+        )
+        
+    mesaj += (
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 <i>Tüm kayıtlar Excel'e ve RAM önbelleğine anında işlendi.</i>"
+    )
+    return mesaj
+
+def gecmis_gun_sorgula_impl(komut_metni: str) -> str:
+    """
+    Belirli geçmiş bir güne ait finans tablosunu veya o tarihteki carinin durumunu raporlar.
+    Örnek:
+    /tarih 25.08.2026
+    /tarih 25.08.2026 SACİD
+    """
+    parcalar = komut_metni.strip().split()[1:]
+    if not parcalar:
+        return (
+            "📅 <b>GEÇMİŞ GÜN SORGULAMA</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "Format: <code>/tarih [GG.AA.YYYY] [Cari Adı (Opsiyonel)]</code>\n\n"
+            "📌 <b>Örnekler:</b>\n"
+            "• <code>/tarih 25.08.2026</code> (Tüm gün bilançosu)\n"
+            "• <code>/tarih 25.08.2026 SACİD</code> (O tarihteki SACİD fişi)\n"
+            "• <code>/tarih 27.08.2026 THY</code>"
+        )
+        
+    tarih_ham = parcalar[0].strip().replace("/", ".").replace("-", ".")
+    cari_ham = " ".join(parcalar[1:]).strip() if len(parcalar) > 1 else ""
+    
+    m = re.search(r'(\d{1,2})\.(\d{1,2})\.(\d{4})', tarih_ham)
+    if not m:
+        return "⚠️ Lütfen geçerli bir tarih formatı giriniz! (Örn: <code>25.08.2026</code>)"
+        
+    gun, ay, yil = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    tarih_str = f"{gun:02d}.{ay:02d}.{yil:04d}"
+    
+    sh = get_spreadsheet()
+    try:
+        ws = sh.worksheet(tarih_str)
+    except Exception:
+        return f"⚠️ <b>{tarih_str}</b> tarihli bir arşiv çalışma sayfası bulunamadı. Lütfen tarihi kontrol ediniz."
+        
+    veriler = ws.get_all_values()
+    
+    # 1. Belirli Bir Cari Sorgulandıysa
+    if cari_ham:
+        hedef_norm = normalize_text(cari_ham)
+        for r in veriler[1:43]:
+            if len(r) >= 2 and normalize_text(r[1]) == hedef_norm:
+                vals = [guvenliSayi(x) for x in r[1:7]]
+                while len(vals) < 6: vals.append(0.0)
+                dDevir, dKasa, dOdenen, dKomisyon, dKalan = vals[1], vals[2], vals[3], vals[4], vals[5]
+                emoji = grupEmojisiBul(r[1])
+                
+                return (
+                    f"📅 <b>GEÇMİŞ GÜN CARİ FİŞİ: {tarih_str}</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"{emoji} Cari Grup: <b>{r[1].upper()}</b>\n"
+                    f"📁 Kaynak: <code>{tarih_str}</code> Sayfası\n\n"
+                    f"🔄 O Günkü Devir: {paraFormatla(dDevir)}\n"
+                    f"💰 Eklenen Kasa: {paraFormatla(dKasa)}\n"
+                    f"💸 Yapılan Ödeme: {paraFormatla(dOdenen)}\n"
+                    f"✂️ Kesinti/Komisyon: {paraFormatla(dKomisyon)}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🏦 <b>O GÜNKÜ NET KALAN: {paraFormatla(dKalan)}</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💡 <i>Çok günlük geçmiş ekstresi için: <code>/ekstre {r[1]}</code></i>"
+                )
+        return f"⚠️ <b>{tarih_str}</b> tarihli sayfada '<b>{cari_ham}</b>' adlı cari bulunamadı."
+        
+    # 2. Tüm Gün Özeti Sorgulandıysa
+    finans = tablodan_finans_ozeti_hesapla(veriler)
+    
+    # Masraflar
+    toplam_masraf = 0.0
+    masraf_sayisi = 0
+    for row in veriler[1:]:
+        if len(row) >= 10:
+            ad = row[8].strip()
+            if ad and "GENEL TOPLAM" not in ad.upper() and ad != "-":
+                fiyat = guvenliSayi(row[9])
+                if abs(fiyat) > 0.001:
+                    toplam_masraf += fiyat
+                    masraf_sayisi += 1
+                    
+    sirali_cariler = sorted(finans["aktif_gruplar"], key=lambda x: abs(x["kalan"]), reverse=True)[:5]
+    
+    mesaj = (
+        f"📅 <b>GEÇMİŞ GÜN BİLANÇOSU: {tarih_str}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📁 Durum: 🔒 <b>Arşivlenmiş Gün</b>\n"
+        f"🏢 İşlem Gören Aktif Cari: <b>{len(finans['aktif_gruplar'])} Adet</b>\n\n"
+        f"📊 <b>GENEL BİLANÇO:</b>\n"
+        f"├ 🔄 Toplam Devir: {paraFormatla(finans['devir'])}\n"
+        f"├ 💰 Toplam Kasa: {paraFormatla(finans['kasa'])}\n"
+        f"├ 💸 Toplam Ödeme: {paraFormatla(finans['odenen'])}\n"
+        f"├ ✂️ Toplam Komisyon: {paraFormatla(finans['komisyon'])}\n"
+        f"└ 🏦 <b>NET KALAN KASA: {paraFormatla(finans['kalan'])}</b>\n\n"
+    )
+    if masraf_sayisi > 0:
+        mesaj += f"📉 <b>GÜNLÜK GİDERLER:</b>\n└ {masraf_sayisi} Kalem Masraf: <b>{paraFormatla(toplam_masraf)}</b>\n\n"
+        
+    if sirali_cariler:
+        mesaj += f"━━━━━━━━━━━━━━━━━━━━\n🏆 <b>EN YÜKSEK İŞLEM GÖREN CARİLER:</b>\n"
+        for idx, g in enumerate(sirali_cariler, 1):
+            emoji = grupEmojisiBul(g["ad"])
+            mesaj += f"├ {idx}. {emoji} <b>{g['ad'].upper()}:</b> 🏦 {paraFormatla(g['kalan'])}\n"
+        lines = mesaj.rstrip().splitlines()
+        if lines and lines[-1].startswith("├ "):
+            lines[-1] = "└ " + lines[-1][2:]
+        mesaj = "\n".join(lines) + "\n"
+
+    mesaj += (
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 <i>Belirli bir carinin o günkü dökümü için: <code>/tarih {tarih_str} SACİD</code></i>"
+    )
+    return mesaj
+
 def metinCevir_impl(gelenMetin: str) -> str:
     cevrilecek = re.sub(r'^/(?:çeviri|ceviri)(?:@\w+)?\s*', '', gelenMetin, flags=re.IGNORECASE).strip()
     if not cevrilecek:
@@ -2572,6 +2846,10 @@ def process_telegram_update(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, iban_bosalt_impl, text)
         elif ana_komut in ["/ekstre", "/gecmis", "/hesapdokumu", "/dokum"]:
             islemi_analiz_bildirimiyle_yap(chat_id, cari_ekstre_impl, text, goster_bildirim=True)
+        elif ana_komut in ["/toplu", "/topluislem", "/hizli"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, toplu_islem_impl, text, goster_bildirim=True)
+        elif ana_komut in ["/tarih", "/gecmisgun", "/gun"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, gecmis_gun_sorgula_impl, text, goster_bildirim=True)
         elif ana_komut == "/hesap":
             islemi_analiz_bildirimiyle_yap(chat_id, hesapMakinesi_impl, text)
         elif ana_komut in ["/çeviri", "/ceviri"]:
