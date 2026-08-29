@@ -641,8 +641,14 @@ def rehber_kategori_metni(kategori: str) -> str:
             "  └ <i>Örnek:</i> <code>/hesap SACİD 2 48.00</code>\n\n"
             "• <code>/iban</code>\n"
             "  └ <i>Kullanımdaki ve boşta olan şirket İBAN'larını listeler.</i>\n\n"
+            "• <code>/ibantahsis [Hesap] [Cari]</code>\n"
+            "  └ <i>İBAN'ı cariye tahsis edip 'Kullanımda' yapar (Örn: /ibantahsis CYL1 SACİD).</i>\n\n"
+            "• <code>/ibanbosalt [Hesap]</code>\n"
+            "  └ <i>İBAN'ı boşa çıkarır ve 'Müsait' yapar (Örn: /ibanbosalt CYL1).</i>\n\n"
             "• <code>/ibancoz [İBAN]</code>\n"
             "  └ <i>İBAN'ı doğrular (MOD-97), bankasını bulur ve temiz kopyalama formatı üretir.</i>\n\n"
+            "• <code>/ekstre [Cari] [Gün]</code>\n"
+            "  └ <i>Carinin son 5 günlük Devir, Kasa, Ödeme ve Kalan hesap ekstresini döker.</i>\n\n"
             "• <code>/t [Cüzdan Adresi]</code>\n"
             "  └ <i>🏛️ TRC-20 canlı blokzincir USDT rezervini ve TL karşılığını raporlar.</i>\n\n"
             "• <code>/qr [Cüzdan Adresi]</code>\n"
@@ -690,12 +696,15 @@ def rehber_kategori_metni(kategori: str) -> str:
             "📊 <b>GÜNLÜK DÖNGÜ VE RAPORLAR</b>\n"
             "• <code>/ozet</code> : Kasa, masraf ve ödenen bilanço özeti.\n"
             "• <code>/rapor</code> : Tüm grupların detaylı durum raporu.\n"
+            "• <code>/ekstre [Cari] [Gün]</code> : Çok günlük cari hesap ekstresi.\n"
             "• <code>/yenigun</code> : 🌅 Kalan kasayı devire aktararak yeni günü açar.\n"
             "• <code>/kapanis</code> : 🌙 Kurucuya özel gün sonu kapanış bilançosu.\n\n"
-            "🪙 <b>KRİPTO, KUR VE FİNANS ARAÇLARI</b>\n"
-            "• <code>/kur</code> : Canlı borsa USDT/TRY kurları.\n"
+            "🪙 <b>KRİPTO, KUR VE İBAN ARAÇLARI</b>\n"
+            "• <code>/kur</code> : Canlı borsa USDT/TRY ve Kapalıçarşı Dolar kurları.\n"
             "• <code>/hesap [Grup] [Kom%] [Kur]</code> : Tether hesap makinesi.\n"
             "• <code>/iban</code> : Şirket İBAN listesi.\n"
+            "• <code>/ibantahsis [Hesap] [Cari]</code> : İBAN'ı cariye tahsis eder.\n"
+            "• <code>/ibanbosalt [Hesap]</code> : İBAN'ı boşa çıkarır.\n"
             "• <code>/ibancoz [İBAN]</code> : İBAN doğrulama ve banka tespiti.\n"
             "• <code>/t</code> : Canlı TRC-20 rezerv ve bakiye raporu.\n"
             "• <code>/qr [Cüzdan]</code> : Cüzdan QR kodu ve istihbarat analizi.\n"
@@ -1704,6 +1713,244 @@ def ibanListesiGetir_impl() -> str:
     mesaj += "🔴 <b>KULLANIMDAKİ İBANLAR</b>\n" + ("\n".join(dolu) if dolu else "🔹 <i>Kullanımda İBAN yok.</i>")
     return mesaj
 
+def iban_hesap_bul(veriler: List[List[str]], aranan_kod: str):
+    """
+    Excel tablosundaki L (12. sütun) ve P (16. sütun) hesap bloklarında arama yapar.
+    Döner: (satir_no_1based, hedef_cari_sutun_1based, hesap_adi, mevcut_cari)
+    """
+    aranan_norm = normalize_text(aranan_kod)
+    if not aranan_norm:
+        return None
+        
+    for idx, row in enumerate(veriler[1:], start=2):
+        # 1. Sol Blok: Sütun L (Col 12), Cari Sütun O (Col 15)
+        if len(row) > 11 and row[11].strip():
+            h_ad = row[11].strip()
+            h_norm = normalize_text(h_ad)
+            if aranan_norm == h_norm or aranan_norm in h_norm or h_norm.startswith(aranan_norm):
+                mevcut_cari = row[14].strip() if len(row) > 14 else ""
+                return idx, 15, h_ad, mevcut_cari
+                
+        # 2. Sağ Blok: Sütun P (Col 16), Cari Sütun R (Col 18)
+        if len(row) > 15 and row[15].strip():
+            h_ad = row[15].strip()
+            h_norm = normalize_text(h_ad)
+            if aranan_norm == h_norm or aranan_norm in h_norm or h_norm.startswith(aranan_norm):
+                mevcut_cari = row[17].strip() if len(row) > 17 else ""
+                return idx, 18, h_ad, mevcut_cari
+                
+    return None
+
+def iban_tahsis_impl(komut_metni: str) -> str:
+    parcalar = komut_metni.strip().split()[1:]
+    if len(parcalar) < 2:
+        return (
+            "⚠️ <b>Hatalı Kullanım!</b>\n"
+            "Format: <code>/ibantahsis [Hesap No] [Cari Adı]</code>\n\n"
+            "📌 <b>Örnekler:</b>\n"
+            "• <code>/ibantahsis CYL1 SACİD</code>\n"
+            "• <code>/ibantahsis HSY2 THY</code>\n"
+            "• <code>/ibantahsis ARS3 BSM</code>"
+        )
+        
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    veriler = sayfa.get_all_values()
+    
+    bulunan = None
+    cari_adi = ""
+    
+    for split_idx in range(len(parcalar) - 1, 0, -1):
+        hesap_adayi = " ".join(parcalar[:split_idx]).strip()
+        cari_adayi = " ".join(parcalar[split_idx:]).strip()
+        res = iban_hesap_bul(veriler, hesap_adayi)
+        if res:
+            bulunan = res
+            cari_adi = cari_adayi
+            break
+            
+    if not bulunan:
+        res = iban_hesap_bul(veriler, parcalar[0])
+        if res:
+            bulunan = res
+            cari_adi = " ".join(parcalar[1:]).strip()
+            
+    if not bulunan:
+        return f"⚠️ <b>Hesap Bulunamadı!</b>\nExcel tablosunda '<b>{' '.join(parcalar[:-1])}</b>' adlı bir İBAN/hesap bulunamadı."
+        
+    satir_idx, col_idx, hesap_adi, eski_cari = bulunan
+    cari_temiz = cari_adi.strip().upper()
+    
+    sayfa.update_cell(satir_idx, col_idx, cari_temiz)
+    
+    app_state["SON_ISLEM"] = {
+        "sayfa": sayfa.title, "satir": satir_idx, "sutun": col_idx,
+        "eskiDeger": eski_cari, "grupAdi": hesap_adi, "islemTuru": "İBAN Tahsis"
+    }
+    sistemeLogYaz("İBAN Tahsis", f"{hesap_adi} ➔ {cari_temiz}")
+    
+    return (
+        f"✅ <b>İBAN BAŞARIYLA TAHSİS EDİLDİ!</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🏦 <b>Hesap:</b> <code>{hesap_adi}</code>\n"
+        f"👤 <b>Tahsis Edilen Cari:</b> <b>{cari_temiz}</b>\n"
+        f"📊 <b>Durum:</b> 🔴 <b>Kullanımda</b>\n"
+        f"📌 <b>Excel Satırı:</b> Satır {satir_idx}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 <i>İşlem bitince <code>/ibanbosalt {parcalar[0]}</code> yazarak boşa çıkarabilirsiniz.</i>"
+    )
+
+def iban_bosalt_impl(komut_metni: str) -> str:
+    parcalar = komut_metni.strip().split()[1:]
+    if len(parcalar) < 1:
+        return (
+            "⚠️ <b>Hatalı Kullanım!</b>\n"
+            "Format: <code>/ibanbosalt [Hesap No]</code>\n\n"
+            "📌 <b>Örnekler:</b>\n"
+            "• <code>/ibanbosalt CYL1</code>\n"
+            "• <code>/ibanbosalt HSY2</code>\n"
+            "• <code>/ibanbosalt ARS3</code>"
+        )
+        
+    hesap_kodu = " ".join(parcalar).strip()
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    veriler = sayfa.get_all_values()
+    
+    bulunan = iban_hesap_bul(veriler, hesap_kodu)
+    if not bulunan:
+        return f"⚠️ <b>Hesap Bulunamadı!</b>\nExcel tablosunda '<b>{hesap_kodu}</b>' adlı bir İBAN/hesap bulunamadı."
+        
+    satir_idx, col_idx, hesap_adi, eski_cari = bulunan
+    
+    sayfa.update_cell(satir_idx, col_idx, "")
+    
+    app_state["SON_ISLEM"] = {
+        "sayfa": sayfa.title, "satir": satir_idx, "sutun": col_idx,
+        "eskiDeger": eski_cari, "grupAdi": hesap_adi, "islemTuru": "İBAN Boşaltma"
+    }
+    sistemeLogYaz("İBAN Boşaltma", f"{hesap_adi} | Eski: {eski_cari} ➔ Boş")
+    
+    eski_str = f"<s>{eski_cari}</s>" if eski_cari else "<i>(Zaten boştu)</i>"
+    return (
+        f"🟢 <b>İBAN BOŞA ÇIKARILDI!</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🏦 <b>Hesap:</b> <code>{hesap_adi}</code>\n"
+        f"👤 <b>Eski Cari:</b> {eski_str}\n"
+        f"📊 <b>Durum:</b> 🟢 <b>Müsait / Kullanıma Hazır</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 <i>Hesap havuza geri döndü, başka bir cariye verilebilir.</i>"
+    )
+
+def cari_ekstre_impl(komut_metni: str) -> str:
+    parcalar = komut_metni.strip().split()[1:]
+    if len(parcalar) < 1:
+        return (
+            "⚠️ <b>Hatalı Kullanım!</b>\n"
+            "Format: <code>/ekstre [Cari Adı] [Gün Sayısı (Opsiyonel)]</code>\n\n"
+            "📌 <b>Örnekler:</b>\n"
+            "• <code>/ekstre SACİD</code>\n"
+            "• <code>/ekstre THY 5</code>\n"
+            "• <code>/ekstre TİGER 7</code>"
+        )
+        
+    gun_sayisi = 5
+    if len(parcalar) > 1 and parcalar[-1].isdigit():
+        gun_sayisi = min(int(parcalar[-1]), 10)
+        grup_ham = " ".join(parcalar[:-1]).strip()
+    else:
+        grup_ham = " ".join(parcalar).strip()
+        
+    hedef_norm = normalize_text(grup_ham)
+    if not hedef_norm:
+        return "⚠️ Lütfen geçerli bir cari/grup adı giriniz."
+        
+    sh = get_spreadsheet()
+    tum_sayfalar = sh.worksheets()
+    
+    tarih_sayfalari = []
+    for ws in tum_sayfalar:
+        if is_valid_daily_sheet(ws) and re.match(r'^\d{2}\.\d{2}\.\d{4}$', ws.title):
+            try:
+                t_obj = datetime.datetime.strptime(ws.title, "%d.%m.%Y")
+                tarih_sayfalari.append((t_obj, ws))
+            except Exception:
+                pass
+                
+    if not tarih_sayfalari:
+        return "📭 Tabloda geçmiş tarihli sayfa bulunamadı."
+        
+    tarih_sayfalari.sort(key=lambda x: x[0], reverse=True)
+    secilen_sayfalar = tarih_sayfalari[:gun_sayisi]
+    
+    def fetch_sheet_cari(ws_tuple):
+        t_obj, ws = ws_tuple
+        try:
+            veriler = ws.get_all_values()
+            for row in veriler[1:43]:
+                if len(row) >= 2 and normalize_text(row[1]) == hedef_norm:
+                    devir = guvenliSayi(row[2]) if len(row) > 2 else 0.0
+                    kasa = guvenliSayi(row[3]) if len(row) > 3 else 0.0
+                    odenen = guvenliSayi(row[4]) if len(row) > 4 else 0.0
+                    komisyon = guvenliSayi(row[5]) if len(row) > 5 else 0.0
+                    kalan = guvenliSayi(row[6]) if len(row) > 6 else 0.0
+                    return (t_obj, ws.title, row[1].strip(), devir, kasa, odenen, komisyon, kalan)
+            return (t_obj, ws.title, None, 0.0, 0.0, 0.0, 0.0, 0.0)
+        except Exception as e:
+            print(f"Ekstre sayfa okuma hatası ({ws.title}): {e}")
+            return (t_obj, ws.title, None, 0.0, 0.0, 0.0, 0.0, 0.0)
+
+    futures = [_update_executor.submit(fetch_sheet_cari, item) for item in secilen_sayfalar]
+    sonuclar = [f.result() for f in futures]
+    sonuclar.sort(key=lambda x: x[0], reverse=True)
+    
+    bulunan_kayitlar = [s for s in sonuclar if s[2] is not None]
+    if not bulunan_kayitlar:
+        return f"⚠️ <b>Cari Bulunamadı:</b> Tablodaki son {len(secilen_sayfalar)} günde '<b>{grup_ham}</b>' adlı cari bulunamadı."
+        
+    gercek_grup_adi = bulunan_kayitlar[0][2]
+    
+    toplam_giris = sum(s[4] for s in sonuclar if s[2] is not None)
+    toplam_odeme = sum(s[5] for s in sonuclar if s[2] is not None)
+    toplam_komisyon = sum(s[6] for s in sonuclar if s[2] is not None)
+    en_guncel_kalan = bulunan_kayitlar[0][7]
+    
+    mesaj = (
+        f"📈 <b>[ {gercek_grup_adi.upper()} ] HESAP EKSTRESİ ({len(secilen_sayfalar)} GÜN)</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+    )
+    
+    for t_obj, baslik, g_ad, devir, kasa, odenen, kom, kalan in sonuclar:
+        if g_ad is None:
+            continue
+            
+        mesaj += f"📅 <b>{baslik}</b>\n"
+        satir_detay = []
+        satir_detay.append(f"🔄 Devir: {paraFormatla(devir)}")
+        if abs(kasa) > 0.001:
+            satir_detay.append(f"💰 Kasa: +{paraFormatla(kasa)}")
+        if abs(odenen) > 0.001:
+            satir_detay.append(f"💸 Ödeme: -{paraFormatla(odenen)}")
+        if abs(kom) > 0.001:
+            satir_detay.append(f"✂️ Kom: {paraFormatla(kom)}")
+            
+        mesaj += f"{' | '.join(satir_detay)}\n"
+        mesaj += f"🏦 <b>Kalan Bakiye: {paraFormatla(kalan)}</b>\n\n"
+        
+    mesaj += (
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📊 <b>{len(secilen_sayfalar)} GÜNLÜK TOPLAM PERFORMANS:</b>\n"
+        f"💰 Toplam Giriş: <b>{paraFormatla(toplam_giris)}</b>\n"
+        f"💸 Toplam Ödeme: <b>{paraFormatla(toplam_odeme)}</b>\n"
+    )
+    if abs(toplam_komisyon) > 0.001:
+        mesaj += f"✂️ Toplam Komisyon: <b>{paraFormatla(toplam_komisyon)}</b>\n"
+    mesaj += (
+        f"🏦 <b>GÜNCEL NET BAKİYE: {paraFormatla(en_guncel_kalan)}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━"
+    )
+    return mesaj
+
 def metinCevir_impl(gelenMetin: str) -> str:
     cevrilecek = re.sub(r'^/(?:çeviri|ceviri)(?:@\w+)?\s*', '', gelenMetin, flags=re.IGNORECASE).strip()
     if not cevrilecek:
@@ -2166,6 +2413,12 @@ def process_telegram_update(update: dict):
                 islemi_analiz_bildirimiyle_yap(chat_id, ibanListesiGetir_impl)
             else:
                 islemi_analiz_bildirimiyle_yap(chat_id, ibanCozumle_impl, text)
+        elif ana_komut in ["/ibantahsis", "/tahsis"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, iban_tahsis_impl, text)
+        elif ana_komut in ["/ibanbosalt", "/bosalt", "/ibansil"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, iban_bosalt_impl, text)
+        elif ana_komut in ["/ekstre", "/gecmis", "/hesapdokumu", "/dokum"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, cari_ekstre_impl, text, goster_bildirim=True)
         elif ana_komut == "/hesap":
             islemi_analiz_bildirimiyle_yap(chat_id, hesapMakinesi_impl, text)
         elif ana_komut in ["/çeviri", "/ceviri"]:
