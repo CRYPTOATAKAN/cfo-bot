@@ -64,12 +64,47 @@ def http_get_json(url: str, headers: dict = None) -> dict:
     with urllib.request.urlopen(req, timeout=10) as response:
         return json.loads(response.read().decode("utf-8"))
 
+_tg_thread_local = threading.local()
+
+def _get_telegram_conn():
+    conn = getattr(_tg_thread_local, "conn", None)
+    if conn is None:
+        try:
+            import http.client
+            import ssl
+            ctx = ssl.create_default_context()
+            conn = http.client.HTTPSConnection("api.telegram.org", timeout=12, context=ctx)
+            _tg_thread_local.conn = conn
+        except Exception:
+            conn = None
+    return conn
+
 def telegram_api(method: str, payload: dict) -> dict:
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/{method}"
+    url_path = f"/bot{TELEGRAM_TOKEN}/{method}"
     data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    headers = {"Content-Type": "application/json", "Connection": "keep-alive"}
+    
+    # 1. Hızlı Kalıcı TLS Soketi (Keep-Alive)
+    for attempt in range(2):
+        conn = _get_telegram_conn()
+        if conn is not None:
+            try:
+                conn.request("POST", url_path, body=data, headers=headers)
+                resp = conn.getresponse()
+                raw_bytes = resp.read()
+                return json.loads(raw_bytes.decode("utf-8"))
+            except Exception:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                _tg_thread_local.conn = None
+
+    # 2. Güvenli Yedek urllib çağrısı
     try:
-        with urllib.request.urlopen(req, timeout=15) as response:
+        url = f"https://api.telegram.org{url_path}"
+        req = urllib.request.Request(url, data=data, headers=headers)
+        with urllib.request.urlopen(req, timeout=12) as response:
             return json.loads(response.read().decode("utf-8"))
     except Exception as e:
         print(f"Telegram API Hatası ({method}): {e}")
@@ -1378,6 +1413,131 @@ def gun_sonu_kapanis_raporu_uret() -> str:
     rapor += "━━━━━━━━━━━━━━━━━━━━\n💡 <i>Yeni güne devretmek için: /yenigun</i>"
     return rapor
 
+# --- PİYASA VE DIŞ BORSA KURLARI (PARALEL & 15s MİKRO-ÖNBELLEK) ---
+_rates_cache = {}
+_rates_cache_time = 0.0
+_rates_lock = threading.Lock()
+
+def fetch_all_market_rates_parallel(force_refresh: bool = False, max_age: float = 15.0) -> dict:
+    """Tüm borsa ve Kapalıçarşı döviz/USDT kurlarını eşzamanlı/paralel çeker ve 15s önbelleğe alır."""
+    global _rates_cache, _rates_cache_time
+    now = time.time()
+    with _rates_lock:
+        if not force_refresh and _rates_cache and (now - _rates_cache_time < max_age):
+            return dict(_rates_cache)
+
+    def fetch_harem():
+        def _parse_kur(val):
+            s = str(val or "").strip()
+            if "," in s and "." in s:
+                s = s.replace(".", "").replace(",", ".")
+            elif "," in s:
+                s = s.replace(",", ".")
+            try:
+                return float(s)
+            except Exception:
+                return 0.0
+
+        try:
+            d = http_get_json("https://finans.truncgil.com/v3/today.json")
+            u = d.get("USD", {})
+            u_alis = _parse_kur(u.get("Buying"))
+            u_satis = _parse_kur(u.get("Selling"))
+            e = d.get("EUR", {})
+            e_alis = _parse_kur(e.get("Buying"))
+            e_satis = _parse_kur(e.get("Selling"))
+            return {
+                "usd": (u_alis, u_satis) if u_alis > 0 and u_satis > 0 else (48.20, 48.25),
+                "eur": (e_alis, e_satis) if e_alis > 0 and e_satis > 0 else (52.30, 52.45)
+            }
+        except Exception:
+            return {"usd": (48.20, 48.25), "eur": (52.30, 52.45)}
+
+    def fetch_fiat():
+        try:
+            d = http_get_json("https://api.exchangerate-api.com/v4/latest/USD")
+            return d.get("rates", {})
+        except Exception:
+            return {"TRY": 48.09, "EUR": 0.92, "GBP": 0.79}
+
+    def fetch_binance_24h():
+        try:
+            r = http_get_json("https://data-api.binance.vision/api/v3/ticker/24hr?symbol=USDTTRY")
+            return {
+                "last": float(r.get("lastPrice", 0)),
+                "high": float(r.get("highPrice", 0)),
+                "low": float(r.get("lowPrice", 0))
+            }
+        except Exception:
+            return None
+
+    def fetch_paribu():
+        try:
+            r = http_get_json("https://www.paribu.com/ticker")["USDT_TL"]
+            return {
+                "last": float(r.get("last", 0)),
+                "high": float(r.get("high24hr", 0)),
+                "low": float(r.get("low24hr", 0))
+            }
+        except Exception:
+            return None
+
+    def fetch_btcturk():
+        try:
+            r = http_get_json("https://api.btcturk.com/api/v2/ticker?pairSymbol=USDT_TRY")["data"][0]
+            return {
+                "last": float(r.get("last", 0)),
+                "high": float(r.get("high", 0)),
+                "low": float(r.get("low", 0))
+            }
+        except Exception:
+            return None
+
+    def fetch_whitebit():
+        try:
+            r = http_get_json("https://whitebit.com/api/v1/public/ticker?market=USDT_TRY")["result"]
+            return {
+                "last": float(r.get("last", 0)),
+                "high": float(r.get("high", 0)),
+                "low": float(r.get("low", 0))
+            }
+        except Exception:
+            return None
+
+    def fetch_okx():
+        try:
+            r = http_get_json("https://www.okx.com/api/v5/market/ticker?instId=USDT-TRY")["data"][0]
+            return {
+                "last": float(r.get("last", 0)),
+                "high": float(r.get("high24h", 0)),
+                "low": float(r.get("low24h", 0))
+            }
+        except Exception:
+            return None
+
+    futures = {
+        "harem": _update_executor.submit(fetch_harem),
+        "fiat": _update_executor.submit(fetch_fiat),
+        "binance": _update_executor.submit(fetch_binance_24h),
+        "paribu": _update_executor.submit(fetch_paribu),
+        "btcturk": _update_executor.submit(fetch_btcturk),
+        "whitebit": _update_executor.submit(fetch_whitebit),
+        "okx": _update_executor.submit(fetch_okx),
+    }
+
+    results = {}
+    for k, fut in futures.items():
+        try:
+            results[k] = fut.result(timeout=3.5)
+        except Exception:
+            results[k] = None
+
+    with _rates_lock:
+        _rates_cache = dict(results)
+        _rates_cache_time = time.time()
+
+    return results
+
 def f_tl(val) -> str:
     try:
         s = f"{float(val):.2f}"
@@ -1387,112 +1547,72 @@ def f_tl(val) -> str:
 
 def get_harem_dolar_kuru() -> Tuple[float, float]:
     """Harem Altın / Kapalıçarşı Serbest Piyasa Doları (USD/TRY) Alış ve Satış kurlarını çeker."""
-    try:
-        data = http_get_json("https://finans.truncgil.com/v3/today.json")
-        usd_info = data.get("USD", {})
-        alis_str = str(usd_info.get("Buying", "")).replace(".", "").replace(",", ".")
-        satis_str = str(usd_info.get("Selling", "")).replace(".", "").replace(",", ".")
-        alis = float(alis_str)
-        satis = float(satis_str)
-        if alis > 0 and satis > 0:
-            return alis, satis
-    except Exception as e:
-        print(f"Harem/Kapalıçarşı Dolar kuru çekme hatası: {e}")
-        
-    try:
-        fiat = http_get_json("https://api.exchangerate-api.com/v4/latest/USD")["rates"]
-        rate = float(fiat.get("TRY", 48.09))
-        return rate - 0.05, rate + 0.05
-    except Exception:
-        return 48.20, 48.25
+    rates = fetch_all_market_rates_parallel()
+    h = rates.get("harem") or {}
+    return h.get("usd", (48.20, 48.25))
+
+def get_harem_euro_kuru() -> Tuple[float, float]:
+    """Harem Altın / Kapalıçarşı Serbest Piyasa Eurosu (EUR/TRY) Alış ve Satış kurlarını çeker."""
+    rates = fetch_all_market_rates_parallel()
+    h = rates.get("harem") or {}
+    return h.get("eur", (52.30, 52.45))
 
 def kurRaporuUret_impl() -> str:
-    yanit = "📊 <b>GÜNCEL DÖVİZ & USDT KURLARI</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
+    rates = fetch_all_market_rates_parallel()
+    h_usd = rates.get("harem", {}).get("usd", (48.20, 48.25))
     
-    # 1. Harem Altın / Kapalıçarşı Serbest Piyasa Doları (USD/TRY)
-    try:
-        h_alis, h_satis = get_harem_dolar_kuru()
-        yanit += (
-            f"🏛️ <b>HAREM (Kapalıçarşı Doları)</b>\n"
-            f"💵 Alış: <b>{f_tl(h_alis)}</b> | Satış: <b>{f_tl(h_satis)}</b>\n\n"
-        )
-    except Exception:
-        pass
-
-    # 2. Binance
-    try:
-        r = http_get_json("https://data-api.binance.vision/api/v3/ticker/24hr?symbol=USDTTRY")
-        yanit += (
-            f"🟡 <b>BİNANCE USDT/TRY</b>\n"
-            f"💵 Anlık Kur: {f_tl(r.get('lastPrice'))}\n"
-            f"🔺 24saat En Yüksek: {f_tl(r.get('highPrice'))}\n"
-            f"🔻 24saat En Düşük: {f_tl(r.get('lowPrice'))}\n\n"
-        )
-    except Exception as e:
+    yanit = "📊 <b>GÜNCEL DÖVİZ & USDT KURLARI</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
+    yanit += (
+        f"🏛️ <b>HAREM (Kapalıçarşı Doları)</b>\n"
+        f"💵 Alış: <b>{f_tl(h_usd[0])}</b> | Satış: <b>{f_tl(h_usd[1])}</b>\n\n"
+    )
+    
+    b = rates.get("binance")
+    if b and b.get("last"):
+        yanit += f"🟡 <b>BİNANCE USDT/TRY</b>\n💵 Anlık Kur: {f_tl(b['last'])}\n🔺 24saat En Yüksek: {f_tl(b['high'])}\n🔻 24saat En Düşük: {f_tl(b['low'])}\n\n"
+    else:
         yanit += "🟡 <b>BİNANCE USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
-
-    # 3. Paribu
-    try:
-        r = http_get_json("https://www.paribu.com/ticker")["USDT_TL"]
-        yanit += (
-            f"🔵 <b>PARİBU USDT/TRY</b>\n"
-            f"💵 Anlık Kur: {f_tl(r.get('last'))}\n"
-            f"🔺 24saat En Yüksek: {f_tl(r.get('high24hr'))}\n"
-            f"🔻 24saat En Düşük: {f_tl(r.get('low24hr'))}\n\n"
-        )
-    except Exception as e:
+        
+    p = rates.get("paribu")
+    if p and p.get("last"):
+        yanit += f"🔵 <b>PARİBU USDT/TRY</b>\n💵 Anlık Kur: {f_tl(p['last'])}\n🔺 24saat En Yüksek: {f_tl(p['high'])}\n🔻 24saat En Düşük: {f_tl(p['low'])}\n\n"
+    else:
         yanit += "🔵 <b>PARİBU USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
-
-    # 4. BtcTurk
-    try:
-        r = http_get_json("https://api.btcturk.com/api/v2/ticker?pairSymbol=USDT_TRY")["data"][0]
-        yanit += (
-            f"🟢 <b>BTCTÜRK USDT/TRY</b>\n"
-            f"💵 Anlık Kur: {f_tl(r.get('last'))}\n"
-            f"🔺 24saat En Yüksek: {f_tl(r.get('high'))}\n"
-            f"🔻 24saat En Düşük: {f_tl(r.get('low'))}\n\n"
-        )
-    except Exception as e:
+        
+    bt = rates.get("btcturk")
+    if bt and bt.get("last"):
+        yanit += f"🟢 <b>BTCTÜRK USDT/TRY</b>\n💵 Anlık Kur: {f_tl(bt['last'])}\n🔺 24saat En Yüksek: {f_tl(bt['high'])}\n🔻 24saat En Düşük: {f_tl(bt['low'])}\n\n"
+    else:
         yanit += "🟢 <b>BTCTÜRK USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
-
-    # 5. WhiteBIT
-    try:
-        r = http_get_json("https://whitebit.com/api/v1/public/ticker?market=USDT_TRY")["result"]
-        yanit += (
-            f"⚪ <b>WHITEBIT USDT/TRY</b>\n"
-            f"💵 Anlık Kur: {f_tl(r.get('last'))}\n"
-            f"🔺 24saat En Yüksek: {f_tl(r.get('high'))}\n"
-            f"🔻 24saat En Düşük: {f_tl(r.get('low'))}\n\n"
-        )
-    except Exception as e:
+        
+    wb = rates.get("whitebit")
+    if wb and wb.get("last"):
+        yanit += f"⚪ <b>WHITEBIT USDT/TRY</b>\n💵 Anlık Kur: {f_tl(wb['last'])}\n🔺 24saat En Yüksek: {f_tl(wb['high'])}\n🔻 24saat En Düşük: {f_tl(wb['low'])}\n\n"
+    else:
         yanit += "⚪ <b>WHITEBIT USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
-
-    # 6. OKX
-    try:
-        r = http_get_json("https://www.okx.com/api/v5/market/ticker?instId=USDT-TRY")["data"][0]
-        yanit += (
-            f"⚫ <b>OKX USDT/TRY</b>\n"
-            f"💵 Anlık Kur: {f_tl(r.get('last'))}\n"
-            f"🔺 24saat En Yüksek: {f_tl(r.get('high24h'))}\n"
-            f"🔻 24saat En Düşük: {f_tl(r.get('low24h'))}\n\n"
-        )
-    except Exception as e:
-        pass
-
+        
+    ok = rates.get("okx")
+    if ok and ok.get("last"):
+        yanit += f"⚫ <b>OKX USDT/TRY</b>\n💵 Anlık Kur: {f_tl(ok['last'])}\n🔺 24saat En Yüksek: {f_tl(ok['high'])}\n🔻 24saat En Düşük: {f_tl(ok['low'])}\n\n"
+        
     return yanit.strip()
 
 def canliKurSorgula_impl() -> str:
     try:
-        b_usdt = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=USDTTRY")
+        rates = fetch_all_market_rates_parallel()
+        b_usdt_val = (rates.get("binance") or {}).get("last", 48.20)
+        fiat = rates.get("fiat") or {}
+        try_rate = float(fiat.get("TRY", 48.09))
+        
+        # Ek kurlar
         b_btc = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=BTCUSDT")
         b_eth = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=ETHUSDT")
-        fiat = http_get_json("https://api.exchangerate-api.com/v4/latest/USD")["rates"]
-        try_rate = fiat.get("TRY", 0)
+        
         return (
             "🌍 <b>CANLI PİYASA & DÜNYA KURLARI</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "🪙 <b>Kripto Paralar (Binance)</b>\n"
-            f"🇹🇷 USDT / TRY: <code>{float(b_usdt['price']):.2f} ₺</code>\n"
+            f"🇹🇷 USDT / TRY: <code>{float(b_usdt_val):.2f} ₺</code>\n"
             f"🔶 BTC / USDT: <code>{float(b_btc['price']):,.0f} $</code>\n"
             f"🔷 ETH / USDT: <code>{float(b_eth['price']):.2f} $</code>\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -1511,27 +1631,6 @@ def canliKurSorgula_impl() -> str:
     except Exception as e:
         return f"❌ <b>API Hatası:</b> {e}"
 
-def get_harem_euro_kuru() -> Tuple[float, float]:
-    """Harem Altın / Kapalıçarşı Serbest Piyasa Eurosu (EUR/TRY) Alış ve Satış kurlarını çeker."""
-    try:
-        data = http_get_json("https://finans.truncgil.com/v3/today.json")
-        eur_info = data.get("EUR", {})
-        alis_str = str(eur_info.get("Buying", "")).replace(".", "").replace(",", ".")
-        satis_str = str(eur_info.get("Selling", "")).replace(".", "").replace(",", ".")
-        alis = float(alis_str)
-        satis = float(satis_str)
-        if alis > 0 and satis > 0:
-            return alis, satis
-    except Exception as e:
-        print(f"Harem/Kapalıçarşı Euro kuru çekme hatası: {e}")
-        
-    try:
-        fiat = http_get_json("https://api.exchangerate-api.com/v4/latest/EUR")["rates"]
-        rate = float(fiat.get("TRY", 52.40))
-        return rate - 0.08, rate + 0.08
-    except Exception:
-        return 52.30, 52.45
-
 def arbitraj_raporu_uret_impl(komut_metni: str = "") -> str:
     """
     Kapalıçarşı Nakit Doları ile Kripto Borsa USDT fiyatları arasındaki canlı makası ve arbitraj fırsatlarını hesaplar.
@@ -1544,27 +1643,21 @@ def arbitraj_raporu_uret_impl(komut_metni: str = "") -> str:
             if val > 0:
                 hacim = val
 
-    h_alis, h_satis = get_harem_dolar_kuru()
+    rates = fetch_all_market_rates_parallel()
+    h_alis, h_satis = rates.get("harem", {}).get("usd", (48.20, 48.25))
     
     borsa_fiyatlari = {}
-    # Binance
-    try:
-        r_b = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=USDTTRY")
-        borsa_fiyatlari["Binance"] = float(r_b.get("price", 0))
-    except Exception: pass
+    if rates.get("binance") and rates["binance"].get("last"):
+        borsa_fiyatlari["Binance"] = rates["binance"]["last"]
+    if rates.get("paribu") and rates["paribu"].get("last"):
+        borsa_fiyatlari["Paribu"] = rates["paribu"]["last"]
+    if rates.get("btcturk") and rates["btcturk"].get("last"):
+        borsa_fiyatlari["BtcTurk"] = rates["btcturk"]["last"]
+    if rates.get("whitebit") and rates["whitebit"].get("last"):
+        borsa_fiyatlari["WhiteBIT"] = rates["whitebit"]["last"]
+    if rates.get("okx") and rates["okx"].get("last"):
+        borsa_fiyatlari["OKX"] = rates["okx"]["last"]
         
-    # Paribu
-    try:
-        r_p = http_get_json("https://www.paribu.com/ticker")["USDT_TL"]
-        borsa_fiyatlari["Paribu"] = float(r_p.get("last", 0))
-    except Exception: pass
-
-    # BtcTurk
-    try:
-        r_bt = http_get_json("https://api.btcturk.com/api/v2/ticker?pairSymbol=USDT_TRY")["data"][0]
-        borsa_fiyatlari["BtcTurk"] = float(r_bt.get("last", 0))
-    except Exception: pass
-
     if not borsa_fiyatlari:
         borsa_fiyatlari["Binance"] = h_satis * 1.004
 
@@ -1864,37 +1957,32 @@ def get_tron_balances(address: str) -> Tuple[float, float, float]:
     return trx_bakiye, usdt_bakiye, toplam_usd
 
 def get_borsa_kurlari_listesi() -> Tuple[str, float]:
-    borsalar = [
-        ("🟡 <b>BİNANCE</b>", "https://data-api.binance.vision/api/v3/ticker/price?symbol=USDTTRY", lambda r: float(r["price"])),
-        ("🔵 <b>PARİBU</b>", "https://www.paribu.com/ticker", lambda r: float(r["USDT_TL"]["last"])),
-        ("🟢 <b>BTCTÜRK</b>", "https://api.btcturk.com/api/v2/ticker?pairSymbol=USDT_TRY", lambda r: float(r["data"][0]["last"])),
-        ("⚪ <b>WHITEBIT</b>", "https://whitebit.com/api/v1/public/ticker?market=USDT_TRY", lambda r: float(r["result"]["last"])),
-        ("⚫ <b>OKX</b>", "https://www.okx.com/api/v5/market/ticker?instId=USDT-TRY", lambda r: float(r["data"][0]["last"]))
-    ]
+    rates = fetch_all_market_rates_parallel()
+    default_rate = rates.get("fiat", {}).get("TRY", 48.09)
     
     def format_sayi_yerel(val):
         return f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
-    default_rate = 48.09
-    try:
-        fiat = http_get_json("https://api.exchangerate-api.com/v4/latest/USD")["rates"]
-        default_rate = float(fiat.get("TRY", 48.09))
-    except Exception:
-        pass
-
+        
+    items = [
+        ("🟡 <b>BİNANCE</b>", rates.get("binance")),
+        ("🔵 <b>PARİBU</b>", rates.get("paribu")),
+        ("🟢 <b>BTCTÜRK</b>", rates.get("btcturk")),
+        ("⚪ <b>WHITEBIT</b>", rates.get("whitebit")),
+        ("⚫ <b>OKX</b>", rates.get("okx")),
+    ]
+    
     satirlar = []
     fiyatlar = []
-    for isim, url, parser in borsalar:
-        try:
-            d = http_get_json(url)
-            val = parser(d)
+    for isim, data in items:
+        val = data.get("last", 0.0) if data else 0.0
+        if val > 0:
             satirlar.append(f"{isim} USDT/TRY - 💵 Anlık Kur: {format_sayi_yerel(val)} ₺")
             fiyatlar.append(val)
-        except Exception:
+        else:
             satirlar.append(f"{isim} USDT/TRY - 💵 Anlık Kur: {format_sayi_yerel(default_rate)} ₺")
             fiyatlar.append(default_rate)
             
-    referans_kur = fiyatlar[0] if fiyatlar else default_rate
+    referans_kur = fiyatlar[0] if (fiyatlar and fiyatlar[0] > 0) else default_rate
     return "\n".join(satirlar), referans_kur
 
 def trc20_varlik_raporu_uret(cuzdan_adresi: str = VARSAYILAN_TRC20_ADRES) -> Tuple[str, dict]:
