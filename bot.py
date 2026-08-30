@@ -102,6 +102,9 @@ def telegramMesajDuzenle(chat_id, message_id, metin: str, reply_markup=None):
         payload["reply_markup"] = reply_markup
     return telegram_api("editMessageText", payload)
 
+def telegramChatAction(chat_id, action: str = "typing"):
+    return telegram_api("sendChatAction", {"chat_id": chat_id, "action": action})
+
 def get_gspread_client():
     global _cached_gc
     if _cached_gc is not None:
@@ -589,6 +592,7 @@ def menuKlavyesiOlustur(isGroup: bool):
     keyboard = [
         [panel_button],
         [{"text": "📊 Tüm Gruplar Raporu", "callback_data": "rapor_tumu"}],
+        [{"text": "🚨 Risk & Bakiye Sıralaması", "callback_data": "risk_tumu"}],
         [{"text": "📉 Masraf & Gider Raporu", "callback_data": "rapor_masraf"}],
         [{"text": "💼 Hızlı Finans Özeti", "callback_data": "rapor_ozet"}],
         [{"text": "🌅 Yeni Gün Geçişi", "callback_data": "menu_yenigun"}]
@@ -706,6 +710,12 @@ def rehber_kategori_metni(kategori: str) -> str:
         return (
             "📊 <b>GÜNLÜK DÖNGÜ VE RAPORLAR</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "• <code>/bakiye</code> veya <code>/sirala</code>\n"
+            "  └ <i>⚖️ Konsolide risk ve bakiye sıralaması: Borçlu carileri ve en yüksek pozitif kasaları tek ekranda listeler.</i>\n\n"
+            "• <code>/borclular</code> veya <code>/borc</code>\n"
+            "  └ <i>🚨 Yalnızca eksi bakiyedeki / şirkete borçlu riskli carileri listeler.</i>\n\n"
+            "• <code>/alacaklar</code>\n"
+            "  └ <i>💰 Pozitif emanet kasası olan carileri büyükten küçüğe sıralar.</i>\n\n"
             "• <code>/ozet</code>\n"
             "  └ <i>Toplam devir, kasa, ödeme, komisyon ve net kalan anlık şirket bilançosu.</i>\n\n"
             "• <code>/rapor</code>\n"
@@ -791,6 +801,9 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/grupkopar</code> : Grubun Excel bağlantısını kaldırır.\n"
             "• <code>/gruplar</code> : Bağlı grupları listeler.\n\n"
             "📊 <b>GÜNLÜK DÖNGÜ VE RAPORLAR</b>\n"
+            "• <code>/bakiye</code> : ⚖️ Konsolide risk ve bakiye sıralaması.\n"
+            "• <code>/borclular</code> : 🚨 Eksi bakiyeli / borçlu carileri sıralar.\n"
+            "• <code>/alacaklar</code> : 💰 Pozitif kasaları büyükten küçüğe sıralar.\n"
             "• <code>/ozet</code> : Kasa, masraf ve ödenen bilanço özeti.\n"
             "• <code>/rapor</code> : Tüm grupların detaylı durum raporu.\n"
             "• <code>/tarih [GG.AA.YYYY]</code> : Geçmiş günün genel tablosu/cari fişi.\n"
@@ -1104,6 +1117,158 @@ def tumGruplarRaporu_impl() -> str:
         f"━━━━━━━━━━━━━━━━━━━━"
     )
     return mesaj
+
+def bakiye_risk_raporu_uret(filtre_turu: str = "tumu") -> Tuple[str, dict]:
+    """
+    Tüm aktif carileri analiz eder; borçlu (negatif bakiye) olanları risk sırasına göre,
+    pozitif bakiyesi olanları en yüksekten en düşüğe sıralar.
+    Filtre türleri: 'borclular', 'pozitif', 'tumu'
+    """
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    veriler = get_sheet_values_fast(sayfa)
+    finans = tablodan_finans_ozeti_hesapla(veriler)
+    saat = suankiZamaniAl().strftime("%H:%M")
+    
+    aktif_cariler = finans.get("aktif_gruplar", [])
+    
+    borclular = [g for g in aktif_cariler if g["kalan"] < -0.001]
+    borclular.sort(key=lambda x: x["kalan"])  # En çok eksi olan en başta
+    
+    pozitifler = [g for g in aktif_cariler if g["kalan"] > 0.001]
+    pozitifler.sort(key=lambda x: x["kalan"], reverse=True)  # En yüksek pozitif en başta
+    
+    sifirlar = [g for g in aktif_cariler if abs(g["kalan"]) <= 0.001]
+    
+    toplam_borc = sum(g["kalan"] for g in borclular)  # negatif toplam
+    toplam_pozitif = sum(g["kalan"] for g in pozitifler)
+    net_kasa = toplam_pozitif + toplam_borc
+    
+    klavye = {
+        "inline_keyboard": [
+            [
+                {"text": "🚨 Sadece Borçlular", "callback_data": "risk_borclular"},
+                {"text": "💰 Pozitif Bakiyeler", "callback_data": "risk_pozitif"}
+            ],
+            [
+                {"text": "📊 Genel Risk Tablosu", "callback_data": "risk_tumu"},
+                {"text": "🔄 Yenile", "callback_data": f"risk_{filtre_turu}"}
+            ]
+        ]
+    }
+    
+    if not aktif_cariler:
+        return (
+            f"⚖️ <b>RİSK & BAKİYE SIRALAMASI</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📅 Tarih: {sayfa.title} | ⏰ Saat: <code>{saat}</code>\n\n"
+            f"📭 <b>Bugün için henüz işlem görmüş aktif bir cari/grup bulunmuyor.</b>",
+            klavye
+        )
+    
+    if filtre_turu in ["borclular", "borc"]:
+        mesaj = (
+            f"🚨 <b>RİSK & BORÇLU CARİLER LİSTESİ</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📅 Tarih: {sayfa.title} | ⏰ Saat: <code>{saat}</code>\n"
+            f"⚠️ <b>Borçlu / Eksi Bakiye Sayısı:</b> <code>{len(borclular)} Cari</code>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        )
+        if not borclular:
+            mesaj += "🟢 <b>Harika!</b> Şu anda eksi bakiyede / şirkete borçlu durumda hiçbir cari bulunmuyor.\n\n"
+        else:
+            for idx, g in enumerate(borclular, 1):
+                emoji = grupEmojisiBul(g["ad"])
+                mesaj += (
+                    f"🔴 <b>{idx}. {emoji} {g['ad'].upper()}</b>\n"
+                    f"├ 🔄 Devir: {paraFormatla(g['devir'])} | 💰 Kasa: {paraFormatla(g['kasa'])}\n"
+                    f"├ 💸 Ödenen: {paraFormatla(g['odenen'])}\n"
+                    f"└ 🚨 <b>Kalan Risk/Borç: {paraFormatla(g['kalan'])}</b>\n\n"
+                )
+            mesaj += (
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"🚨 <b>TOPLAM CARİ AÇIĞI / BORÇ:</b> <code>{paraFormatla(toplam_borc)}</code>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+            )
+        mesaj += "💡 <i>Kasa veya ödeme girişleri için /kasa veya /odeme komutlarını kullanabilirsiniz.</i>"
+        return mesaj, klavye
+
+    elif filtre_turu in ["pozitif", "alacaklar", "alacak"]:
+        mesaj = (
+            f"💰 <b>POZİTİF KASA & BAKİYE SIRALAMASI</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📅 Tarih: {sayfa.title} | ⏰ Saat: <code>{saat}</code>\n"
+            f"🏢 <b>Pozitif Bakiyeli Cari Sayısı:</b> <code>{len(pozitifler)} Cari</code>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        )
+        if not pozitifler:
+            mesaj += "📭 Pozitif bakiyeli aktif cari bulunmuyor.\n\n"
+        else:
+            madalyalar = {1: "🥇", 2: "🥈", 3: "🥉"}
+            for idx, g in enumerate(pozitifler, 1):
+                emoji = grupEmojisiBul(g["ad"])
+                madalya = madalyalar.get(idx, f"<b>{idx}.</b>")
+                mesaj += (
+                    f"{madalya} {emoji} <b>{g['ad'].upper()}</b>\n"
+                    f"├ 💰 Kasa: {paraFormatla(g['kasa'])} | 💸 Ödenen: {paraFormatla(g['odenen'])}\n"
+                    f"└ 🏦 <b>Kalan Bakiye: {paraFormatla(g['kalan'])}</b>\n\n"
+                )
+            mesaj += (
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"💎 <b>TOPLAM POZİTİF EMANET KASA:</b> <code>{paraFormatla(toplam_pozitif)}</code>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+            )
+        mesaj += "💡 <i>Bakiye detay fişi için grupta /kasa veya /kasa [Grup] yazınız.</i>"
+        return mesaj, klavye
+
+    else:  # "tumu"
+        mesaj = (
+            f"⚖️ <b>KONSOLİDE RİSK & BAKİYE SIRALAMASI</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📅 Tarih: {sayfa.title} | ⏰ Saat: <code>{saat}</code>\n"
+            f"👥 <b>İşlem Gören Aktif Cari:</b> <code>{len(aktif_cariler)} Adet</code>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        )
+        
+        # 1. Eksi Bakiyeliler (Risk)
+        if borclular:
+            mesaj += f"🚨 <b>RİSK & BORÇLU CARİLER ({len(borclular)} Adet)</b>\n"
+            for idx, g in enumerate(borclular, 1):
+                emoji = grupEmojisiBul(g["ad"])
+                mesaj += f"├ 🔴 {idx}. {emoji} <b>{g['ad'].upper()}:</b> <code>{paraFormatla(g['kalan'])}</code>\n"
+            mesaj += f"└ ⚠️ <b>Toplam Risk:</b> <code>{paraFormatla(toplam_borc)}</code>\n\n"
+        else:
+            mesaj += "🟢 <b>Risk Masası:</b> Eksi bakiyede cari bulunmuyor.\n\n"
+            
+        # 2. Pozitif Bakiyeliler Sıralaması
+        if pozitifler:
+            mesaj += f"🏆 <b>POZİTİF KASA LİDERLİĞİ (Top {min(len(pozitifler), 10)})</b>\n"
+            madalyalar = {1: "🥇", 2: "🥈", 3: "🥉"}
+            for idx, g in enumerate(pozitifler[:10], 1):
+                emoji = grupEmojisiBul(g["ad"])
+                madalya = madalyalar.get(idx, f"{idx}.")
+                mesaj += f"├ {madalya} {emoji} <b>{g['ad'].upper()}:</b> <b>{paraFormatla(g['kalan'])}</b>\n"
+            if len(pozitifler) > 10:
+                mesaj += f"├ <i>... ve {len(pozitifler) - 10} cari daha</i>\n"
+            mesaj += f"└ 💎 <b>Toplam Pozitif Kasa:</b> <code>{paraFormatla(toplam_pozitif)}</code>\n\n"
+            
+        # 3. Kapanmış / Sıfır Bakiyeliler
+        if sifirlar:
+            sifir_adlar = ", ".join([g["ad"].upper() for g in sifirlar[:5]])
+            if len(sifirlar) > 5:
+                sifir_adlar += f" (+{len(sifirlar)-5})"
+            mesaj += f"⚖️ <b>Sıfırlanmış / Dengede ({len(sifirlar)}):</b> <i>{sifir_adlar}</i>\n\n"
+            
+        mesaj += (
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📊 <b>KONSOLİDE NET DURUM:</b>\n"
+            f"├ 💎 Toplam Pozitif Kasa: <b>{paraFormatla(toplam_pozitif)}</b>\n"
+            f"├ 🚨 Toplam Borç/Açık: <b>{paraFormatla(toplam_borc)}</b>\n"
+            f"└ 🏦 <b>NET KALAN KASA: {paraFormatla(net_kasa)}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💡 <i>Detaylı filtreler için aşağıdaki butonları kullanabilirsiniz.</i>"
+        )
+        return mesaj, klavye
 
 def masrafRaporuUret_impl() -> str:
     sh = get_spreadsheet()
@@ -3012,11 +3177,45 @@ def debug_sistem_impl() -> str:
     )
     return yanit
 
-# --- YARDIMCI: HIZLI VE GÜVENLİ ÇALIŞTIRICI ---
-def islemi_analiz_bildirimiyle_yap(chat_id: int, islem_fn, *args, goster_bildirim: bool = False):
+# --- YARDIMCI: HIZLI VE GÜVENLİ ÇALIŞTIRICI & DİNAMİK İLERLEME ÇUBUĞU ---
+def yukleme_metni_uret(islem_tipi: str = "") -> str:
+    """İşlem tipine göre dinamik, şık bir progress bar metni üretir."""
+    t = (islem_tipi or "").lower()
+    if any(k in t for k in ["kur", "doviz", "döviz", "kripto", "trc20", "arbitraj", "varlik", "varlık", "portfoy", "portföy", "cevir", "t_"]):
+        return (
+            "🪙 <b>Piyasa kurları çekiliyor...</b>\n"
+            "<code>[████████░░] %80</code>\n"
+            "⏳ <i>Canlı borsa ve blokzincir verisi sorgulanıyor...</i>"
+        )
+    elif any(k in t for k in ["iban", "banka", "sablon", "şablon", "tahsis", "bosalt", "boşalt", "cozumle"]):
+        return (
+            "🏦 <b>İBAN ve banka verisi taranıyor...</b>\n"
+            "<code>[███████░░░] %70</code>\n"
+            "⏳ <i>Doğrulama ve şablon kontrolü...</i>"
+        )
+    elif any(k in t for k in ["kasa", "rapor", "bakiye", "borc", "borç", "alacak", "ozet", "özet", "ekstre", "tarih", "gun", "gunsonu", "kapanis"]):
+        return (
+            "📊 <b>Kasa ve cariler taranıyor...</b>\n"
+            "<code>[██████░░░░] %60</code>\n"
+            "⏳ <i>Tablolar ve bakiyeler hesaplanıyor...</i>"
+        )
+    else:
+        return (
+            "⚡ <b>CFO İşlem Motoru Çalışıyor...</b>\n"
+            "<code>[██████░░░░] %60</code>\n"
+            "⏳ <i>Finansal veriler işleniyor...</i>"
+        )
+
+def islemi_analiz_bildirimiyle_yap(chat_id: int, islem_fn, *args, goster_bildirim: bool = False, islem_tipi: str = ""):
+    telegramChatAction(chat_id, "typing")
     msg_id = None
     if goster_bildirim:
-        yukleniyor = telegramMesajGonder(chat_id, "⏳ <b>Veriler analiz ediliyor, lütfen bekleyin...</b>")
+        fn_name = islem_tipi or getattr(islem_fn, "__name__", "")
+        for a in args:
+            if isinstance(a, str):
+                fn_name += "_" + a
+        metin = yukleme_metni_uret(fn_name)
+        yukleniyor = telegramMesajGonder(chat_id, metin)
         msg_id = yukleniyor.get("result", {}).get("message_id") if yukleniyor.get("ok") else None
     
     try:
@@ -3070,6 +3269,14 @@ def process_telegram_update(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, masrafRaporuUret_impl)
         elif data == "rapor_tumu":
             islemi_analiz_bildirimiyle_yap(chat_id, tumGruplarRaporu_impl, goster_bildirim=True)
+        elif data.startswith("risk_"):
+            filtre = data.replace("risk_", "").strip()
+            msg_id = cq.get("message", {}).get("message_id")
+            metin, klavye = bakiye_risk_raporu_uret(filtre)
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+            else:
+                telegramMesajGonder(chat_id, metin, klavye)
         elif data == "menu_yenigun":
             metin, klavye = yenigun_baslat_mesaji()
             telegramMesajGonder(chat_id, metin, klavye)
@@ -3238,6 +3445,12 @@ def process_telegram_update(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, hizliOzetUret_impl)
         elif ana_komut == "/rapor":
             islemi_analiz_bildirimiyle_yap(chat_id, tumGruplarRaporu_impl, goster_bildirim=True)
+        elif ana_komut in ["/bakiye", "/bakiyeler", "/sirala", "/sırala", "/risk"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, bakiye_risk_raporu_uret, "tumu", goster_bildirim=True)
+        elif ana_komut in ["/borclular", "/borçlular", "/borc", "/borç"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, bakiye_risk_raporu_uret, "borclular", goster_bildirim=True)
+        elif ana_komut in ["/alacaklar", "/alacak"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, bakiye_risk_raporu_uret, "pozitif", goster_bildirim=True)
         elif ana_komut in ["/masraf", "/gider"]:
             islemi_analiz_bildirimiyle_yap(chat_id, masrafRaporuUret_impl)
         elif ana_komut == "/canlikur":
