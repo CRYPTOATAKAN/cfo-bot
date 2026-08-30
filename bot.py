@@ -36,6 +36,7 @@ _update_executor = concurrent.futures.ThreadPoolExecutor(max_workers=16, thread_
 _log_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="LogWorker")
 
 app_state = {
+    "WEB_APP_URL": WEB_APP_URL,
     "EK_ADMINLER": set(),
     "GRUP_BAGLANTILARI": {},
     "BAGLANTI_CACHE_TIME": 0,
@@ -619,13 +620,8 @@ def grup_kasa_analiz_fisi_uret(grup_ham: str) -> str:
     )
 
 def menuKlavyesiOlustur(isGroup: bool):
-    panel_button = (
-        {"text": "🌐 Canlı CFO Paneli (Tarayıcıda Aç)", "url": WEB_APP_URL}
-        if (isGroup or not WEB_APP_URL) else
-        {"text": "🌐 Canlı CFO Paneli (Mini-App)", "web_app": {"url": WEB_APP_URL}}
-    )
     keyboard = [
-        [panel_button],
+        [{"text": "🖥️ Canlı CFO Dashboard", "callback_data": "dashboard_yenile"}],
         [{"text": "📊 Tüm Gruplar Raporu", "callback_data": "rapor_tumu"}],
         [{"text": "🚨 Risk & Bakiye Sıralaması", "callback_data": "risk_tumu"}],
         [{"text": "📉 Masraf & Gider Raporu", "callback_data": "rapor_masraf"}],
@@ -1304,6 +1300,81 @@ def bakiye_risk_raporu_uret(filtre_turu: str = "tumu") -> Tuple[str, dict]:
             f"💡 <i>Detaylı filtreler için aşağıdaki butonları kullanabilirsiniz.</i>"
         )
         return mesaj, klavye
+
+def cfo_dashboard_raporu_uret() -> Tuple[str, dict]:
+    """Excel'deki /rapor verilerini (tüm carilerin Devir, Kasa, Ödeme, Komisyon, Kalan detaylarını) şık ve görsel bir Dashboard olarak üretir."""
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    veriler = get_sheet_values_fast(sayfa)
+    finans = tablodan_finans_ozeti_hesapla(veriler)
+    
+    saat = suankiZamaniAl().strftime("%H:%M")
+    tarih = sayfa.title
+    aktifler = finans.get("aktif_gruplar", [])
+    
+    if not aktifler:
+        return (
+            "📭 <b>Bugün için henüz işlem görmüş aktif bir cari bulunmuyor.</b>",
+            {"inline_keyboard": [[{"text": "🔄 Dashboard Yenile", "callback_data": "dashboard_yenile"}]]}
+        )
+        
+    dashboard_metni = (
+        f"🖥️ <b>CFO CANLI FİNANS & CARİ DASHBOARD</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📅 <b>Tarih:</b> <code>{tarih}</code> | ⏰ <b>Saat:</b> <code>{saat}</code>\n"
+        f"👥 <b>İşlem Gören Cari:</b> <code>{len(aktifler)} Adet</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"📋 <b>CARİ BAZLI CANLI HAREKET TABLOSU:</b>\n\n"
+    )
+    
+    for g in aktifler:
+        emoji = grupEmojisiBul(g["ad"])
+        kalan = g["kalan"]
+        if kalan > 0.001:
+            durum_tag = "🟢 <i>Pozitif</i>"
+        elif kalan < -0.001:
+            durum_tag = "🔴 <i>Borçlu</i>"
+        else:
+            durum_tag = "⚪ <i>Dengede</i>"
+            
+        dashboard_metni += (
+            f"👤 {emoji} <b>{g['ad'].upper()}</b> ({durum_tag})\n"
+            f"├ 🔄 Devir: <code>{paraFormatla(g['devir'])}</code>\n"
+            f"├ 💰 Kasa: <code>+{paraFormatla(g['kasa'])}</code>\n"
+            f"├ 💸 Ödenen: <code>-{paraFormatla(g['odenen'])}</code>\n"
+            f"├ ✂️ Komisyon: <code>{paraFormatla(g['komisyon'])}</code>\n"
+            f"└ 🏦 <b>Kalan: <code>{paraFormatla(g['kalan'])}</code></b>\n\n"
+        )
+        
+    dashboard_metni += (
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🏆 <b>KONSOLİDE GENEL TOPLAM BİLANÇO</b>\n"
+        f"├ 🔄 <b>Toplam Devir:</b> <code>{paraFormatla(finans['devir'])}</code>\n"
+        f"├ 💰 <b>Toplam Eklenen Kasa:</b> <code>+{paraFormatla(finans['kasa'])}</code>\n"
+        f"├ 💸 <b>Toplam Yapılan Ödeme:</b> <code>-{paraFormatla(finans['odenen'])}</code>\n"
+        f"├ ✂️ <b>Toplam Komisyon:</b> <code>{paraFormatla(finans['komisyon'])}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🏦 <b>GÜNCEL NET KALAN KASA: {paraFormatla(finans['kalan'])}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━"
+    )
+    
+    klavye = {
+        "inline_keyboard": [
+            [
+                {"text": "🔄 Dashboard Yenile", "callback_data": "dashboard_yenile"},
+                {"text": "🚨 Risk & Borçlular", "callback_data": "risk_borclular"}
+            ],
+            [
+                {"text": "💰 Pozitif Bakiyeler", "callback_data": "risk_pozitif"},
+                {"text": "📉 Masraflar", "callback_data": "rapor_masraf"}
+            ],
+            [
+                {"text": "🪙 Canlı Kurlar", "callback_data": "menu_kur"},
+                {"text": "📊 Finans Özeti", "callback_data": "rapor_ozet"}
+            ]
+        ]
+    }
+    return dashboard_metni, klavye
 
 def masrafRaporuUret_impl() -> str:
     sh = get_spreadsheet()
@@ -3425,6 +3496,11 @@ def process_telegram_update(update: dict):
             metin, klavye = bakiye_risk_raporu_uret(filtre)
             if msg_id:
                 telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+        elif data == "dashboard_yenile":
+            msg_id = cq.get("message", {}).get("message_id")
+            metin, klavye = cfo_dashboard_raporu_uret()
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
             else:
                 telegramMesajGonder(chat_id, metin, klavye)
         elif data == "menu_yenigun":
@@ -3582,14 +3658,32 @@ def process_telegram_update(update: dict):
             telegramMesajGonder(chat_id, rehber_ana_metni(), rehber_ana_klavyesi())
         elif ana_komut in ["/qr", "/tronqr", "/tron", "/cuzdan", "/cüzdan", "/adres"]:
             cuzdanQrUret_impl(chat_id, text)
-        elif ana_komut == "/panel":
-            panel_btn = {"inline_keyboard": [[{"text": "🚀 Canlı CFO Panelini Aç", "url": WEB_APP_URL}]]}
+        elif ana_komut in ["/panel", "/dashboard"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, cfo_dashboard_raporu_uret, goster_bildirim=True, islem_tipi="kasa")
+        elif ana_komut in ["/panellink", "/panelurl", "/panellinki"]:
+            if user_id != KURUCU_ID:
+                telegramMesajGonder(chat_id, "⛔ <b>Yetkisiz İşlem:</b> Panel linkini güncelleme yetkisi sadece Şirket Kurucusuna aittir.")
+                return
+            p_args = text.split()[1:]
+            if not p_args:
+                cur = app_state.get("WEB_APP_URL", WEB_APP_URL)
+                telegramMesajGonder(
+                    chat_id,
+                    f"🌐 <b>Mevcut Canlı Panel Linki:</b>\n{cur}\n\n"
+                    f"💡 Yeni link tanımlamak için: <code>/panellink https://yeni-linkiniz.code.run</code>"
+                )
+                return
+            yeni_url = p_args[0].strip()
+            if not yeni_url.startswith("http://") and not yeni_url.startswith("https://"):
+                yeni_url = "https://" + yeni_url
+            app_state["WEB_APP_URL"] = yeni_url
+            sistemeLogYaz("Panel Linki Güncellendi", f"Yeni Link: {yeni_url}")
             telegramMesajGonder(
                 chat_id,
-                f"🌐 <b>CANLI CFO WEB DASHBOARD</b>\n━━━━━━━━━━━━━━━━━━━━\n"
-                f"📊 <i>Şirketinizin tüm finans ve kasa verilerini 7/24 canlı web panelinden anlık izleyebilirsiniz.</i>\n\n"
-                f"🔗 <b>Panel Linki:</b>\n{WEB_APP_URL}",
-                panel_btn
+                f"✅ <b>Canlı CFO Panel Linki Başarıyla Güncellendi!</b>\n\n"
+                f"🔗 <b>Yeni Panel Adresi:</b>\n{yeni_url}\n\n"
+                f"💡 Artık <code>/panel</code> komutu ve menü butonları doğrudan bu linki açacaktır.",
+                {"inline_keyboard": [[{"text": "🚀 Yeni Paneli Aç", "url": yeni_url}]]}
             )
         elif ana_komut == "/ozet":
             islemi_analiz_bildirimiyle_yap(chat_id, hizliOzetUret_impl)
