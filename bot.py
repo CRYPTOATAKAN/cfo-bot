@@ -3177,59 +3177,118 @@ def debug_sistem_impl() -> str:
     )
     return yanit
 
-# --- YARDIMCI: HIZLI VE GÜVENLİ ÇALIŞTIRICI & DİNAMİK İLERLEME ÇUBUĞU ---
-def yukleme_metni_uret(islem_tipi: str = "") -> str:
-    """İşlem tipine göre dinamik, şık bir progress bar metni üretir."""
+# --- YARDIMCI: HIZLI VE GÜVENLİ ÇALIŞTIRICI & DİNAMİK 1-100% İLERLEME ÇUBUĞU ---
+def dynamic_progress_bar(percentage: int, total_blocks: int = 10) -> str:
+    filled = int(round((percentage / 100.0) * total_blocks))
+    filled = max(0, min(total_blocks, filled))
+    empty = total_blocks - filled
+    return "█" * filled + "░" * empty
+
+def yukleme_adim_metni_uret(islem_tipi: str, yuzde: int) -> str:
+    """İşlem tipine ve yüzdeye göre dinamik progress bar metni üretir."""
     t = (islem_tipi or "").lower()
+    p_bar = dynamic_progress_bar(yuzde)
+    
     if any(k in t for k in ["kur", "doviz", "döviz", "kripto", "trc20", "arbitraj", "varlik", "varlık", "portfoy", "portföy", "cevir", "t_"]):
-        return (
-            "🪙 <b>Piyasa kurları çekiliyor...</b>\n"
-            "<code>[████████░░] %80</code>\n"
-            "⏳ <i>Canlı borsa ve blokzincir verisi sorgulanıyor...</i>"
-        )
+        baslik = "🪙 <b>Piyasa Kurları & Varlık Taraması</b>"
+        if yuzde < 35:
+            alt = "⏳ <i>Piyasa bağlantısı kuruluyor...</i>"
+        elif yuzde < 70:
+            alt = "⏳ <i>Borsa ve Kapalıçarşı API'leri sorgulanıyor...</i>"
+        elif yuzde < 95:
+            alt = "⏳ <i>Canlı kurlar ve portföy hesaplanıyor...</i>"
+        else:
+            alt = "✅ <i>Veriler hazırlandı, iletiliyor...</i>"
     elif any(k in t for k in ["iban", "banka", "sablon", "şablon", "tahsis", "bosalt", "boşalt", "cozumle"]):
-        return (
-            "🏦 <b>İBAN ve banka verisi taranıyor...</b>\n"
-            "<code>[███████░░░] %70</code>\n"
-            "⏳ <i>Doğrulama ve şablon kontrolü...</i>"
-        )
+        baslik = "🏦 <b>İBAN & Banka Sorgulama</b>"
+        if yuzde < 35:
+            alt = "⏳ <i>İBAN havuzu ve banka kodları taranıyor...</i>"
+        elif yuzde < 70:
+            alt = "⏳ <i>MOD-97 ve şirket envanteri doğrulanıyor...</i>"
+        elif yuzde < 95:
+            alt = "⏳ <i>Ödeme şablonu derleniyor...</i>"
+        else:
+            alt = "✅ <i>Şablon doğrulandı, iletiliyor...</i>"
     elif any(k in t for k in ["kasa", "rapor", "bakiye", "borc", "borç", "alacak", "ozet", "özet", "ekstre", "tarih", "gun", "gunsonu", "kapanis"]):
-        return (
-            "📊 <b>Kasa ve cariler taranıyor...</b>\n"
-            "<code>[██████░░░░] %60</code>\n"
-            "⏳ <i>Tablolar ve bakiyeler hesaplanıyor...</i>"
-        )
+        baslik = "📊 <b>Finans & Kasa Analizi</b>"
+        if yuzde < 35:
+            alt = "⏳ <i>Aktif gün sayfası ve cariler taranıyor...</i>"
+        elif yuzde < 70:
+            alt = "⏳ <i>Devir, kasa ve ödeme matrisi okunuyor...</i>"
+        elif yuzde < 95:
+            alt = "⏳ <i>Bilanço ve bakiye sıralaması hesaplanıyor...</i>"
+        else:
+            alt = "✅ <i>Analiz tamamlandı, iletiliyor...</i>"
     else:
-        return (
-            "⚡ <b>CFO İşlem Motoru Çalışıyor...</b>\n"
-            "<code>[██████░░░░] %60</code>\n"
-            "⏳ <i>Finansal veriler işleniyor...</i>"
-        )
+        baslik = "⚡ <b>CFO İşlem Motoru</b>"
+        if yuzde < 35:
+            alt = "⏳ <i>İşlem başlatılıyor...</i>"
+        elif yuzde < 70:
+            alt = "⏳ <i>Finansal veriler işleniyor...</i>"
+        elif yuzde < 95:
+            alt = "⏳ <i>Sonuçlar derleniyor...</i>"
+        else:
+            alt = "✅ <i>Tamamlandı, iletiliyor...</i>"
+            
+    return f"{baslik}\n<code>[{p_bar}] %{yuzde}</code>\n{alt}"
+
+def yukleme_metni_uret(islem_tipi: str = "") -> str:
+    return yukleme_adim_metni_uret(islem_tipi, 50)
 
 def islemi_analiz_bildirimiyle_yap(chat_id: int, islem_fn, *args, goster_bildirim: bool = False, islem_tipi: str = ""):
     telegramChatAction(chat_id, "typing")
     msg_id = None
+    fn_name = islem_tipi or getattr(islem_fn, "__name__", "")
+    for a in args:
+        if isinstance(a, str):
+            fn_name += "_" + a
+
     if goster_bildirim:
-        fn_name = islem_tipi or getattr(islem_fn, "__name__", "")
-        for a in args:
-            if isinstance(a, str):
-                fn_name += "_" + a
-        metin = yukleme_metni_uret(fn_name)
-        yukleniyor = telegramMesajGonder(chat_id, metin)
+        ilk_metin = yukleme_adim_metni_uret(fn_name, 15)
+        yukleniyor = telegramMesajGonder(chat_id, ilk_metin)
         msg_id = yukleniyor.get("result", {}).get("message_id") if yukleniyor.get("ok") else None
+
+    future = _update_executor.submit(islem_fn, *args)
     
-    try:
-        sonuc = islem_fn(*args)
+    if msg_id:
+        adimlar = [35, 60, 85, 95]
+        for yuzde in adimlar:
+            if future.done():
+                break
+            time.sleep(0.3)
+            if not future.done():
+                telegramChatAction(chat_id, "typing")
+                telegramMesajDuzenle(chat_id, msg_id, yukleme_adim_metni_uret(fn_name, yuzde))
+        
+        try:
+            sonuc = future.result(timeout=20)
+        except Exception as e:
+            telegramMesajSil(chat_id, msg_id)
+            telegramMesajGonder(chat_id, f"❌ <b>Hata:</b> {e}")
+            return
+            
+        try:
+            telegramMesajDuzenle(chat_id, msg_id, yukleme_adim_metni_uret(fn_name, 100))
+            time.sleep(0.25)
+        except Exception:
+            pass
+            
+        telegramMesajSil(chat_id, msg_id)
         if isinstance(sonuc, tuple):
             text, markup = sonuc
             telegramMesajGonder(chat_id, text, markup)
         else:
             telegramMesajGonder(chat_id, str(sonuc))
-    except Exception as e:
-        telegramMesajGonder(chat_id, f"❌ <b>Hata:</b> {e}")
-    finally:
-        if msg_id:
-            telegramMesajSil(chat_id, msg_id)
+    else:
+        try:
+            sonuc = future.result(timeout=20)
+            if isinstance(sonuc, tuple):
+                text, markup = sonuc
+                telegramMesajGonder(chat_id, text, markup)
+            else:
+                telegramMesajGonder(chat_id, str(sonuc))
+        except Exception as e:
+            telegramMesajGonder(chat_id, f"❌ <b>Hata:</b> {e}")
 
 # --- UPDATE DISPATCHER ---
 def process_telegram_update(update: dict):
