@@ -3236,59 +3236,62 @@ def yukleme_metni_uret(islem_tipi: str = "") -> str:
     return yukleme_adim_metni_uret(islem_tipi, 50)
 
 def islemi_analiz_bildirimiyle_yap(chat_id: int, islem_fn, *args, goster_bildirim: bool = False, islem_tipi: str = ""):
-    telegramChatAction(chat_id, "typing")
-    msg_id = None
+    # 1. Non-blocking typing bildirimi
+    _log_executor.submit(telegramChatAction, chat_id, "typing")
+    
     fn_name = islem_tipi or getattr(islem_fn, "__name__", "")
     for a in args:
         if isinstance(a, str):
             fn_name += "_" + a
 
+    msg_id = None
+    stop_anim = threading.Event()
+
     if goster_bildirim:
-        ilk_metin = yukleme_adim_metni_uret(fn_name, 15)
+        # İlerleme çubuğunu başlat (%20)
+        ilk_metin = yukleme_adim_metni_uret(fn_name, 20)
         yukleniyor = telegramMesajGonder(chat_id, ilk_metin)
         msg_id = yukleniyor.get("result", {}).get("message_id") if yukleniyor.get("ok") else None
 
+        # Arka planda non-blocking animatör (ana işlemi asla bekletmez/yavaşlatmaz)
+        def animasyon_worker(m_id, f_name):
+            adimlar = [45, 70, 90]
+            for y in adimlar:
+                if stop_anim.wait(0.12):
+                    break
+                try:
+                    telegramMesajDuzenle(chat_id, m_id, yukleme_adim_metni_uret(f_name, y))
+                except Exception:
+                    pass
+
+        if msg_id:
+            anim_thread = threading.Thread(target=animasyon_worker, args=(msg_id, fn_name), daemon=True)
+            anim_thread.start()
+
+    # 2. Asıl işlemi hemen paralel iş parçacığı havuzunda çalıştır
     future = _update_executor.submit(islem_fn, *args)
-    
-    if msg_id:
-        adimlar = [35, 60, 85, 95]
-        for yuzde in adimlar:
-            if future.done():
-                break
-            time.sleep(0.3)
-            if not future.done():
-                telegramChatAction(chat_id, "typing")
-                telegramMesajDuzenle(chat_id, msg_id, yukleme_adim_metni_uret(fn_name, yuzde))
-        
-        try:
-            sonuc = future.result(timeout=20)
-        except Exception as e:
+
+    # 3. Sonucu bekle ve animatörü durdur
+    try:
+        sonuc = future.result(timeout=25)
+    except Exception as e:
+        stop_anim.set()
+        if msg_id:
             telegramMesajSil(chat_id, msg_id)
-            telegramMesajGonder(chat_id, f"❌ <b>Hata:</b> {e}")
-            return
-            
-        try:
-            telegramMesajDuzenle(chat_id, msg_id, yukleme_adim_metni_uret(fn_name, 100))
-            time.sleep(0.25)
-        except Exception:
-            pass
-            
+        telegramMesajGonder(chat_id, f"❌ <b>Hata:</b> {e}")
+        return
+    finally:
+        stop_anim.set()
+
+    # 4. Yükleme mesajını sil ve nihai sonucu anında ilet
+    if msg_id:
         telegramMesajSil(chat_id, msg_id)
-        if isinstance(sonuc, tuple):
-            text, markup = sonuc
-            telegramMesajGonder(chat_id, text, markup)
-        else:
-            telegramMesajGonder(chat_id, str(sonuc))
+
+    if isinstance(sonuc, tuple):
+        text, markup = sonuc
+        telegramMesajGonder(chat_id, text, markup)
     else:
-        try:
-            sonuc = future.result(timeout=20)
-            if isinstance(sonuc, tuple):
-                text, markup = sonuc
-                telegramMesajGonder(chat_id, text, markup)
-            else:
-                telegramMesajGonder(chat_id, str(sonuc))
-        except Exception as e:
-            telegramMesajGonder(chat_id, f"❌ <b>Hata:</b> {e}")
+        telegramMesajGonder(chat_id, str(sonuc))
 
 # --- UPDATE DISPATCHER ---
 def process_telegram_update(update: dict):
