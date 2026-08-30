@@ -3920,23 +3920,24 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         .status-dot { width:8px; height:8px; border-radius:50%; background:#22c55e; animation:pulse 2s infinite; }
         @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
         
-        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-bottom:30px; }
-        .stat-card { background:#111827; border:1px solid #1f2937; border-radius:16px; padding:20px; position:relative; overflow:hidden; }
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(195px, 1fr)); gap:12px; margin-bottom:28px; }
+        .stat-card { background:#111827; border:1px solid #1f2937; border-radius:14px; padding:14px 12px; position:relative; overflow:hidden; }
         .stat-card::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; }
         .stat-devir::before { background:#6366f1; }
         .stat-kasa::before { background:#3b82f6; }
         .stat-odenen::before { background:#f59e0b; }
         .stat-komisyon::before { background:#ec4899; }
         .stat-kalan::before { background:#10b981; }
-        .stat-label { font-size:13px; color:#9ca3af; font-weight:600; text-transform:uppercase; margin-bottom:8px; }
-        .stat-value { font-size:24px; font-weight:800; color:#ffffff; }
+        .stat-label { font-size:11px; color:#9ca3af; font-weight:700; text-transform:uppercase; margin-bottom:6px; letter-spacing:0.3px; }
+        .stat-value { font-size:17px; font-weight:800; color:#ffffff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .stat-value .curr { font-size:14px; font-weight:600; opacity:0.85; }
         
         .section-title { font-size:18px; font-weight:700; color:#f8fafc; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
         .groups-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:16px; margin-bottom:30px; }
         .group-card { background:#131d31; border:1px solid #202d46; border-radius:16px; padding:20px; }
         .group-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid #1f2d47; }
         .group-name { font-size:16px; font-weight:700; color:#60a5fa; display:flex; align-items:center; gap:8px; }
-        .group-kalan-badge { background:rgba(16, 185, 129, 0.15); color:#34d399; padding:4px 10px; border-radius:8px; font-weight:700; font-size:14px; }
+        .group-kalan-badge { background:rgba(16, 185, 129, 0.15); color:#34d399; padding:4px 10px; border-radius:8px; font-weight:700; font-size:13px; white-space:nowrap; }
         
         .row-item { display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px; color:#cbd5e1; }
         .row-item span:first-child { color:#94a3b8; }
@@ -4000,8 +4001,15 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         function fmt(n) {
             const num = Number(n);
             const isNeg = num < 0;
-            const formatted = Math.abs(num).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
-            return isNeg ? '-' + formatted : formatted;
+            const formatted = Math.abs(num).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return (isNeg ? '-' : '') + formatted + ' ₺';
+        }
+
+        function fmtHtml(n) {
+            const num = Number(n);
+            const isNeg = num < 0;
+            const formatted = Math.abs(num).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            return (isNeg ? '-' : '') + formatted + '<span class="curr">&nbsp;₺</span>';
         }
 
         async function fetchData() {
@@ -4013,11 +4021,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                     return;
                 }
                 document.getElementById('time-text').innerText = 'Tarih: ' + d.tarih + ' | Son Güncelleme: ' + new Date().toLocaleTimeString('tr-TR');
-                document.getElementById('toplam-devir').innerText = fmt(d.devir);
-                document.getElementById('toplam-kasa').innerText = fmt(d.kasa);
-                document.getElementById('toplam-odenen').innerText = fmt(d.odenen);
-                document.getElementById('toplam-komisyon').innerText = fmt(d.komisyon);
-                document.getElementById('toplam-kalan').innerText = fmt(d.kalan);
+                document.getElementById('toplam-devir').innerHTML = fmtHtml(d.devir);
+                document.getElementById('toplam-kasa').innerHTML = fmtHtml(d.kasa);
+                document.getElementById('toplam-odenen').innerHTML = fmtHtml(d.odenen);
+                document.getElementById('toplam-komisyon').innerHTML = fmtHtml(d.komisyon);
+                document.getElementById('toplam-kalan').innerHTML = fmtHtml(d.kalan);
 
                 const gc = document.getElementById('groups-container');
                 if(!d.gruplar || d.gruplar.length === 0) {
