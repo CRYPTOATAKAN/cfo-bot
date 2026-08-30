@@ -111,7 +111,25 @@ def telegram_api(method: str, payload: dict) -> dict:
         print(f"Telegram API Hatası ({method}): {e}")
         return {"ok": False, "error": str(e)}
 
-def telegramMesajGonder(chat_id, metin: str, reply_markup=None):
+def _append_close_button_if_needed(reply_markup):
+    close_btn = [{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]
+    if reply_markup is None:
+        return {"inline_keyboard": [close_btn]}
+    if isinstance(reply_markup, dict) and "inline_keyboard" in reply_markup:
+        has_close = any(
+            any(btn.get("callback_data") in ["mesaj_kapat", "panel_kapat", "kapat"] for btn in row)
+            for row in reply_markup.get("inline_keyboard", [])
+        )
+        if not has_close:
+            new_kb = [list(row) for row in reply_markup["inline_keyboard"]]
+            new_kb.append(close_btn)
+            return {"inline_keyboard": new_kb}
+        return reply_markup
+    return reply_markup
+
+def telegramMesajGonder(chat_id, metin: str, reply_markup=None, kapat_butonu_ekle: bool = True):
+    if kapat_butonu_ekle:
+        reply_markup = _append_close_button_if_needed(reply_markup)
     payload = {"chat_id": chat_id, "text": metin, "parse_mode": "HTML"}
     if reply_markup:
         payload["reply_markup"] = reply_markup
@@ -121,7 +139,9 @@ def telegramMesajGonder(chat_id, metin: str, reply_markup=None):
         return telegram_api("sendMessage", payload)
     return res
 
-def telegramFotoGonder(chat_id, foto_url: str, caption: str = None, reply_markup=None):
+def telegramFotoGonder(chat_id, foto_url: str, caption: str = None, reply_markup=None, kapat_butonu_ekle: bool = True):
+    if kapat_butonu_ekle:
+        reply_markup = _append_close_button_if_needed(reply_markup)
     payload = {"chat_id": chat_id, "photo": foto_url, "parse_mode": "HTML"}
     if caption:
         payload["caption"] = caption
@@ -132,7 +152,9 @@ def telegramFotoGonder(chat_id, foto_url: str, caption: str = None, reply_markup
 def telegramMesajSil(chat_id, message_id):
     return telegram_api("deleteMessage", {"chat_id": chat_id, "message_id": message_id})
 
-def telegramMesajDuzenle(chat_id, message_id, metin: str, reply_markup=None):
+def telegramMesajDuzenle(chat_id, message_id, metin: str, reply_markup=None, kapat_butonu_ekle: bool = True):
+    if reply_markup is not None and kapat_butonu_ekle:
+        reply_markup = _append_close_button_if_needed(reply_markup)
     payload = {"chat_id": chat_id, "message_id": message_id, "text": metin, "parse_mode": "HTML"}
     if reply_markup is not None:
         payload["reply_markup"] = reply_markup
@@ -3415,7 +3437,7 @@ def islemi_analiz_bildirimiyle_yap(chat_id: int, islem_fn, *args, goster_bildiri
     if goster_bildirim:
         # İlerleme çubuğunu başlat (%20)
         ilk_metin = yukleme_adim_metni_uret(fn_name, 20)
-        yukleniyor = telegramMesajGonder(chat_id, ilk_metin)
+        yukleniyor = telegramMesajGonder(chat_id, ilk_metin, kapat_butonu_ekle=False)
         msg_id = yukleniyor.get("result", {}).get("message_id") if yukleniyor.get("ok") else None
 
         # Arka planda non-blocking animatör (ana işlemi asla bekletmez/yavaşlatmaz)
@@ -3425,7 +3447,7 @@ def islemi_analiz_bildirimiyle_yap(chat_id: int, islem_fn, *args, goster_bildiri
                 if stop_anim.wait(0.12):
                     break
                 try:
-                    telegramMesajDuzenle(chat_id, m_id, yukleme_adim_metni_uret(f_name, y))
+                    telegramMesajDuzenle(chat_id, m_id, yukleme_adim_metni_uret(f_name, y), kapat_butonu_ekle=False)
                 except Exception:
                     pass
 
@@ -3469,6 +3491,9 @@ def process_telegram_update(update: dict):
         telegram_api("answerCallbackQuery", {"callback_query_id": cq["id"]})
         
         if data.startswith("t_yenile_"):
+            if user_id != KURUCU_ID:
+                telegramMesajGonder(chat_id, "⛔ <b>Yetkisiz İşlem:</b> Şirket cüzdan ve rezerv raporunu sorgulama yetkisi sadece <b>Şirket Kurucusuna</b> aittir.")
+                return
             cuzdan = data.replace("t_yenile_", "").strip()
             islemi_analiz_bildirimiyle_yap(chat_id, trc20_varlik_raporu_uret, cuzdan)
             return
@@ -3556,6 +3581,12 @@ def process_telegram_update(update: dict):
 
         # /t veya /rezerv veya /varlik (TRC-20 Canlı Rezerv & Varlık Raporu)
         if ana_komut in ["/t", "/rezerv", "/varlik"]:
+            if user_id != KURUCU_ID:
+                telegramMesajGonder(
+                    chat_id,
+                    "⛔ <b>Yetkisiz İşlem:</b> Şirket cüzdan ve rezerv raporunu sorgulama yetkisi sadece <b>Şirket Kurucusuna</b> aittir."
+                )
+                return
             cuzdan = komut_parcalari[1].strip() if len(komut_parcalari) > 1 else VARSAYILAN_TRC20_ADRES
             islemi_analiz_bildirimiyle_yap(chat_id, trc20_varlik_raporu_uret, cuzdan, goster_bildirim=True)
             return
