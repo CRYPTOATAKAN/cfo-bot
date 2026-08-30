@@ -79,7 +79,11 @@ def telegramMesajGonder(chat_id, metin: str, reply_markup=None):
     payload = {"chat_id": chat_id, "text": metin, "parse_mode": "HTML"}
     if reply_markup:
         payload["reply_markup"] = reply_markup
-    return telegram_api("sendMessage", payload)
+    res = telegram_api("sendMessage", payload)
+    if not res.get("ok") and ("can't parse entities" in str(res.get("description", "")).lower() or "bad request" in str(res.get("description", "")).lower()):
+        payload.pop("parse_mode", None)
+        return telegram_api("sendMessage", payload)
+    return res
 
 def telegramFotoGonder(chat_id, foto_url: str, caption: str = None, reply_markup=None):
     payload = {"chat_id": chat_id, "photo": foto_url, "parse_mode": "HTML"}
@@ -729,6 +733,8 @@ def rehber_kategori_metni(kategori: str) -> str:
             "  └ <i>Tether / Komisyon hesap makinesi (Örn: /hesap SACİD 2 48.00).</i>\n\n"
             "• <code>/iban</code>\n"
             "  └ <i>Kullanımdaki ve boşta olan şirket İBAN'larını listeler.</i>\n\n"
+            "• <code>/sablon [Hesap]</code> (veya <code>/[Hesap Adı]</code>)\n"
+            "  └ <i>📋 Excel'deki resmi ödeme/İBAN şablonunu anında çeker (Örn: /HSY EMLAK 3).</i>\n\n"
             "• <code>/ibantahsis [Hesap] [Cari]</code>\n"
             "  └ <i>İBAN'ı cariye tahsis edip 'Kullanımda' yapar (Örn: /ibantahsis CYL1 SACİD).</i>\n\n"
             "• <code>/ibanbosalt [Hesap]</code>\n"
@@ -798,6 +804,7 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/portfoy</code> : Şirket konsolide hazine ve portföy bilançosu.\n"
             "• <code>/hesap [Grup] [Kom%] [Kur]</code> : Tether hesap makinesi.\n"
             "• <code>/iban</code> : Şirket İBAN listesi.\n"
+            "• <code>/sablon [Hesap]</code> : Excel ödeme şablonunu çeker (Örn: /HSY EMLAK 3).\n"
             "• <code>/ibantahsis [Hesap] [Cari]</code> : İBAN'ı cariye tahsis eder.\n"
             "• <code>/ibanbosalt [Hesap]</code> : İBAN'ı boşa çıkarır.\n"
             "• <code>/ibancoz [İBAN]</code> : İBAN doğrulama ve banka tespiti.\n"
@@ -2111,12 +2118,111 @@ def ibanListesiGetir_impl() -> str:
     mesaj += "🔴 <b>KULLANIMDAKİ İBANLAR</b>\n" + ("\n".join(dolu) if dolu else "🔹 <i>Kullanımda İBAN yok.</i>")
     return mesaj
 
+def normalize_hesap_kodu(text: str) -> str:
+    if not text:
+        return ""
+    t = normalize_text(text)
+    return re.sub(r'[^A-Z0-9]', '', t)
+
+def iban_sablon_bul(veriler: List[List[str]], aranan_kod: str):
+    """
+    Excel tablosundaki Sol Blok (Col L: 12, Col M: 13, Col O: 15) ve 
+    Sağ Blok (Col P: 16, Col Q: 17, Col R: 18) üzerinde şablon arar.
+    Döner: (satir_idx, hesap_adi, sablon_metni, cari_adi) veya None
+    """
+    aranan_temiz = aranan_kod.strip()
+    aranan_norm = normalize_hesap_kodu(aranan_temiz)
+    if not aranan_norm:
+        return None
+
+    # 1. Aşama: Tam veya doğrudan başlangıç/içerme eşleşmesi
+    for idx, row in enumerate(veriler[1:], start=2):
+        if len(row) > 11 and row[11].strip():
+            h_ad = row[11].strip()
+            h_norm = normalize_hesap_kodu(h_ad)
+            if h_norm == aranan_norm or (len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm)):
+                sablon = row[12].strip() if len(row) > 12 else ""
+                cari = row[14].strip() if len(row) > 14 else ""
+                return idx, h_ad, sablon, cari
+
+        if len(row) > 15 and row[15].strip():
+            h_ad = row[15].strip()
+            h_norm = normalize_hesap_kodu(h_ad)
+            if h_norm == aranan_norm or (len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm)):
+                sablon = row[16].strip() if len(row) > 16 else ""
+                cari = row[17].strip() if len(row) > 17 else ""
+                return idx, h_ad, sablon, cari
+
+    # 2. Aşama: Esnek token eşleşmesi (Örn: 'ARS 3' -> 'ARS EMLAK 3' veya 'HSY 2' -> 'HSY 2 / 29')
+    match_digits = re.findall(r'\d+', aranan_norm)
+    match_letters = re.findall(r'[A-Z]+', aranan_norm)
+    if match_digits and match_letters:
+        num = match_digits[-1]
+        letters = "".join(match_letters)
+        for idx, row in enumerate(veriler[1:], start=2):
+            if len(row) > 11 and row[11].strip():
+                h_ad = row[11].strip()
+                h_norm = normalize_hesap_kodu(h_ad)
+                if letters in h_norm and h_norm.endswith(num):
+                    sablon = row[12].strip() if len(row) > 12 else ""
+                    cari = row[14].strip() if len(row) > 14 else ""
+                    return idx, h_ad, sablon, cari
+
+            if len(row) > 15 and row[15].strip():
+                h_ad = row[15].strip()
+                h_norm = normalize_hesap_kodu(h_ad)
+                if letters in h_norm and h_norm.endswith(num):
+                    sablon = row[16].strip() if len(row) > 16 else ""
+                    cari = row[17].strip() if len(row) > 17 else ""
+                    return idx, h_ad, sablon, cari
+
+    return None
+
+def iban_sablon_getir_impl(komut_metni: str) -> str:
+    """
+    Kullanıcı /HSY EMLAK 3 veya /sablon HSY EMLAK 3 yazdığında
+    Excel'deki ilgili satırdan hazır ödeme şablonunu çeker ve doğrudan Telegram'a gönderir.
+    """
+    temiz_komut = komut_metni.strip()
+    if temiz_komut.startswith("/sablon") or temiz_komut.startswith("/şablon") or temiz_komut.startswith("/hesapbilgi"):
+        p = temiz_komut.split()[1:]
+        aranan = " ".join(p).strip()
+    else:
+        aranan = temiz_komut.lstrip("/").strip()
+
+    if not aranan:
+        return (
+            "📋 <b>ŞİRKET ÖDEME ŞABLONU ÇEKİCİ</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "Kullanım: <code>/sablon [Hesap Adı]</code> veya doğrudan <code>/[Hesap Adı]</code>\n\n"
+            "📌 <b>Örnekler:</b>\n"
+            "• <code>/HSY EMLAK 3</code>\n"
+            "• <code>/CYL 1</code>\n"
+            "• <code>/ARS EMLAK 2</code>\n"
+            "• <code>/SRGL 1</code>"
+        )
+
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    veriler = get_sheet_values_fast(sayfa)
+
+    res = iban_sablon_bul(veriler, aranan)
+    if not res:
+        return f"⚠️ <b>Şablon Bulunamadı!</b>\nExcel tablosunda '<b>{aranan}</b>' hesabına ait bir ödeme şablonu bulunamadı.\n\n💡 <i>Mevcut hesaplar: CYL 1-5, HSY 1-10, HSY EMLAK 1-16, ARS EMLAK 1-17, SRGL 1-10</i>"
+
+    satir_idx, hesap_adi, sablon_metni, cari_adi = res
+
+    if not sablon_metni:
+        return f"⚠️ <b>'{hesap_adi}'</b> için Excel tablosunda henüz bir şablon metni girilmemiş."
+
+    return sablon_metni
+
 def iban_hesap_bul(veriler: List[List[str]], aranan_kod: str):
     """
     Excel tablosundaki L (12. sütun) ve P (16. sütun) hesap bloklarında arama yapar.
     Döner: (satir_no_1based, hedef_cari_sutun_1based, hesap_adi, mevcut_cari)
     """
-    aranan_norm = normalize_text(aranan_kod)
+    aranan_norm = normalize_hesap_kodu(aranan_kod)
     if not aranan_norm:
         return None
         
@@ -2124,16 +2230,16 @@ def iban_hesap_bul(veriler: List[List[str]], aranan_kod: str):
         # 1. Sol Blok: Sütun L (Col 12), Cari Sütun O (Col 15)
         if len(row) > 11 and row[11].strip():
             h_ad = row[11].strip()
-            h_norm = normalize_text(h_ad)
-            if aranan_norm == h_norm or aranan_norm in h_norm or h_norm.startswith(aranan_norm):
+            h_norm = normalize_hesap_kodu(h_ad)
+            if aranan_norm == h_norm or (len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm)):
                 mevcut_cari = row[14].strip() if len(row) > 14 else ""
                 return idx, 15, h_ad, mevcut_cari
                 
         # 2. Sağ Blok: Sütun P (Col 16), Cari Sütun R (Col 18)
         if len(row) > 15 and row[15].strip():
             h_ad = row[15].strip()
-            h_norm = normalize_text(h_ad)
-            if aranan_norm == h_norm or aranan_norm in h_norm or h_norm.startswith(aranan_norm):
+            h_norm = normalize_hesap_kodu(h_ad)
+            if aranan_norm == h_norm or (len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm)):
                 mevcut_cari = row[17].strip() if len(row) > 17 else ""
                 return idx, 18, h_ad, mevcut_cari
                 
@@ -3144,6 +3250,8 @@ def process_telegram_update(update: dict):
                 islemi_analiz_bildirimiyle_yap(chat_id, ibanListesiGetir_impl)
             else:
                 islemi_analiz_bildirimiyle_yap(chat_id, ibanCozumle_impl, text)
+        elif ana_komut in ["/sablon", "/şablon", "/hesapbilgi"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, iban_sablon_getir_impl, text)
         elif ana_komut in ["/ibantahsis", "/tahsis"]:
             islemi_analiz_bildirimiyle_yap(chat_id, iban_tahsis_impl, text)
         elif ana_komut in ["/ibanbosalt", "/bosalt", "/ibansil"]:
@@ -3265,6 +3373,18 @@ def process_telegram_update(update: dict):
                     out += f"📌 <b>{r[0] if len(r)>0 else ''}</b>\n<code>{r[1] if len(r)>1 else ''}</code>\n\n"
                 return out
             islemi_analiz_bildirimiyle_yap(chat_id, notlari_getir_impl)
+        else:
+            if text.startswith("/"):
+                aranan_aday = text.strip().lstrip("/")
+                try:
+                    sh_temp = get_spreadsheet()
+                    sayfa_temp = get_active_daily_sheet(sh_temp)
+                    veriler_temp = get_sheet_values_fast(sayfa_temp)
+                    if iban_sablon_bul(veriler_temp, aranan_aday):
+                        islemi_analiz_bildirimiyle_yap(chat_id, iban_sablon_getir_impl, text)
+                        return
+                except Exception:
+                    pass
 
 # --- MODERN CANLI CFO WEB PANELİ & API ---
 DASHBOARD_HTML = """<!DOCTYPE html>
