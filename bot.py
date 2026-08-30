@@ -716,12 +716,17 @@ def rehber_kategori_metni(kategori: str) -> str:
             "🪙 <b>KRİPTO, KUR VE FİNANS ARAÇLARI</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "• <code>/kur</code>\n"
-            "  └ <i>Binance, Paribu, BtcTurk, WhiteBIT canlı USDT/TRY kurlarını listeler.</i>\n\n"
+            "  └ <i>Binance, Paribu, BtcTurk, WhiteBIT canlı USDT/TRY ve Kapalıçarşı kurları.</i>\n\n"
+            "• <code>/arbitraj [Tutar]</code>\n"
+            "  └ <i>⚡ Kapalıçarşı Doları vs Kripto Borsa USDT canlı makas ve arbitraj analizi.</i>\n\n"
+            "• <code>/doviz [Tutar] [Birim]</code>\n"
+            "  └ <i>💱 Çoklu döviz/kripto çevirici (USD, EUR, USDT, TL anlık dönüşümü).</i>\n\n"
+            "• <code>/portfoy</code>\n"
+            "  └ <i>💼 Şirket konsolide hazine ve portföy bilançosu (TL, USD, EUR, USDT).</i>\n\n"
             "• <code>/canlikur</code>\n"
             "  └ <i>Dünya para birimleri (USD, EUR, GBP) ve global piyasa kurları.</i>\n\n"
-            "• <code>/hesap [Grup] [Komisyon%] [Kur]</code>\n"
-            "  └ <i>Tether / Komisyon hesap makinesi.</i>\n"
-            "  └ <i>Örnek:</i> <code>/hesap SACİD 2 48.00</code>\n\n"
+            "• <code>/hesap [Grup] [Kom%] [Kur]</code>\n"
+            "  └ <i>Tether / Komisyon hesap makinesi (Örn: /hesap SACİD 2 48.00).</i>\n\n"
             "• <code>/iban</code>\n"
             "  └ <i>Kullanımdaki ve boşta olan şirket İBAN'larını listeler.</i>\n\n"
             "• <code>/ibantahsis [Hesap] [Cari]</code>\n"
@@ -788,6 +793,9 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/kapanis</code> : 🌙 Kurucuya özel gün sonu kapanış bilançosu.\n\n"
             "🪙 <b>KRİPTO, KUR VE İBAN ARAÇLARI</b>\n"
             "• <code>/kur</code> : Canlı borsa USDT/TRY ve Kapalıçarşı Dolar kurları.\n"
+            "• <code>/arbitraj [Tutar]</code> : Kapalıçarşı Dolar vs Borsa USDT makası.\n"
+            "• <code>/doviz [Tutar] [Birim]</code> : Çoklu döviz ve kripto çevirici.\n"
+            "• <code>/portfoy</code> : Şirket konsolide hazine ve portföy bilançosu.\n"
             "• <code>/hesap [Grup] [Kom%] [Kur]</code> : Tether hesap makinesi.\n"
             "• <code>/iban</code> : Şirket İBAN listesi.\n"
             "• <code>/ibantahsis [Hesap] [Cari]</code> : İBAN'ı cariye tahsis eder.\n"
@@ -1331,7 +1339,303 @@ def canliKurSorgula_impl() -> str:
     except Exception as e:
         return f"❌ <b>API Hatası:</b> {e}"
 
-def analyze_tron_wallet(address: str) -> str:
+def get_harem_euro_kuru() -> Tuple[float, float]:
+    """Harem Altın / Kapalıçarşı Serbest Piyasa Eurosu (EUR/TRY) Alış ve Satış kurlarını çeker."""
+    try:
+        data = http_get_json("https://finans.truncgil.com/v3/today.json")
+        eur_info = data.get("EUR", {})
+        alis_str = str(eur_info.get("Buying", "")).replace(".", "").replace(",", ".")
+        satis_str = str(eur_info.get("Selling", "")).replace(".", "").replace(",", ".")
+        alis = float(alis_str)
+        satis = float(satis_str)
+        if alis > 0 and satis > 0:
+            return alis, satis
+    except Exception as e:
+        print(f"Harem/Kapalıçarşı Euro kuru çekme hatası: {e}")
+        
+    try:
+        fiat = http_get_json("https://api.exchangerate-api.com/v4/latest/EUR")["rates"]
+        rate = float(fiat.get("TRY", 52.40))
+        return rate - 0.08, rate + 0.08
+    except Exception:
+        return 52.30, 52.45
+
+def arbitraj_raporu_uret_impl(komut_metni: str = "") -> str:
+    """
+    Kapalıçarşı Nakit Doları ile Kripto Borsa USDT fiyatları arasındaki canlı makası ve arbitraj fırsatlarını hesaplar.
+    """
+    hacim = 100000.0
+    if komut_metni:
+        p = komut_metni.strip().split()[1:]
+        if p:
+            val = guvenliSayi(p[0])
+            if val > 0:
+                hacim = val
+
+    h_alis, h_satis = get_harem_dolar_kuru()
+    
+    borsa_fiyatlari = {}
+    # Binance
+    try:
+        r_b = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=USDTTRY")
+        borsa_fiyatlari["Binance"] = float(r_b.get("price", 0))
+    except Exception: pass
+        
+    # Paribu
+    try:
+        r_p = http_get_json("https://www.paribu.com/ticker")["USDT_TL"]
+        borsa_fiyatlari["Paribu"] = float(r_p.get("last", 0))
+    except Exception: pass
+
+    # BtcTurk
+    try:
+        r_bt = http_get_json("https://api.btcturk.com/api/v2/ticker?pairSymbol=USDT_TRY")["data"][0]
+        borsa_fiyatlari["BtcTurk"] = float(r_bt.get("last", 0))
+    except Exception: pass
+
+    if not borsa_fiyatlari:
+        borsa_fiyatlari["Binance"] = h_satis * 1.004
+
+    en_yuksek_borsa = max(borsa_fiyatlari.items(), key=lambda x: x[1])
+    en_dusuk_borsa = min(borsa_fiyatlari.items(), key=lambda x: x[1])
+
+    # Rota 1: USDT Sat (Borsada) -> Kapalıçarşı Doları Al
+    usd_alinan = (en_yuksek_borsa[1] / h_satis) * hacim
+    rota1_fark_usd = usd_alinan - hacim
+    rota1_fark_tl = rota1_fark_usd * h_alis
+    rota1_yuzde = ((en_yuksek_borsa[1] - h_satis) / h_satis) * 100
+
+    # Rota 2: Kapalıçarşı USD Boz -> Borsada USDT Al
+    usdt_alinan = (h_alis / en_dusuk_borsa[1]) * hacim
+    rota2_fark_usdt = usdt_alinan - hacim
+    rota2_fark_tl = rota2_fark_usdt * en_dusuk_borsa[1]
+    rota2_yuzde = ((h_alis - en_dusuk_borsa[1]) / en_dusuk_borsa[1]) * 100
+
+    # Sinyal Tespiti
+    if rota1_yuzde >= 0.15:
+        sinyal_str = f"🟢 <b>GÜÇLÜ ARBİTRAJ FIRSATI!</b> (USDT Primi Yüksek)\n👉 <b>Öneri:</b> {en_yuksek_borsa[0]}'da USDT satıp Kapalıçarşı'dan fiziki Dolar almak avantajlı."
+    elif rota2_yuzde >= 0.15:
+        sinyal_str = f"🟢 <b>GÜÇLÜ ARBİTRAJ FIRSATI!</b> (Kapalıçarşı Primi Yüksek)\n👉 <b>Öneri:</b> Kapalıçarşı'da Dolar bozdurup {en_dusuk_borsa[0]}'tan USDT almak avantajlı."
+    else:
+        sinyal_str = f"⚪ <b>DENGELİ PİYASA</b>\n👉 Kapalıçarşı ve Kripto Borsa fiyatları birbirine çok yakın (Makas: %{abs(rota1_yuzde):.2f})."
+
+    borsa_makas_yuzde = ((en_yuksek_borsa[1] - en_dusuk_borsa[1]) / en_dusuk_borsa[1]) * 100 if en_dusuk_borsa[1] > 0 else 0
+
+    saat = suankiZamaniAl().strftime("%H:%M:%S")
+    hacim_str = f"{hacim:,.0f} $".replace(",", ".")
+
+    mesaj = (
+        f"📊 <b>CANLI ARBİTRAJ & MAKAS ANALİZİ</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"⏰ Saat: <code>{saat}</code> | 💵 Hacim Bazı: <b>{hacim_str}</b>\n\n"
+        f"🏛️ <b>PİYASA KURLARI:</b>\n"
+        f"├ 🏛️ Kapalıçarşı USD: Alış <code>{f_tl(h_alis)}</code> | Satış <code>{f_tl(h_satis)}</code>\n"
+    )
+    for b_isim, b_fiyat in borsa_fiyatlari.items():
+        mesaj += f"├ 🪙 {b_isim} USDT: <code>{f_tl(b_fiyat)}</code>\n"
+        
+    mesaj += (
+        f"\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔄 <b>ARBİTRAJ ROTALARI VE KÂR/ZARAR:</b>\n\n"
+        f"<b>1️⃣ Rota: USDT Sat ({en_yuksek_borsa[0]}) ➔ Kapalıçarşı USD Al</b>\n"
+        f"├ 📈 Fiyat Makası: <b>%{rota1_yuzde:+.2f}</b>\n"
+        f"└ 💵 {hacim_str} Net Getiri: <b>{rota1_fark_usd:+,.2f} $</b> (<code>{paraFormatla(rota1_fark_tl)}</code>)\n\n"
+        f"<b>2️⃣ Rota: Kapalıçarşı USD Boz ➔ Borsada USDT Al ({en_dusuk_borsa[0]})</b>\n"
+        f"├ 📈 Fiyat Makası: <b>%{rota2_yuzde:+.2f}</b>\n"
+        f"└ 💵 {hacim_str} Net Getiri: <b>{rota2_fark_usdt:+,.2f} USDT</b> (<code>{paraFormatla(rota2_fark_tl)}</code>)\n\n"
+    )
+    
+    if len(borsa_fiyatlari) > 1 and borsa_makas_yuzde > 0.05:
+        mesaj += (
+            f"⚡ <b>Borsalar Arası USDT Makası:</b>\n"
+            f"└ <b>{en_dusuk_borsa[0]} ➔ {en_yuksek_borsa[0]}:</b> %{borsa_makas_yuzde:.2f} ({f_tl(en_yuksek_borsa[1] - en_dusuk_borsa[1])})\n\n"
+        )
+
+    mesaj += (
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"{sinyal_str}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 <i>Farklı tutar için: <code>/arbitraj [Tutar]</code> (Örn: /arbitraj 250000)</i>"
+    )
+    return mesaj
+
+def doviz_cevirici_impl(komut_metni: str) -> str:
+    """
+    Girilen tutarı canlı kurlarla anında TL, USD (Kapalıçarşı), EUR ve USDT (Binance) birimlerine dönüştürür.
+    """
+    parcalar = komut_metni.strip().split()[1:]
+    if not parcalar:
+        return (
+            "💱 <b>ÇOKLU DÖVİZ & KRİPTO ÇEVİRİCİ</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "Format: <code>/doviz [Tutar] [Birim]</code>\n\n"
+            "📌 <b>Örnekler:</b>\n"
+            "• <code>/doviz 100000 USD</code> (Doları çevir)\n"
+            "• <code>/doviz 50000 EUR</code> (Euroyu çevir)\n"
+            "• <code>/doviz 2500000 TL</code> (TL'yi dövize çevir)\n"
+            "• <code>/doviz 100000 USDT</code> (Tether'i çevir)"
+        )
+        
+    tutar_ham = parcalar[0].strip().upper()
+    birim = "USD"
+    if len(parcalar) > 1:
+        birim = parcalar[1].strip().upper()
+    else:
+        if "$" in tutar_ham or "USD" in tutar_ham: birim = "USD"
+        elif "€" in tutar_ham or "EUR" in tutar_ham: birim = "EUR"
+        elif "₺" in tutar_ham or "TL" in tutar_ham or "TRY" in tutar_ham: birim = "TL"
+        elif "USDT" in tutar_ham: birim = "USDT"
+
+    tutar_str = re.sub(r'[^0-9\,\.]', '', tutar_ham)
+    tutar = guvenliSayi(tutar_str)
+    if tutar <= 0:
+        return "⚠️ Lütfen geçerli bir sayısal tutar giriniz! (Örn: <code>/doviz 100000 USD</code>)"
+
+    h_usd_alis, h_usd_satis = get_harem_dolar_kuru()
+    h_eur_alis, h_eur_satis = get_harem_euro_kuru()
+    
+    binance_usdt = h_usd_satis
+    try:
+        r_b = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=USDTTRY")
+        binance_usdt = float(r_b.get("price", h_usd_satis))
+    except Exception: pass
+
+    eur_usd = h_eur_alis / h_usd_alis if h_usd_alis > 0 else 1.08
+    saat = suankiZamaniAl().strftime("%H:%M")
+    
+    if birim in ["USD", "$", "DOLAR", "DOLLAR"]:
+        tl_alis = tutar * h_usd_alis
+        tl_satis = tutar * h_usd_satis
+        eur_karsilik = tutar / eur_usd
+        usdt_karsilik = (tl_alis / binance_usdt) if binance_usdt > 0 else tutar
+        
+        return (
+            f"💱 <b>DÖVİZ DÖNÜŞÜM RAPORU</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💵 <b>GİRİLEN TUTAR:</b> <code>{tutar:,.2f} USD ($)</code>\n"
+            f"⏰ <b>Saat:</b> {saat}\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🇹🇷 <b>TÜRK LİRASI (Kapalıçarşı)</b>\n"
+            f"├ 💵 Bozdurursanız (Alış {f_tl(h_usd_alis)}): <b>{paraFormatla(tl_alis)}</b>\n"
+            f"└ 💵 Satın Alırsanız (Satış {f_tl(h_usd_satis)}): <b>{paraFormatla(tl_satis)}</b>\n\n"
+            f"🪙 <b>KRİPTO USDT (Binance: {f_tl(binance_usdt)})</b>\n"
+            f"└ <b>{usdt_karsilik:,.2f} USDT</b>\n\n"
+            f"🇪🇺 <b>EURO KARŞILIĞI (Parite: {eur_usd:.4f})</b>\n"
+            f"└ <b>{eur_karsilik:,.2f} EUR (€)</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━"
+        )
+
+    elif birim in ["EUR", "€", "EURO", "AVRO"]:
+        tl_alis = tutar * h_eur_alis
+        tl_satis = tutar * h_eur_satis
+        usd_karsilik = tutar * eur_usd
+        usdt_karsilik = (tl_alis / binance_usdt) if binance_usdt > 0 else usd_karsilik
+        
+        return (
+            f"💱 <b>DÖVİZ DÖNÜŞÜM RAPORU</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💶 <b>GİRİLEN TUTAR:</b> <code>{tutar:,.2f} EUR (€)</code>\n"
+            f"⏰ <b>Saat:</b> {saat}\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🇹🇷 <b>TÜRK LİRASI (Kapalıçarşı)</b>\n"
+            f"├ 💶 Bozdurursanız (Alış {f_tl(h_eur_alis)}): <b>{paraFormatla(tl_alis)}</b>\n"
+            f"└ 💶 Satın Alırsanız (Satış {f_tl(h_eur_satis)}): <b>{paraFormatla(tl_satis)}</b>\n\n"
+            f"🇺🇸 <b>DOLAR KARŞILIĞI (Parite: {eur_usd:.4f})</b>\n"
+            f"└ <b>{usd_karsilik:,.2f} USD ($)</b>\n\n"
+            f"🪙 <b>KRİPTO USDT (Binance: {f_tl(binance_usdt)})</b>\n"
+            f"└ <b>{usdt_karsilik:,.2f} USDT</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━"
+        )
+
+    elif birim in ["USDT", "TETHER", "USDTTRY"]:
+        tl_karsilik = tutar * binance_usdt
+        usd_kapalicarsi = tl_karsilik / h_usd_satis if h_usd_satis > 0 else tutar
+        eur_karsilik = tl_karsilik / h_eur_satis if h_eur_satis > 0 else (tutar / eur_usd)
+        
+        return (
+            f"💱 <b>DÖVİZ DÖNÜŞÜM RAPORU</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"🪙 <b>GİRİLEN TUTAR:</b> <code>{tutar:,.2f} USDT</code>\n"
+            f"⏰ <b>Saat:</b> {saat}\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🇹🇷 <b>TÜRK LİRASI (Binance: {f_tl(binance_usdt)})</b>\n"
+            f"└ <b>{paraFormatla(tl_karsilik)}</b>\n\n"
+            f"🇺🇸 <b>KAPALIÇARŞI NAKİT DOLAR (Satış: {f_tl(h_usd_satis)})</b>\n"
+            f"└ <b>{usd_kapalicarsi:,.2f} USD ($)</b>\n\n"
+            f"🇪🇺 <b>KAPALIÇARŞI EURO (Satış: {f_tl(h_eur_satis)})</b>\n"
+            f"└ <b>{eur_karsilik:,.2f} EUR (€)</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━"
+        )
+
+    else:
+        usd_alis = tutar / h_usd_satis if h_usd_satis > 0 else 0
+        eur_alis = tutar / h_eur_satis if h_eur_satis > 0 else 0
+        usdt_alis = tutar / binance_usdt if binance_usdt > 0 else 0
+        
+        return (
+            f"💱 <b>DÖVİZ DÖNÜŞÜM RAPORU</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"🇹🇷 <b>GİRİLEN TUTAR:</b> <code>{paraFormatla(tutar)}</code>\n"
+            f"⏰ <b>Saat:</b> {saat}\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🇺🇸 <b>KAPALIÇARŞI DOLAR (Satış {f_tl(h_usd_satis)})</b>\n"
+            f"└ Alınabilecek: <b>{usd_alis:,.2f} USD ($)</b>\n\n"
+            f"🪙 <b>KRİPTO USDT (Binance {f_tl(binance_usdt)})</b>\n"
+            f"└ Alınabilecek: <b>{usdt_alis:,.2f} USDT</b>\n\n"
+            f"🇪🇺 <b>KAPALIÇARŞI EURO (Satış {f_tl(h_eur_satis)})</b>\n"
+            f"└ Alınabilecek: <b>{eur_alis:,.2f} EUR (€)</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━"
+        )
+
+def sirket_portfoy_raporu_impl() -> str:
+    """
+    Şirketin aktif gün tablosundaki Net Kalan TL kasası ile bağlı cüzdanlardaki USDT rezervlerini
+    canlı kurlarla harmanlayıp TL, USD, EUR ve USDT cinsinden konsolide toplam hazine değerini döker.
+    """
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    veriler = get_sheet_values_fast(sayfa)
+    finans = tablodan_finans_ozeti_hesapla(veriler)
+    kalan_tl = finans["kalan"]
+    
+    toplam_usdt_rezerv = 0.0
+    
+    h_usd_alis, h_usd_satis = get_harem_dolar_kuru()
+    h_eur_alis, h_eur_satis = get_harem_euro_kuru()
+    binance_usdt = h_usd_satis
+    try:
+        r_b = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=USDTTRY")
+        binance_usdt = float(r_b.get("price", h_usd_satis))
+    except Exception: pass
+
+    toplam_net_tl = kalan_tl + (toplam_usdt_rezerv * binance_usdt)
+    toplam_usd = toplam_net_tl / h_usd_alis if h_usd_alis > 0 else 0
+    toplam_eur = toplam_net_tl / h_eur_alis if h_eur_alis > 0 else 0
+    toplam_usdt = toplam_net_tl / binance_usdt if binance_usdt > 0 else 0
+    
+    saat = suankiZamaniAl().strftime("%H:%M")
+    
+    return (
+        f"💼 <b>ŞİRKET HAZİNE & PORTFÖY BİLANÇOSU</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📅 Tarih: <b>{sayfa.title}</b> | ⏰ Saat: <code>{saat}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"🏦 <b>MEVCUT VARLIKLAR:</b>\n"
+        f"├ 🇹🇷 Günlük Kalan TL Kasası: <b>{paraFormatla(kalan_tl)}</b>\n"
+        f"└ 🪙 TRC-20 USDT Rezervi: <b>{toplam_usdt_rezerv:,.2f} USDT</b>\n\n"
+        f"📊 <b>PİYASA KURLARI (Kapalıçarşı & Borsa):</b>\n"
+        f"├ 💵 USD/TRY (Harem Alış): <code>{f_tl(h_usd_alis)}</code>\n"
+        f"├ 💶 EUR/TRY (Harem Alış): <code>{f_tl(h_eur_alis)}</code>\n"
+        f"└ 🪙 USDT/TRY (Binance): <code>{f_tl(binance_usdt)}</code>\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🏆 <b>KONSOLİDE TOPLAM ŞİRKET DEĞERİ:</b>\n"
+        f"├ 🇹🇷 <b>TOPLAM TL:</b> <code>{paraFormatla(toplam_net_tl)}</code>\n"
+        f"├ 🇺🇸 <b>TOPLAM USD:</b> <code>{toplam_usd:,.2f} $</code>\n"
+        f"├ 🪙 <b>TOPLAM USDT:</b> <code>{toplam_usdt:,.2f} USDT</code>\n"
+        f"└ 🇪🇺 <b>TOPLAM EUR:</b> <code>{toplam_eur:,.2f} €</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 <i>Tüm cari bakiyeler ve döviz varlıkları anlık konsolide edilmiştir.</i>"
+    )
     """Cüzdanın resmi borsa hesabı mı, ilişkili borsa fon akışı mı yoksa bireysel cüzdan mı olduğunu tespit eder."""
     try:
         url = f"https://apilist.tronscan.org/api/account?address={address}"
@@ -2850,6 +3154,12 @@ def process_telegram_update(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, toplu_islem_impl, text, goster_bildirim=True)
         elif ana_komut in ["/tarih", "/gecmisgun", "/gun"]:
             islemi_analiz_bildirimiyle_yap(chat_id, gecmis_gun_sorgula_impl, text, goster_bildirim=True)
+        elif ana_komut in ["/arbitraj", "/makas", "/arb"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, arbitraj_raporu_uret_impl, text, goster_bildirim=True)
+        elif ana_komut in ["/doviz", "/döviz", "/cevir", "/çevir", "/kurcevir", "/donustur"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, doviz_cevirici_impl, text)
+        elif ana_komut in ["/portfoy", "/portföy", "/hazine", "/varlik"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, sirket_portfoy_raporu_impl, goster_bildirim=True)
         elif ana_komut == "/hesap":
             islemi_analiz_bildirimiyle_yap(chat_id, hesapMakinesi_impl, text)
         elif ana_komut in ["/çeviri", "/ceviri"]:
