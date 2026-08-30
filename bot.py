@@ -25,7 +25,7 @@ def suankiZamaniAl():
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8629756462:AAHSn66-SVOZzWp_UrBj36bHjF1hpts5bco")
 KURUCU_ID = int(os.environ.get("KURUCU_ID", "8395730761"))
 SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID", "1Gim_-YSb_TtODclXiZ0hnx2WDsc-RCW9CD51LeVNOaI")
-WEB_APP_URL = os.environ.get("WEB_APP_URL", "https://site--cfo-bot-servis--drx8qyvbw8cw.code.run")
+WEB_APP_URL = os.environ.get("WEB_APP_URL", "https://site--cfo-bot-servis--drx8qvjbw8cw.code.run")
 LOG_SAYFASI = "Guvenlik_Log"
 ADMIN_SAYFASI = "YONETICILER"
 BAGLANTI_SAYFASI = "GRUP_BAGLANTILARI"
@@ -1184,6 +1184,9 @@ def bakiye_risk_raporu_uret(filtre_turu: str = "tumu") -> Tuple[str, dict]:
             [
                 {"text": "📊 Genel Risk Tablosu", "callback_data": "risk_tumu"},
                 {"text": "🔄 Yenile", "callback_data": f"risk_{filtre_turu}"}
+            ],
+            [
+                {"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}
             ]
         ]
     }
@@ -1371,6 +1374,9 @@ def cfo_dashboard_raporu_uret() -> Tuple[str, dict]:
             [
                 {"text": "🪙 Canlı Kurlar", "callback_data": "menu_kur"},
                 {"text": "📊 Finans Özeti", "callback_data": "rapor_ozet"}
+            ],
+            [
+                {"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}
             ]
         ]
     }
@@ -3515,6 +3521,10 @@ def process_telegram_update(update: dict):
         elif data.startswith("rapor_"):
             grup = data.replace("rapor_", "")
             islemi_analiz_bildirimiyle_yap(chat_id, grup_kasa_analiz_fisi_uret, grup)
+        elif data in ["mesaj_kapat", "panel_kapat", "kapat"]:
+            msg_id = cq.get("message", {}).get("message_id")
+            if msg_id:
+                telegramMesajSil(chat_id, msg_id)
         return
 
     if "message" in update and "text" in update["message"]:
@@ -3658,7 +3668,22 @@ def process_telegram_update(update: dict):
             telegramMesajGonder(chat_id, rehber_ana_metni(), rehber_ana_klavyesi())
         elif ana_komut in ["/qr", "/tronqr", "/tron", "/cuzdan", "/cüzdan", "/adres"]:
             cuzdanQrUret_impl(chat_id, text)
-        elif ana_komut in ["/panel", "/dashboard"]:
+        elif ana_komut in ["/panel", "/webpanel"]:
+            cur_panel_url = app_state.get("WEB_APP_URL", WEB_APP_URL)
+            panel_btn = {
+                "inline_keyboard": [
+                    [{"text": "🚀 Canlı CFO Panelini Aç", "url": cur_panel_url}],
+                    [{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]
+                ]
+            }
+            telegramMesajGonder(
+                chat_id,
+                f"🌐 <b>CANLI CFO WEB DASHBOARD</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+                f"📊 <i>Şirketinizin tüm finans ve kasa verilerini 7/24 canlı web panelinden anlık izleyebilirsiniz.</i>\n\n"
+                f"🔗 <b>Panel Linki:</b>\n{cur_panel_url}",
+                panel_btn
+            )
+        elif ana_komut == "/dashboard":
             islemi_analiz_bildirimiyle_yap(chat_id, cfo_dashboard_raporu_uret, goster_bildirim=True, islem_tipi="kasa")
         elif ana_komut in ["/panellink", "/panelurl", "/panellinki"]:
             if user_id != KURUCU_ID:
