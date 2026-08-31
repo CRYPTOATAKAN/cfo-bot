@@ -601,7 +601,7 @@ def grup_baglantilari_listesi_impl() -> str:
     baglantilar = app_state.get("GRUP_BAGLANTILARI", {})
     if not baglantilar:
         return "📭 <b>Henüz hiçbir Telegram grubu bir Excel satırına bağlanmamış.</b>\n\nGrupları bağlamak için grupta <code>/grupbagla [Grup Adı]</code> yazabilirsiniz."
-    out = "🔗 <b>BAĞLI TELEGRAM GRUPLARI</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
+    out = "🔗 <b>BAĞLI TELEGRAM GRUPLARI</b>\n━━━━━━━━━━━━━━━\n\n"
     for c_id, info in baglantilar.items():
         g_ad = info.get("grup", "Bilinmiyor")
         title = info.get("title", "")
@@ -640,16 +640,16 @@ def grup_kasa_analiz_fisi_uret(grup_ham: str) -> str:
 
     return (
         f"📊 <b>[ {gercek_grup_adi.upper()} ] GÜNCEL KASA ANALİZİ</b>\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━━━━━\n"
         f"📅 Tarih: {tarih_str} | ⏰ Saat: {saat_str}\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━━━━━\n"
         f"🔄 Önceki Devir: {paraFormatla(devir)}\n"
         f"💰 Eklenen Kasa: {paraFormatla(kasa)}\n"
         f"💸 Yapılan Ödeme: {paraFormatla(odenen)}\n"
         f"✂️ Kesinti/Masraf: {paraFormatla(komisyon)}\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━━━━━\n"
         f"🏦 <b>NET KALAN TL: {paraFormatla(kalan)}</b>\n"
-        f"━━━━━━━━━━━━━━━━━━"
+        f"━━━━━━━━━━━━━━━"
     )
 
 def menuKlavyesiOlustur(isGroup: bool):
@@ -747,7 +747,7 @@ def rehber_kategori_metni(kategori: str) -> str:
     elif kategori == "masraf":
         return (
             "📉 <b>MASRAF VE GİDER YÖNETİMİ</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "━━━━━━━━━━━━━━━\n\n"
             "• <code>/masrafekle [Kalem] [Tutar]</code>\n"
             "  └ <i>Excel'deki ilk boş satıra yeni masraf kalemi olarak işler.</i>\n"
             "  └ <i>Örnek:</i> <code>/masrafekle Yemek 1.250,50</code>\n"
@@ -761,7 +761,7 @@ def rehber_kategori_metni(kategori: str) -> str:
     elif kategori == "grup":
         return (
             "👥 <b>GRUP VE CARİ EŞLEŞTİRME</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "━━━━━━━━━━━━━━━━\n\n"
             "• <code>/grupbagla [Grup Adı]</code>\n"
             "  └ <i>Bu Telegram grubunu Excel'deki cari satırına bağlar (Grupta bir kez çalıştırılır).</i>\n"
             "  └ <i>Örnek:</i> <code>/grupbagla SACİD</code>\n\n"
@@ -773,7 +773,7 @@ def rehber_kategori_metni(kategori: str) -> str:
     elif kategori == "rapor":
         return (
             "📊 <b>GÜNLÜK DÖNGÜ VE RAPORLAR</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "━━━━━━━━━━━━━━━\n\n"
             "• <code>/bakiye</code> veya <code>/sirala</code>\n"
             "  └ <i>⚖️ Konsolide risk ve bakiye sıralaması: Borçlu carileri ve en yüksek pozitif kasaları tek ekranda listeler.</i>\n\n"
             "• <code>/borclular</code> veya <code>/borc</code>\n"
@@ -792,7 +792,7 @@ def rehber_kategori_metni(kategori: str) -> str:
     elif kategori == "kripto":
         return (
             "🪙 <b>KRİPTO, KUR VE FİNANS ARAÇLARI</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "━━━━━━━━━━━━━━━\n\n"
             "• <code>/kur</code>\n"
             "  └ <i>Binance, Paribu, BtcTurk, WhiteBIT canlı USDT/TRY ve Kapalıçarşı kurları.</i>\n\n"
             "• <code>/arbitraj [Tutar]</code>\n"
@@ -825,7 +825,7 @@ def rehber_kategori_metni(kategori: str) -> str:
     elif kategori == "admin":
         return (
             "🛡️ <b>YÖNETİCİ KONTROLLERİ</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "━━━━━━━━━━━━━━━\n\n"
             "• <code>/adminler</code>\n"
             "  └ <i>Sistemde yetkilendirilmiş şirket yöneticilerini listeler.</i>\n\n"
             "• <code>/adminekle [Telegram ID] [İsim]</code>\n"
@@ -846,7 +846,7 @@ def rehber_kategori_metni(kategori: str) -> str:
     else:  # "tumu"
         return (
             "📚 <b>TÜM SİSTEM KOMUTLARI</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "━━━━━━━━━━━━━━━\n\n"
             "🏢 <b>KASA VE OPERASYON</b>\n"
             "• <code>/kasa</code> : Canlı durum fişi döker.\n"
             "• <code>/kasa [Grup] [Tutar]</code> : Kasaya nakit ekler.\n"
@@ -954,7 +954,7 @@ def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int) 
             dDevir, dKasa, dOdenen, dKomisyon, dKalan = row_vals[1], row_vals[2], row_vals[3], row_vals[4], row_vals[5]
             
             return (
-                f"✅ <b>{isim} Başarılı!</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+                f"✅ <b>{isim} Başarılı!</b>\n━━━━━━━━━━━━━━━━\n"
                 f"{grupEmojisiBul(row[1])} <b>{row[1].upper()}</b>\n"
                 f"💵 İşlem Tutarı: <b>{paraFormatla(tutar * carp)}</b>\n\n"
                 f"🔄 Devir: {paraFormatla(dDevir)}\n"
@@ -1002,7 +1002,7 @@ def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
         sistemeLogYaz("Masraf Ekleme", f"{masraf_ham.upper()} | {paraFormatla(tutar_yuvarlanmis)}")
         
         return (
-            f"✅ <b>Masraf Eklendi!</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+            f"✅ <b>Masraf Eklendi!</b>\n━━━━━━━━━━━━━━━\n"
             f"📉 Masraf Kalemi: <b>{masraf_ham.upper()}</b>\n"
             f"💵 Eklenen Tutar: <b>{paraFormatla(tutar_yuvarlanmis)}</b>\n"
             f"📌 Excel Satırı: <b>Satır {bos_satir}</b>\n\n"
@@ -1041,7 +1041,7 @@ def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
             }
             sistemeLogYaz("Masraf Silme", f"{col_i} | Tamamı Silindi ({paraFormatla(mevcut)})")
             return (
-                f"🗑️ <b>Masraf Satırı Silindi!</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+                f"🗑️ <b>Masraf Satırı Silindi!</b>\n━━━━━━━━━━━━━━\n"
                 f"📉 Masraf Kalemi: <b>{col_i}</b>\n"
                 f"💵 Silinen Tutar: <b>{paraFormatla(mevcut)}</b>\n"
                 f"📌 Excel Satırı: <b>Satır {bulunan_i}</b>\n\n"
@@ -1056,7 +1056,7 @@ def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
             }
             sistemeLogYaz("Masraf Silme", f"{col_i} | -{paraFormatla(tutar)} (Kalan: {paraFormatla(yeni)})")
             return (
-                f"✅ <b>Masraf Tutarı Düşüldü!</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+                f"✅ <b>Masraf Tutarı Düşüldü!</b>\n━━━━━━━━━━━━━\n"
                 f"📉 Masraf Kalemi: <b>{col_i}</b>\n"
                 f"💵 Düşülen Tutar: <b>{paraFormatla(tutar)}</b>\n"
                 f"📊 Güncel Kalan Masraf: <b>{paraFormatla(yeni)}</b>\n\n"
@@ -1126,17 +1126,17 @@ def hizliOzetUret_impl() -> str:
     
     return (
         f"📊 <b>GÜNLÜK FİNANS BİLANÇOSU</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━\n"
         f"📅 Tarih: {sayfa.title} | ⏰ Saat: {saat}\n"
         f"🏢 Aktif Grup Sayısı: {len(finans['aktif_gruplar'])}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"━━━━━━━━━━━\n\n"
         f"🔄 Toplam Devir: {paraFormatla(finans['devir'])}\n"
         f"💰 Eklenen Kasa: {paraFormatla(finans['kasa'])}\n"
         f"💸 Toplam Ödeme: {paraFormatla(finans['odenen'])}\n"
         f"✂️ Toplam Komisyon: {paraFormatla(finans['komisyon'])}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━\n"
         f"🏦 <b>NET KALAN KASA: {paraFormatla(finans['kalan'])}</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━\n"
         f"💡 <i>Tüm grupların anlık genel toplamıdır.</i>"
     )
 
@@ -1150,9 +1150,9 @@ def tumGruplarRaporu_impl() -> str:
     
     mesaj = (
         f"📊 <b>GÜNLÜK DETAYLI GRUP RAPORU</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━━━\n"
         f"📅 Tarih: {sayfa.title} | ⏰ Saat: {saat}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"━━━━━━━━━━━━━\n\n"
     )
     
     if not finans["aktif_gruplar"]:
@@ -1170,15 +1170,15 @@ def tumGruplarRaporu_impl() -> str:
         )
         
     mesaj += (
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━━━\n"
         f"🏆 <b>GENEL TOPLAM BİLANÇO</b>\n"
         f"🔄 Toplam Devir: {paraFormatla(finans['devir'])}\n"
         f"💰 Toplam Kasa: {paraFormatla(finans['kasa'])}\n"
         f"💸 Toplam Ödeme: {paraFormatla(finans['odenen'])}\n"
         f"✂️ Toplam Komisyon: {paraFormatla(finans['komisyon'])}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━━━\n"
         f"🏦 <b>NET KALAN KASA: {paraFormatla(finans['kalan'])}</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━"
+        f"━━━━━━━━━━━━━"
     )
     return mesaj
 
@@ -1227,7 +1227,7 @@ def bakiye_risk_raporu_uret(filtre_turu: str = "tumu") -> Tuple[str, dict]:
     if not aktif_cariler:
         return (
             f"⚖️ <b>RİSK & BAKİYE SIRALAMASI</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"━━━━━━━━━━━━━━━\n"
             f"📅 Tarih: {sayfa.title} | ⏰ Saat: <code>{saat}</code>\n\n"
             f"📭 <b>Bugün için henüz işlem görmüş aktif bir cari/grup bulunmuyor.</b>",
             klavye
@@ -1236,10 +1236,10 @@ def bakiye_risk_raporu_uret(filtre_turu: str = "tumu") -> Tuple[str, dict]:
     if filtre_turu in ["borclular", "borc"]:
         mesaj = (
             f"🚨 <b>RİSK & BORÇLU CARİLER LİSTESİ</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"━━━━━━━━━━━━━━━━\n"
             f"📅 Tarih: {sayfa.title} | ⏰ Saat: <code>{saat}</code>\n"
             f"⚠️ <b>Borçlu / Eksi Bakiye Sayısı:</b> <code>{len(borclular)} Cari</code>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"━━━━━━━━━━━━━━━━\n\n"
         )
         if not borclular:
             mesaj += "🟢 <b>Harika!</b> Şu anda eksi bakiyede / şirkete borçlu durumda hiçbir cari bulunmuyor.\n\n"
@@ -1253,9 +1253,9 @@ def bakiye_risk_raporu_uret(filtre_turu: str = "tumu") -> Tuple[str, dict]:
                     f"└ 🚨 <b>Kalan Risk/Borç: {paraFormatla(g['kalan'])}</b>\n\n"
                 )
             mesaj += (
-                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"━━━━━━━━━━━━━━━\n"
                 f"🚨 <b>TOPLAM CARİ AÇIĞI / BORÇ:</b> <code>{paraFormatla(toplam_borc)}</code>\n"
-                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"━━━━━━━━━━━━━━━\n"
             )
         mesaj += "💡 <i>Kasa veya ödeme girişleri için /kasa veya /odeme komutlarını kullanabilirsiniz.</i>"
         return mesaj, klavye
@@ -1263,10 +1263,10 @@ def bakiye_risk_raporu_uret(filtre_turu: str = "tumu") -> Tuple[str, dict]:
     elif filtre_turu in ["pozitif", "alacaklar", "alacak"]:
         mesaj = (
             f"💰 <b>POZİTİF KASA & BAKİYE SIRALAMASI</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"━━━━━━━━━━\n"
             f"📅 Tarih: {sayfa.title} | ⏰ Saat: <code>{saat}</code>\n"
             f"🏢 <b>Pozitif Bakiyeli Cari Sayısı:</b> <code>{len(pozitifler)} Cari</code>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"━━━━━━━━━━\n\n"
         )
         if not pozitifler:
             mesaj += "📭 Pozitif bakiyeli aktif cari bulunmuyor.\n\n"
@@ -1291,10 +1291,10 @@ def bakiye_risk_raporu_uret(filtre_turu: str = "tumu") -> Tuple[str, dict]:
     else:  # "tumu"
         mesaj = (
             f"⚖️ <b>KONSOLİDE RİSK & BAKİYE SIRALAMASI</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"━━━━━━━━━━━━\n"
             f"📅 Tarih: {sayfa.title} | ⏰ Saat: <code>{saat}</code>\n"
             f"👥 <b>İşlem Gören Aktif Cari:</b> <code>{len(aktif_cariler)} Adet</code>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"━━━━━━━━━━━━\n\n"
         )
         
         # 1. Eksi Bakiyeliler (Risk)
@@ -1327,12 +1327,12 @@ def bakiye_risk_raporu_uret(filtre_turu: str = "tumu") -> Tuple[str, dict]:
             mesaj += f"⚖️ <b>Sıfırlanmış / Dengede ({len(sifirlar)}):</b> <i>{sifir_adlar}</i>\n\n"
             
         mesaj += (
-            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"━━━━━━━━━━━━\n"
             f"📊 <b>KONSOLİDE NET DURUM:</b>\n"
             f"├ 💎 Toplam Pozitif Kasa: <b>{paraFormatla(toplam_pozitif)}</b>\n"
             f"├ 🚨 Toplam Borç/Açık: <b>{paraFormatla(toplam_borc)}</b>\n"
             f"└ 🏦 <b>NET KALAN KASA: {paraFormatla(net_kasa)}</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"━━━━━━━━━━━━\n"
             f"💡 <i>Detaylı filtreler için aşağıdaki butonları kullanabilirsiniz.</i>"
         )
         return mesaj, klavye
@@ -1356,10 +1356,10 @@ def cfo_dashboard_raporu_uret() -> Tuple[str, dict]:
         
     dashboard_metni = (
         f"🖥️ <b>CFO CANLI FİNANS & CARİ DASHBOARD</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"📅 <b>Tarih:</b> <code>{tarih}</code> | ⏰ <b>Saat:</b> <code>{saat}</code>\n"
         f"👥 <b>İşlem Gören Cari:</b> <code>{len(aktifler)} Adet</code>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"━━━━━━━━━━\n\n"
         f"📋 <b>CARİ BAZLI CANLI HAREKET TABLOSU:</b>\n\n"
     )
     
@@ -1383,15 +1383,15 @@ def cfo_dashboard_raporu_uret() -> Tuple[str, dict]:
         )
         
     dashboard_metni += (
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━\n"
         f"🏆 <b>KONSOLİDE GENEL TOPLAM BİLANÇO</b>\n"
         f"├ 🔄 <b>Toplam Devir:</b> <code>{paraFormatla(finans['devir'])}</code>\n"
         f"├ 💰 <b>Toplam Eklenen Kasa:</b> <code>+{paraFormatla(finans['kasa'])}</code>\n"
         f"├ 💸 <b>Toplam Yapılan Ödeme:</b> <code>-{paraFormatla(finans['odenen'])}</code>\n"
         f"├ ✂️ <b>Toplam Komisyon:</b> <code>{paraFormatla(finans['komisyon'])}</code>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━\n"
         f"🏦 <b>GÜNCEL NET KALAN KASA: {paraFormatla(finans['kalan'])}</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━"
+        f"━━━━━━━━━━━"
     )
     
     klavye = {
@@ -1434,15 +1434,15 @@ def masrafRaporuUret_impl() -> str:
     masraflar.sort(key=lambda x: x["fiyat"], reverse=True)
     mesaj = (
         f"📉 <b>{sayfa.title} GÜNLÜK GİDER TABLOSU</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"━━━━━━━━━━━\n\n"
     )
     for m in masraflar:
         mesaj += f"🔹 <b>{m['ad']}:</b> {paraFormatla(m['fiyat'])}\n"
     mesaj += (
-        f"\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"\n━━━━━━━━━━━\n"
         f"📋 Toplam Kalem: <b>{len(masraflar)} Adet</b>\n"
         f"📊 <b>TOPLAM GİDER: {paraFormatla(toplam)}</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━"
+        f"━━━━━━━━━━━━━"
     )
     return mesaj
 
@@ -1478,18 +1478,18 @@ def gun_sonu_kapanis_raporu_uret() -> str:
     
     rapor = (
         f"🌙 <b>GÜN SONU FİNANS VE KASA BİLANÇOSU</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━\n"
         f"📅 <b>Tarih:</b> {tarih} | ⏰ <b>Saat:</b> {saat}\n"
         f"🏢 <b>İşlem Gören Grup:</b> {len(finans['aktif_gruplar'])} Adet\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"━━━━━━━━━━━\n\n"
         f"🔄 <b>Toplam Devir:</b> {paraFormatla(finans['devir'])}\n"
         f"💰 <b>Eklenen Kasa:</b> {paraFormatla(finans['kasa'])}\n"
         f"💸 <b>Toplam Ödeme:</b> {paraFormatla(finans['odenen'])}\n"
         f"✂️ <b>Toplam Komisyon:</b> {paraFormatla(finans['komisyon'])}\n"
         f"📉 <b>Toplam Masraf:</b> {paraFormatla(toplam_masraf)} <i>({len(masraflar)} Kalem)</i>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━\n"
         f"🏦 <b>GÜN SONU NET KALAN: {paraFormatla(finans['kalan'])}</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"━━━━━━━━━━━\n\n"
     )
     
     if finans['aktif_gruplar']:
@@ -1518,9 +1518,9 @@ def gun_sonu_kapanis_raporu_uret() -> str:
         rapor += "\n"
         
     if anlik_kur_str:
-        rapor += f"━━━━━━━━━━━━━━━━━━━━\n{anlik_kur_str}"
+        rapor += f"━━━━━━━━━━━━━\n{anlik_kur_str}"
         
-    rapor += "━━━━━━━━━━━━━━━━━━━━\n💡 <i>Yeni güne devretmek için: /yenigun</i>"
+    rapor += "━━━━━━━━━━━━━\n💡 <i>Yeni güne devretmek için: /yenigun</i>"
     return rapor
 
 # --- PİYASA VE DIŞ BORSA KURLARI (PARALEL & 15s MİKRO-ÖNBELLEK) ---
@@ -1697,7 +1697,7 @@ def kurRaporuUret_impl() -> str:
     rates = fetch_all_market_rates_parallel()
     h_usd = rates.get("harem", {}).get("usd", (48.20, 48.25))
     
-    yanit = "📊 <b>GÜNCEL DÖVİZ & USDT KURLARI</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
+    yanit = "📊 <b>GÜNCEL DÖVİZ & USDT KURLARI</b>\n━━━━━━━━━━━━\n\n"
     yanit += (
         f"🏛️ <b>HAREM (Kapalıçarşı Doları)</b>\n"
         f"💵 Alış: <b>{f_tl(h_usd[0])}</b> | Satış: <b>{f_tl(h_usd[1])}</b>\n\n"
@@ -1746,12 +1746,12 @@ def canliKurSorgula_impl() -> str:
         
         return (
             "🌍 <b>CANLI PİYASA & DÜNYA KURLARI</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "━━━━━━━━━━━━\n\n"
             "🪙 <b>Kripto Paralar (Binance)</b>\n"
             f"🇹🇷 USDT / TRY: <code>{float(b_usdt_val):.2f} ₺</code>\n"
             f"🔶 BTC / USDT: <code>{float(b_btc['price']):,.0f} $</code>\n"
             f"🔷 ETH / USDT: <code>{float(b_eth['price']):.2f} $</code>\n\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "━━━━━━━━━━━━\n\n"
             "💵 <b>Dünya Para Birimleri</b>\n"
             f"🇺🇸 Dolar (USD): <code>{try_rate:.2f} ₺</code>\n"
             f"🇪🇺 Euro (EUR): <code>{(try_rate / fiat.get('EUR', 1)):.2f} ₺</code>\n"
@@ -1827,7 +1827,7 @@ def arbitraj_raporu_uret_impl(komut_metni: str = "") -> str:
 
     mesaj = (
         f"📊 <b>CANLI ARBİTRAJ & MAKAS ANALİZİ</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━━━\n"
         f"⏰ Saat: <code>{saat}</code> | 💵 Hacim Bazı: <b>{hacim_str}</b>\n\n"
         f"🏛️ <b>PİYASA KURLARI:</b>\n"
         f"├ 🏛️ Kapalıçarşı USD: Alış <code>{f_tl(h_alis)}</code> | Satış <code>{f_tl(h_satis)}</code>\n"
@@ -1836,7 +1836,7 @@ def arbitraj_raporu_uret_impl(komut_metni: str = "") -> str:
         mesaj += f"├ 🪙 {b_isim} USDT: <code>{f_tl(b_fiyat)}</code>\n"
         
     mesaj += (
-        f"\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"\n━━━━━━━━━\n"
         f"🔄 <b>ARBİTRAJ ROTALARI VE KÂR/ZARAR:</b>\n\n"
         f"<b>1️⃣ Rota: USDT Sat ({en_yuksek_borsa[0]}) ➔ Kapalıçarşı USD Al</b>\n"
         f"├ 📈 Fiyat Makası: <b>%{rota1_yuzde:+.2f}</b>\n"
@@ -1853,9 +1853,9 @@ def arbitraj_raporu_uret_impl(komut_metni: str = "") -> str:
         )
 
     mesaj += (
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"{sinyal_str}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"💡 <i>Farklı tutar için: <code>/arbitraj [Tutar]</code> (Örn: /arbitraj 250000)</i>"
     )
     return mesaj
@@ -1912,10 +1912,10 @@ def doviz_cevirici_impl(komut_metni: str) -> str:
         
         return (
             f"💱 <b>DÖVİZ DÖNÜŞÜM RAPORU</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"━━━━━━━━━━━\n"
             f"💵 <b>GİRİLEN TUTAR:</b> <code>{tutar:,.2f} USD ($)</code>\n"
             f"⏰ <b>Saat:</b> {saat}\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"━━━━━━━━━━━\n\n"
             f"🇹🇷 <b>TÜRK LİRASI (Kapalıçarşı)</b>\n"
             f"├ 💵 Bozdurursanız (Alış {f_tl(h_usd_alis)}): <b>{paraFormatla(tl_alis)}</b>\n"
             f"└ 💵 Satın Alırsanız (Satış {f_tl(h_usd_satis)}): <b>{paraFormatla(tl_satis)}</b>\n\n"
@@ -1923,7 +1923,7 @@ def doviz_cevirici_impl(komut_metni: str) -> str:
             f"└ <b>{usdt_karsilik:,.2f} USDT</b>\n\n"
             f"🇪🇺 <b>EURO KARŞILIĞI (Parite: {eur_usd:.4f})</b>\n"
             f"└ <b>{eur_karsilik:,.2f} EUR (€)</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━"
+            f"━━━━━━━━━━━"
         )
 
     elif birim in ["EUR", "€", "EURO", "AVRO"]:
@@ -1934,10 +1934,10 @@ def doviz_cevirici_impl(komut_metni: str) -> str:
         
         return (
             f"💱 <b>DÖVİZ DÖNÜŞÜM RAPORU</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"━━━━━━━━━\n"
             f"💶 <b>GİRİLEN TUTAR:</b> <code>{tutar:,.2f} EUR (€)</code>\n"
             f"⏰ <b>Saat:</b> {saat}\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"━━━━━━━━━\n\n"
             f"🇹🇷 <b>TÜRK LİRASI (Kapalıçarşı)</b>\n"
             f"├ 💶 Bozdurursanız (Alış {f_tl(h_eur_alis)}): <b>{paraFormatla(tl_alis)}</b>\n"
             f"└ 💶 Satın Alırsanız (Satış {f_tl(h_eur_satis)}): <b>{paraFormatla(tl_satis)}</b>\n\n"
@@ -1945,7 +1945,7 @@ def doviz_cevirici_impl(komut_metni: str) -> str:
             f"└ <b>{usd_karsilik:,.2f} USD ($)</b>\n\n"
             f"🪙 <b>KRİPTO USDT (Binance: {f_tl(binance_usdt)})</b>\n"
             f"└ <b>{usdt_karsilik:,.2f} USDT</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━"
+            f"━━━━━━━━━━"
         )
 
     elif birim in ["USDT", "TETHER", "USDTTRY"]:
@@ -1955,17 +1955,17 @@ def doviz_cevirici_impl(komut_metni: str) -> str:
         
         return (
             f"💱 <b>DÖVİZ DÖNÜŞÜM RAPORU</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"━━━━━━━━━━\n"
             f"🪙 <b>GİRİLEN TUTAR:</b> <code>{tutar:,.2f} USDT</code>\n"
             f"⏰ <b>Saat:</b> {saat}\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"━━━━━━━━━━\n\n"
             f"🇹🇷 <b>TÜRK LİRASI (Binance: {f_tl(binance_usdt)})</b>\n"
             f"└ <b>{paraFormatla(tl_karsilik)}</b>\n\n"
             f"🇺🇸 <b>KAPALIÇARŞI NAKİT DOLAR (Satış: {f_tl(h_usd_satis)})</b>\n"
             f"└ <b>{usd_kapalicarsi:,.2f} USD ($)</b>\n\n"
             f"🇪🇺 <b>KAPALIÇARŞI EURO (Satış: {f_tl(h_eur_satis)})</b>\n"
             f"└ <b>{eur_karsilik:,.2f} EUR (€)</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━"
+            f"━━━━━━━━━━"
         )
 
     else:
@@ -1975,17 +1975,17 @@ def doviz_cevirici_impl(komut_metni: str) -> str:
         
         return (
             f"💱 <b>DÖVİZ DÖNÜŞÜM RAPORU</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"━━━━━━━━━━\n"
             f"🇹🇷 <b>GİRİLEN TUTAR:</b> <code>{paraFormatla(tutar)}</code>\n"
             f"⏰ <b>Saat:</b> {saat}\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"━━━━━━━━━━\n\n"
             f"🇺🇸 <b>KAPALIÇARŞI DOLAR (Satış {f_tl(h_usd_satis)})</b>\n"
             f"└ Alınabilecek: <b>{usd_alis:,.2f} USD ($)</b>\n\n"
             f"🪙 <b>KRİPTO USDT (Binance {f_tl(binance_usdt)})</b>\n"
             f"└ Alınabilecek: <b>{usdt_alis:,.2f} USDT</b>\n\n"
             f"🇪🇺 <b>KAPALIÇARŞI EURO (Satış {f_tl(h_eur_satis)})</b>\n"
             f"└ Alınabilecek: <b>{eur_alis:,.2f} EUR (€)</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━"
+            f"━━━━━━━━━━"
         )
 
 def sirket_portfoy_raporu_impl() -> str:
@@ -2018,9 +2018,9 @@ def sirket_portfoy_raporu_impl() -> str:
     
     return (
         f"💼 <b>ŞİRKET HAZİNE & PORTFÖY BİLANÇOSU</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"📅 Tarih: <b>{sayfa.title}</b> | ⏰ Saat: <code>{saat}</code>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"━━━━━━━━━━\n\n"
         f"🏦 <b>MEVCUT VARLIKLAR:</b>\n"
         f"├ 🇹🇷 Günlük Kalan TL Kasası: <b>{paraFormatla(kalan_tl)}</b>\n"
         f"└ 🪙 TRC-20 USDT Rezervi: <b>{toplam_usdt_rezerv:,.2f} USDT</b>\n\n"
@@ -2028,13 +2028,13 @@ def sirket_portfoy_raporu_impl() -> str:
         f"├ 💵 USD/TRY (Harem Alış): <code>{f_tl(h_usd_alis)}</code>\n"
         f"├ 💶 EUR/TRY (Harem Alış): <code>{f_tl(h_eur_alis)}</code>\n"
         f"└ 🪙 USDT/TRY (Binance): <code>{f_tl(binance_usdt)}</code>\n\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"🏆 <b>KONSOLİDE TOPLAM ŞİRKET DEĞERİ:</b>\n"
         f"├ 🇹🇷 <b>TOPLAM TL:</b> <code>{paraFormatla(toplam_net_tl)}</code>\n"
         f"├ 🇺🇸 <b>TOPLAM USD:</b> <code>{toplam_usd:,.2f} $</code>\n"
         f"├ 🪙 <b>TOPLAM USDT:</b> <code>{toplam_usdt:,.2f} USDT</code>\n"
         f"└ 🇪🇺 <b>TOPLAM EUR:</b> <code>{toplam_eur:,.2f} €</code>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━\n"
         f"💡 <i>Tüm cari bakiyeler ve döviz varlıkları anlık konsolide edilmiştir.</i>"
     )
     """Cüzdanın resmi borsa hesabı mı, ilişkili borsa fon akışı mı yoksa bireysel cüzdan mı olduğunu tespit eder."""
@@ -2143,20 +2143,20 @@ def trc20_varlik_raporu_uret(cuzdan_adresi: str = VARSAYILAN_TRC20_ADRES) -> Tup
 
     mesaj = (
         f"🏛️ <b>REZERV & CANLI VARLIK RAPORU</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━\n"
         f"📅 <b>Tarih/Saat:</b> {tarih_saat}\n"
         f"🌐 <b>Ağ:</b> TRON (TRC-20)\n"
         f"📌 <b>Cüzdan:</b> <code>{cuzdan_adresi}</code>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━\n"
         f"{borsa_kurlari_metni}\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━\n"
         f"💵 <b>USDT Bakiyesi:</b> <code>{usdt_format} USDT</code>\n"
         f"⚡ <b>TRX Bakiyesi:</b> <code>{trx_format} TRX</code>\n"
         f"🌍 <b>Toplam Varlık (USD):</b> <code>${usd_format}</code>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━\n"
         f"🇹🇷 <b>USDT TÜRK LİRASI KARŞILIĞI:</b>\n"
         f"💰 <b>{usdt_tl_format} ₺</b> <i>(1 USDT ≈ {kur_format} ₺)</i>\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━\n"
         f"⚡ <i>Canlı Blokzincir Verisi • Tronscan API</i>"
     )
 
@@ -2205,14 +2205,14 @@ def cuzdanQrUret_impl(chat_id: int, komut_metni: str):
             f"💵 <b>USDT (TRC20):</b> <code>{usdt_bal:,.2f} USDT</code>\n"
             f"🪙 <b>TRX Bakiyesi:</b> <code>{trx_bal:,.2f} TRX</code>\n"
             f"📊 <b>Toplam Cüzdan Değeri:</b> <code>~{total_usd:,.2f} $</code>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"━━━━━━━━━━━\n"
         )
 
     qr_foto_url = f"https://api.qrserver.com/v1/create-qr-code/?size=500x500&data={urllib.parse.quote(cuzdan_adresi)}&margin=15"
     
     caption = (
         f"⚡ <b>CÜZDAN ADRESİ & CANLI BAKİYE</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━\n"
         f"🌐 <b>Ağ Türü:</b> {ag_adi}\n"
         f"{borsa_metni}"
         f"📌 <b>Cüzdan Adresi:</b>\n"
@@ -2278,7 +2278,7 @@ def hesapMakinesi_impl(orijinalMetin: str) -> str:
     islemZamani = suankiZamaniAl().strftime("%d.%m.%Y | %H:%M")
     mesaj = (
         f"🧮 <b>HESAP KESİM RAPORU</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━\n"
         f"🏢 Grup: <b>{gercekGrupAdi.upper()}</b>\n"
         f"🕒 Zaman: {islemZamani}\n\n"
     )
@@ -2286,16 +2286,16 @@ def hesapMakinesi_impl(orijinalMetin: str) -> str:
         mesaj += (
             f"⚠️ <b>DEVİR / BORÇ HATIRLATMASI</b> ⚠️\n"
             f"Geçmişten Kalan: <b>{paraFormatla(devirBorc)}</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"━━━━━━━━━━━\n\n"
         )
     mesaj += (
         f"💵 Güncel Kasa: {paraFormatla(guncelKasa)}\n"
         f"📉 Komisyon (% {komisyonOrani}): {paraFormatla(komisyonKesintisi)}\n"
         f"✅ Net Bakiye (TL): {paraFormatla(netKasaTl)}\n"
         f"💱 İşlem Kuru: {kur}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"🪙 <b>Tether Karşılığı: {rakamFormatla(duzUsdt)} USDT</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━"
+        f"━━━━━━━━━━"
     )
     return mesaj
 
@@ -2464,15 +2464,15 @@ def ibanCozumle_impl(ham_metin: str) -> str:
 
     mesaj = (
         f"🔍 <b>İBAN ÇÖZÜMLEME & DOĞRULAMA</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"🏦 <b>Banka:</b> {banka_adi_str}\n"
         f"📊 <b>Durum:</b> {durum_str}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"📌 <b>Okunabilir Format (Boşluklu):</b>\n"
         f"<code>{bosluklu_iban}</code>\n\n"
         f"⚡ <b>Hızlı Kopyala (Mobil Bankacılık):</b>\n"
         f"<code>{bitisik_iban}</code>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
     )
     if banka_kodu:
         mesaj += (
@@ -2481,7 +2481,7 @@ def ibanCozumle_impl(ham_metin: str) -> str:
         )
     mesaj += (
         f"📑 <b>Şirket Envanteri:</b> {sirket_durumu}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━\n"
         f"💡 <i>Kopyalamak için numaranın üzerine dokunabilirsiniz.</i>"
     )
     return mesaj
@@ -2502,7 +2502,7 @@ def ibanListesiGetir_impl() -> str:
             not2 = row[17].strip() if len(row) > 17 else ""
             if not not2: bosta.append(f"🔹 <code>{ib2}</code>")
             else: dolu.append(f"🔹 👤 <b>{not2}:</b> <code>{ib2}</code>")
-    mesaj = "🏦 <b>ŞİRKET İBAN LİSTESİ</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
+    mesaj = "🏦 <b>ŞİRKET İBAN LİSTESİ</b>\n━━━━━━━━━━\n\n"
     mesaj += "🟢 <b>BOŞTAKİ İBANLAR</b> <i>(Kullanıma Hazır)</i>\n" + ("\n".join(bosta) if bosta else "🔹 <i>Boşta İBAN yok.</i>") + "\n\n"
     mesaj += "🔴 <b>KULLANIMDAKİ İBANLAR</b>\n" + ("\n".join(dolu) if dolu else "🔹 <i>Kullanımda İBAN yok.</i>")
     return mesaj
@@ -2582,7 +2582,7 @@ def iban_sablon_getir_impl(komut_metni: str) -> str:
     if not aranan:
         return (
             "📋 <b>ŞİRKET ÖDEME ŞABLONU ÇEKİCİ</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
+            "━━━━━━━━━━━\n"
             "Kullanım: <code>/sablon [Hesap Adı]</code> veya doğrudan <code>/[Hesap Adı]</code>\n\n"
             "📌 <b>Örnekler:</b>\n"
             "• <code>/HSY EMLAK 3</code>\n"
@@ -2685,12 +2685,12 @@ def iban_tahsis_impl(komut_metni: str) -> str:
     
     return (
         f"✅ <b>İBAN BAŞARIYLA TAHSİS EDİLDİ!</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━\n"
         f"🏦 <b>Hesap:</b> <code>{hesap_adi}</code>\n"
         f"👤 <b>Tahsis Edilen Cari:</b> <b>{cari_temiz}</b>\n"
         f"📊 <b>Durum:</b> 🔴 <b>Kullanımda</b>\n"
         f"📌 <b>Excel Satırı:</b> Satır {satir_idx}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━\n"
         f"💡 <i>İşlem bitince <code>/ibanbosalt {parcalar[0]}</code> yazarak boşa çıkarabilirsiniz.</i>"
     )
 
@@ -2729,11 +2729,11 @@ def iban_bosalt_impl(komut_metni: str) -> str:
     eski_str = f"<s>{eski_cari}</s>" if eski_cari else "<i>(Zaten boştu)</i>"
     return (
         f"🟢 <b>İBAN BOŞA ÇIKARILDI!</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"🏦 <b>Hesap:</b> <code>{hesap_adi}</code>\n"
         f"👤 <b>Eski Cari:</b> {eski_str}\n"
         f"📊 <b>Durum:</b> 🟢 <b>Müsait / Kullanıma Hazır</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"💡 <i>Hesap havuza geri döndü, başka bir cariye verilebilir.</i>"
     )
 
@@ -2812,7 +2812,7 @@ def cari_ekstre_impl(komut_metni: str) -> str:
     
     mesaj = (
         f"📈 <b>[ {gercek_grup_adi.upper()} ] HESAP EKSTRESİ ({len(secilen_sayfalar)} GÜN)</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"━━━━━━━━━━\n\n"
     )
     
     for t_obj, baslik, g_ad, devir, kasa, odenen, kom, kalan in sonuclar:
@@ -2833,7 +2833,7 @@ def cari_ekstre_impl(komut_metni: str) -> str:
         mesaj += f"🏦 <b>Kalan Bakiye: {paraFormatla(kalan)}</b>\n\n"
         
     mesaj += (
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━\n"
         f"📊 <b>{len(secilen_sayfalar)} GÜNLÜK TOPLAM PERFORMANS:</b>\n"
         f"💰 Toplam Giriş: <b>{paraFormatla(toplam_giris)}</b>\n"
         f"💸 Toplam Ödeme: <b>{paraFormatla(toplam_odeme)}</b>\n"
@@ -2842,7 +2842,7 @@ def cari_ekstre_impl(komut_metni: str) -> str:
         mesaj += f"✂️ Toplam Komisyon: <b>{paraFormatla(toplam_komisyon)}</b>\n"
     mesaj += (
         f"🏦 <b>GÜNCEL NET BAKİYE: {paraFormatla(en_guncel_kalan)}</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━"
+        f"━━━━━━━━━━━"
     )
     return mesaj
 
@@ -2864,7 +2864,7 @@ def toplu_islem_impl(komut_metni: str) -> str:
         if not kalan_metin:
             return (
                 "⚡ <b>TOPLU HIZLI İŞLEM KULLANIMI</b>\n"
-                "━━━━━━━━━━━━━━━━━━━━\n"
+                "━━━━━━━━━━━━━\n"
                 "İşlemleri tek bir mesajda alt alta yazabilirsiniz:\n\n"
                 "<code>/toplu\n"
                 "+ SACİD 50000\n"
@@ -2878,7 +2878,7 @@ def toplu_islem_impl(komut_metni: str) -> str:
                 "• <code>Ö</code> veya <code>O</code> : Ödeme Yap\n"
                 "• <code>D</code> : Devir Ekle\n"
                 "• <code>M</code> veya <code>G</code> : Masraf/Gider Ekle\n"
-                "━━━━━━━━━━━━━━━━━━━━"
+                "━━━━━━━━━━━━━━"
             )
         satirlar = [kalan_metin]
     else:
@@ -2983,7 +2983,7 @@ def toplu_islem_impl(komut_metni: str) -> str:
     saat = suankiZamaniAl().strftime("%H:%M")
     mesaj = (
         f"⚡ <b>TOPLU İŞLEM RAPORU</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"📅 Tarih: {sayfa.title} | ⏰ Saat: {saat}\n"
         f"📋 İşlenen Kalem: <b>{len(islem_sonuclari)} Adet</b>\n\n"
         f"✅ <b>İŞLEM DETAYLARI:</b>\n"
@@ -2992,13 +2992,13 @@ def toplu_islem_impl(komut_metni: str) -> str:
     
     if kalanlar_listesi:
         mesaj += (
-            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"━━━━━━━━━━\n"
             f"📊 <b>İŞLEM SONRASI GÜNCEL KALANLAR:</b>\n"
             + "\n".join(kalanlar_listesi) + "\n"
         )
         
     mesaj += (
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━\n"
         f"💡 <i>Tüm kayıtlar Excel'e ve RAM önbelleğine anında işlendi.</i>"
     )
     return mesaj
@@ -3014,7 +3014,7 @@ def gecmis_gun_sorgula_impl(komut_metni: str) -> str:
     if not parcalar:
         return (
             "📅 <b>GEÇMİŞ GÜN SORGULAMA</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n"
+            "━━━━━━━━━━\n"
             "Format: <code>/tarih [GG.AA.YYYY] [Cari Adı (Opsiyonel)]</code>\n\n"
             "📌 <b>Örnekler:</b>\n"
             "• <code>/tarih 25.08.2026</code> (Tüm gün bilançosu)\n"
@@ -3052,16 +3052,16 @@ def gecmis_gun_sorgula_impl(komut_metni: str) -> str:
                 
                 return (
                     f"📅 <b>GEÇMİŞ GÜN CARİ FİŞİ: {tarih_str}</b>\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"━━━━━━━━━━\n"
                     f"{emoji} Cari Grup: <b>{r[1].upper()}</b>\n"
                     f"📁 Kaynak: <code>{tarih_str}</code> Sayfası\n\n"
                     f"🔄 O Günkü Devir: {paraFormatla(dDevir)}\n"
                     f"💰 Eklenen Kasa: {paraFormatla(dKasa)}\n"
                     f"💸 Yapılan Ödeme: {paraFormatla(dOdenen)}\n"
                     f"✂️ Kesinti/Komisyon: {paraFormatla(dKomisyon)}\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"━━━━━━━━━━\n"
                     f"🏦 <b>O GÜNKÜ NET KALAN: {paraFormatla(dKalan)}</b>\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"━━━━━━━━━━\n"
                     f"💡 <i>Çok günlük geçmiş ekstresi için: <code>/ekstre {r[1]}</code></i>"
                 )
         return f"⚠️ <b>{tarih_str}</b> tarihli sayfada '<b>{cari_ham}</b>' adlı cari bulunamadı."
@@ -3085,7 +3085,7 @@ def gecmis_gun_sorgula_impl(komut_metni: str) -> str:
     
     mesaj = (
         f"📅 <b>GEÇMİŞ GÜN BİLANÇOSU: {tarih_str}</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━\n"
         f"📁 Durum: 🔒 <b>Arşivlenmiş Gün</b>\n"
         f"🏢 İşlem Gören Aktif Cari: <b>{len(finans['aktif_gruplar'])} Adet</b>\n\n"
         f"📊 <b>GENEL BİLANÇO:</b>\n"
@@ -3099,7 +3099,7 @@ def gecmis_gun_sorgula_impl(komut_metni: str) -> str:
         mesaj += f"📉 <b>GÜNLÜK GİDERLER:</b>\n└ {masraf_sayisi} Kalem Masraf: <b>{paraFormatla(toplam_masraf)}</b>\n\n"
         
     if sirali_cariler:
-        mesaj += f"━━━━━━━━━━━━━━━━━━━━\n🏆 <b>EN YÜKSEK İŞLEM GÖREN CARİLER:</b>\n"
+        mesaj += f"━━━━━━━━━━━\n🏆 <b>EN YÜKSEK İŞLEM GÖREN CARİLER:</b>\n"
         for idx, g in enumerate(sirali_cariler, 1):
             emoji = grupEmojisiBul(g["ad"])
             mesaj += f"├ {idx}. {emoji} <b>{g['ad'].upper()}:</b> 🏦 {paraFormatla(g['kalan'])}\n"
@@ -3130,7 +3130,7 @@ def metinCevir_impl(gelenMetin: str) -> str:
             res_en = http_get_json(url_en)
             son_ceviri = "".join([x[0] for x in res_en[0] if x[0]])
             etiket = "🇹🇷 Türkçe ➔ 🇺🇸 İngilizce"
-        return f"🌐 <b>YAPAY ZEKA ÇEVİRİSİ</b>\n━━━━━━━━━━━━━━━━━━━━\n\n📝 <b>Orijinal Metin:</b>\n<i>{cevrilecek}</i>\n\n🎯 <b>{etiket}:</b>\n<code>{son_ceviri}</code>"
+        return f"🌐 <b>YAPAY ZEKA ÇEVİRİSİ</b>\n━━━━━━━━━━━━\n\n📝 <b>Orijinal Metin:</b>\n<i>{cevrilecek}</i>\n\n🎯 <b>{etiket}:</b>\n<code>{son_ceviri}</code>"
     except Exception as e:
         return f"❌ <b>Çeviri Hatası:</b> {e}"
 
@@ -3155,7 +3155,7 @@ def yenigun_baslat_mesaji():
         ]
     }
     return (
-        f"🌅 <b>YENİ GÜN DEVİR İŞLEMİ ➔ {hedef_tarih}</b>\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"🌅 <b>YENİ GÜN DEVİR İŞLEMİ ➔ {hedef_tarih}</b>\n━━━━━━━━━━\n\n"
         f"📁 <b>Kaynak Sayfa:</b> <code>{kaynak_sayfa.title}</code>\n"
         f"📅 <b>Açılacak Yeni Sayfa:</b> <code>{hedef_tarih}</code>\n\n"
         "1. Dünkü <b>Kalan Kasa</b> (G sütunu) tutarları (+/- işaretleri ve kuruşları korunarak) yeni günün <b>Devir/Borç</b> (C sütunu) hanesine aktarılacaktır.\n"
@@ -3677,7 +3677,7 @@ def process_telegram_update(update: dict):
                             return
                         telegramMesajGonder(
                             chat_id,
-                            "💡 <b>Kasa Komutu Kullanım Rehberi:</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+                            "💡 <b>Kasa Komutu Kullanım Rehberi:</b>\n━━━━━━━━━━━\n"
                             "• <code>/kasa SACİD</code> : Grup durum fişini görüntüler.\n"
                             "• <code>/kasa SACİD 1500</code> : Kasaya para ekler.\n"
                             "• <code>/kasasil SACİD 500</code> : Kasadan siler.\n\n"
@@ -3860,7 +3860,7 @@ def process_telegram_update(update: dict):
             if not p_args:
                 telegramMesajGonder(
                     chat_id,
-                    f"🕒 <b>Otomatik Kapanış Rapor Saati:</b> <code>{app_state.get('KAPANIS_SAATI', '23:00')}</code>\n\n"
+                    f"🕒 <b>Otomatik Kapanış Rapor Saati:</b> <code>{app_state.get('KAPANIS_SAATI', '23:45')}</code>\n\n"
                     f"💡 Saati güncellemek için: <code>/kapanissaati 22:30</code>"
                 )
                 return
@@ -4168,7 +4168,7 @@ def run_kapanis_scheduler():
 if __name__ == "__main__":
     threading.Thread(target=run_dashboard_server, daemon=True).start()
     threading.Thread(target=run_kapanis_scheduler, daemon=True).start()
-    print(f"CFO Bot & Canlı Dashboard Başlatıldı (7/24 Kesintisiz - Otomatik Kapanış Saati: {app_state.get('KAPANIS_SAATI', '23:00')})...")
+    print(f"CFO Bot & Canlı Dashboard Başlatıldı (7/24 Kesintisiz - Otomatik Kapanış Saati: {app_state.get('KAPANIS_SAATI', '23:45')})...")
     
     offset = 0
     while True:
