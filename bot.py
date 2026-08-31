@@ -61,9 +61,20 @@ _cached_sh_time = 0
 _sh_lock = threading.Lock()
 
 def http_get_json(url: str, headers: dict = None) -> dict:
-    req = urllib.request.Request(url, headers=headers or {"User-Agent": "Mozilla/5.0"})
+    req = urllib.request.Request(url, headers=headers or {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"})
     with urllib.request.urlopen(req, timeout=10) as response:
         return json.loads(response.read().decode("utf-8"))
+
+def http_get_text(url: str, headers: dict = None) -> str:
+    default_headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+    }
+    if headers:
+        default_headers.update(headers)
+    req = urllib.request.Request(url, headers=default_headers)
+    with urllib.request.urlopen(req, timeout=10) as response:
+        return response.read().decode("utf-8", errors="ignore")
 
 _tg_thread_local = threading.local()
 
@@ -1537,6 +1548,32 @@ def fetch_all_market_rates_parallel(force_refresh: bool = False, max_age: float 
             except Exception:
                 return 0.0
 
+        # 1. Öncelikli Gerçek Kaynak: https://kur.doviz.com/harem/amerikan-dolari (Harem Altın Kapalıçarşı Canlı Tahtası)
+        try:
+            html = http_get_text("https://kur.doviz.com/harem/amerikan-dolari")
+            u_alis, u_satis = 0.0, 0.0
+            m_u_bid = re.search(r'data-socket-key="23-USD"[^>]*data-socket-attr="bid"[^>]*>([\d,\.\s]+)<', html)
+            m_u_ask = re.search(r'data-socket-key="23-USD"[^>]*data-socket-attr="ask"[^>]*>([\d,\.\s]+)<', html)
+            if m_u_bid and m_u_ask:
+                u_alis = _parse_kur(m_u_bid.group(1))
+                u_satis = _parse_kur(m_u_ask.group(1))
+
+            e_alis, e_satis = 0.0, 0.0
+            m_e_bid = re.search(r'data-socket-key="23-EUR"[^>]*data-socket-attr="bid"[^>]*>([\d,\.\s]+)<', html)
+            m_e_ask = re.search(r'data-socket-key="23-EUR"[^>]*data-socket-attr="ask"[^>]*>([\d,\.\s]+)<', html)
+            if m_e_bid and m_e_ask:
+                e_alis = _parse_kur(m_e_bid.group(1))
+                e_satis = _parse_kur(m_e_ask.group(1))
+
+            if u_alis > 0 and u_satis > 0:
+                return {
+                    "usd": (u_alis, u_satis),
+                    "eur": (e_alis, e_satis) if (e_alis > 0 and e_satis > 0) else (55.60, 55.85)
+                }
+        except Exception as e:
+            pass
+
+        # 2. İkincil Yedek Kaynak: Truncgil
         try:
             d = http_get_json("https://finans.truncgil.com/v3/today.json")
             u = d.get("USD", {})
@@ -1546,11 +1583,11 @@ def fetch_all_market_rates_parallel(force_refresh: bool = False, max_age: float 
             e_alis = _parse_kur(e.get("Buying"))
             e_satis = _parse_kur(e.get("Selling"))
             return {
-                "usd": (u_alis, u_satis) if u_alis > 0 and u_satis > 0 else (48.20, 48.25),
-                "eur": (e_alis, e_satis) if e_alis > 0 and e_satis > 0 else (52.30, 52.45)
+                "usd": (u_alis, u_satis) if u_alis > 0 and u_satis > 0 else (48.08, 48.17),
+                "eur": (e_alis, e_satis) if e_alis > 0 and e_satis > 0 else (55.60, 55.85)
             }
         except Exception:
-            return {"usd": (48.20, 48.25), "eur": (52.30, 52.45)}
+            return {"usd": (48.08, 48.17), "eur": (55.60, 55.85)}
 
     def fetch_fiat():
         try:
