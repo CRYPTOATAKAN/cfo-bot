@@ -41,7 +41,7 @@ app_state = {
     "GRUP_BAGLANTILARI": {},
     "BAGLANTI_CACHE_TIME": 0,
     "SISTEM_KILIDI": "PASIF",
-    "CIRO_HEDEFI": None,
+    "CIRO_HEDEFI": float(os.environ.get("CIRO_HEDEFI", "50000000.0")),
     "SON_ISLEM": None,
     "LOG_HAFTASI": None,
     "ADMIN_CACHE_TIME": 0,
@@ -782,6 +782,10 @@ def rehber_kategori_metni(kategori: str) -> str:
             "  └ <i>💰 Pozitif emanet kasası olan carileri büyükten küçüğe sıralar.</i>\n\n"
             "• <code>/ozet</code>\n"
             "  └ <i>Toplam devir, kasa, ödeme, komisyon ve net kalan anlık şirket bilançosu.</i>\n\n"
+            "• <code>/hedef</code> veya <code>/kpi</code>\n"
+            "  └ <i>🎯 Günlük işlem hacmi / ciro hedefi ilerleme çubuğu ve kalan tutar.</i>\n\n"
+            "• <code>/trend</code> veya <code>/haftalik</code>\n"
+            "  └ <i>📈 Son 7 günün konsolide bilançosu, büyüme trendi ve en aktif carileri.</i>\n\n"
             "• <code>/rapor</code>\n"
             "  └ <i>Tüm aktif grupların ayrıntılı döküm raporunu verir.</i>\n\n"
             "• <code>/tarih [GG.AA.YYYY] [Cari (Opsiyonel)]</code>\n"
@@ -795,6 +799,8 @@ def rehber_kategori_metni(kategori: str) -> str:
             "━━━━━━━━━━━━━━━\n\n"
             "• <code>/kur</code>\n"
             "  └ <i>Binance, Paribu, BtcTurk, WhiteBIT canlı USDT/TRY ve Kapalıçarşı kurları.</i>\n\n"
+            "• <code>/kurfark</code> veya <code>/makas</code>\n"
+            "  └ <i>🔄 Kapalıçarşı Doları ile 5 büyük borsa (Binance, Paribu, BtcTurk, WhiteBIT, OKX) anlık makas ve arbitraj kar sıralaması.</i>\n\n"
             "• <code>/arbitraj [Tutar]</code>\n"
             "  └ <i>⚡ Kapalıçarşı Doları vs Kripto Borsa USDT canlı makas ve arbitraj analizi.</i>\n\n"
             "• <code>/doviz [Tutar] [Birim]</code>\n"
@@ -2037,6 +2043,234 @@ def sirket_portfoy_raporu_impl() -> str:
         f"━━━━━━━━━\n"
         f"💡 <i>Tüm cari bakiyeler ve döviz varlıkları anlık konsolide edilmiştir.</i>"
     )
+
+def hedef_kpi_raporu_uret(yeni_hedef_str: str = None) -> str:
+    """Günlük ciro hedefini takip eder, dinamik ilerleme çubuğu ve kalan tutarı gösterir."""
+    if yeni_hedef_str:
+        try:
+            val = float(yeni_hedef_str.replace(".", "").replace(",", ".").replace("₺", "").strip())
+            if val > 0:
+                app_state["CIRO_HEDEFI"] = val
+                sistemeLogYaz("Ciro Hedefi Güncellendi", f"Yeni Hedef: {paraFormatla(val)}")
+                return f"✅ <b>Günlük Ciro Hedefi Güncellendi!</b>\n🎯 <b>Yeni Hedef:</b> <code>{paraFormatla(val)}</code>"
+        except Exception:
+            return "⚠️ <b>Geçersiz Tutar!</b> Örnek: <code>/hedef 50.000.000</code>"
+
+    hedef = float(app_state.get("CIRO_HEDEFI") or 50000000.0)
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    veriler = get_sheet_values_fast(sayfa)
+    finans = tablodan_finans_ozeti_hesapla(veriler)
+    
+    # Günlük işlenen toplam işlem hacmi (Eklenen Kasa + Yapılan Ödeme)
+    islenen_kasa = finans.get("kasa", 0.0)
+    islenen_odeme = finans.get("odenen", 0.0)
+    toplam_hacim = islenen_kasa + islenen_odeme
+    
+    # Oran
+    yuzde = min(100.0, (toplam_hacim / hedef) * 100.0) if hedef > 0 else 0.0
+    kalan = max(0.0, hedef - toplam_hacim)
+    p_bar = dynamic_progress_bar(int(yuzde), total_blocks=10)
+    
+    saat = suankiZamaniAl().strftime("%H:%M")
+    durum_emoji = "🔥" if yuzde >= 100 else ("⚡" if yuzde >= 50 else "⏳")
+    
+    yanit = (
+        f"🎯 <b>GÜNLÜK CİRO & KPI HEDEF TAKİBİ</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📅 Tarih: <b>{sayfa.title}</b> | ⏰ Saat: <code>{saat}</code>\n"
+        f"🎯 <b>Günlük Hedef:</b> <code>{paraFormatla(hedef)}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"{durum_emoji} <b>HEDEF DOLULUK ORANI:</b>\n"
+        f"<code>[{p_bar}] %{yuzde:.1f}</code>\n\n"
+        f"📊 <b>GÜNÜN FİNANSAL HACMİ:</b>\n"
+        f"├ 💰 Eklenen Kasa: <code>+{paraFormatla(islenen_kasa)}</code>\n"
+        f"├ 💸 Yapılan Ödemeler: <code>-{paraFormatla(islenen_odeme)}</code>\n"
+        f"└ ⚡ <b>Toplam İşlenen Hacim: <code>{paraFormatla(toplam_hacim)}</code></b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+    )
+    
+    if yuzde >= 100:
+        fazla = toplam_hacim - hedef
+        yanit += f"🏆 <b>TEBRİKLER! GÜNLÜK HEDEF AŞILDI!</b>\n🎉 Hedefin <b>{paraFormatla(fazla)}</b> üzerindesiniz!\n"
+    else:
+        yanit += (
+            f"⏳ <b>Hedefe Kalan:</b> <b>{paraFormatla(kalan)}</b>\n"
+            f"💪 <i>Hedefe ulaşmaya %{100.0 - yuzde:.1f} kaldı, harika gidiyorsunuz!</i>\n"
+        )
+        
+    yanit += "\n💡 <i>Hedefi değiştirmek için: <code>/hedef 60.000.000</code></i>"
+    return yanit
+
+def haftalik_trend_raporu_uret(gun_sayisi: int = 7) -> str:
+    """Google E-Tablo'daki geçmiş gün sayfalarını tarayarak haftalık toplam işlem hacmini, masrafları ve en aktif carileri analiz eder."""
+    sh = get_spreadsheet()
+    tum_ws = sh.worksheets()
+    
+    tarih_sayfalari = []
+    for ws in tum_ws:
+        if is_valid_daily_sheet(ws) and re.match(r'^\d{2}\.\d{2}\.\d{4}$', ws.title):
+            try:
+                t_obj = datetime.datetime.strptime(ws.title, "%d.%m.%Y")
+                tarih_sayfalari.append((t_obj, ws))
+            except Exception:
+                pass
+                
+    if not tarih_sayfalari:
+        return "📭 <b>Geçmiş günlere ait analiz edilecek sayfa bulunamadı.</b>"
+        
+    tarih_sayfalari.sort(key=lambda x: x[0], reverse=True)
+    secilen_gunler = tarih_sayfalari[:gun_sayisi]
+    
+    toplam_haftalik_kasa = 0.0
+    toplam_haftalik_odenen = 0.0
+    toplam_haftalik_komisyon = 0.0
+    toplam_haftalik_masraf = 0.0
+    
+    cari_hacimleri = {}  # grup_adi -> toplam_hacim (kasa + odenen)
+    
+    for t_obj, ws in secilen_gunler:
+        try:
+            veriler = ws.get_all_values()
+            finans = tablodan_finans_ozeti_hesapla(veriler)
+            toplam_haftalik_kasa += finans.get("kasa", 0.0)
+            toplam_haftalik_odenen += finans.get("odenen", 0.0)
+            toplam_haftalik_komisyon += finans.get("komisyon", 0.0)
+            
+            for g in finans.get("aktif_gruplar", []):
+                ad = g["ad"].upper().strip()
+                hacim = g["kasa"] + g["odenen"]
+                cari_hacimleri[ad] = cari_hacimleri.get(ad, 0.0) + hacim
+                
+            # Masraflar
+            for row in veriler[1:]:
+                if len(row) >= 10:
+                    m_ad = row[8].strip()
+                    if m_ad and "GENEL TOPLAM" not in m_ad.upper() and m_ad != "-":
+                        m_fiyat = guvenliSayi(row[9])
+                        if abs(m_fiyat) > 0.001:
+                            toplam_haftalik_masraf += m_fiyat
+        except Exception:
+            continue
+            
+    toplam_haftalik_hacim = toplam_haftalik_kasa + toplam_haftalik_odenen
+    baslangic_tarihi = secilen_gunler[-1][1].title
+    bitis_tarihi = secilen_gunler[0][1].title
+    
+    sirali_cariler = sorted(cari_hacimleri.items(), key=lambda x: x[1], reverse=True)
+    
+    yanit = (
+        f"📈 <b>HAFTALIK FİNANS & CARİ PERFORMANS ANALİZİ</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🗓️ <b>Dönem:</b> <code>{baslangic_tarihi} - {bitis_tarihi}</code> ({len(secilen_gunler)} Gün)\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"📊 <b>KONSOLİDE DÖNEM BİLANÇOSU:</b>\n"
+        f"├ 💰 Toplam Giriş (Kasa): <code>+{paraFormatla(toplam_haftalik_kasa)}</code>\n"
+        f"├ 💸 Toplam Çıkış (Ödeme): <code>-{paraFormatla(toplam_haftalik_odenen)}</code>\n"
+        f"├ ✂️ Toplam Komisyon: <code>{paraFormatla(toplam_haftalik_komisyon)}</code>\n"
+        f"├ 📉 Toplam Masraf & Gider: <code>{paraFormatla(toplam_haftalik_masraf)}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"⚡ <b>TOPLAM İŞLEM HACMİ: {paraFormatla(toplam_haftalik_hacim)}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+    )
+    
+    if sirali_cariler:
+        yanit += "🏆 <b>HAFTANIN EN YÜKSEK HACİMLİ CARİLERİ:</b>\n"
+        madalyalar = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+        for idx, (ad, hacim) in enumerate(sirali_cariler[:5]):
+            pay = (hacim / toplam_haftalik_hacim * 100.0) if toplam_haftalik_hacim > 0 else 0.0
+            emoji = grupEmojisiBul(ad)
+            m_simge = madalyalar[idx] if idx < len(madalyalar) else "🔹"
+            yanit += f"├ {m_simge} {emoji} <b>{ad}:</b> <code>{paraFormatla(hacim)}</code> <i>(%{pay:.1f} Pay)</i>\n"
+        yanit += "\n"
+        
+    gunluk_ort = toplam_haftalik_hacim / len(secilen_gunler) if secilen_gunler else 0.0
+    yanit += (
+        f"💡 <b>YÖNETİCİ ÖZETİ:</b>\n"
+        f"└ 📅 Günlük Ortalama Hacim: <b>{paraFormatla(gunluk_ort)}</b>\n"
+    )
+    return yanit
+
+def kur_fark_makas_raporu_uret(simulasyon_tutar_str: str = "100000") -> str:
+    """Harem Altın Kapalıçarşı Doları ile 5 büyük kripto borsasının (Binance, Paribu, BtcTurk, WhiteBIT, OKX) USDT kurlarını kıyaslar, anlık makas ve arbitraj karını listeler."""
+    try:
+        tutar = float(str(simulasyon_tutar_str).replace(".", "").replace(",", ".").replace("$", "").strip())
+        if tutar <= 0:
+            tutar = 100000.0
+    except Exception:
+        tutar = 100000.0
+        
+    rates = fetch_all_market_rates_parallel()
+    h_usd_alis, h_usd_satis = rates.get("harem", {}).get("usd", (48.08, 48.17))
+    
+    # 5 Büyük Kripto Borsası
+    borsalar = [
+        {"ad": "BİNANCE", "key": "binance", "emoji": "🟡"},
+        {"ad": "PARİBU", "key": "paribu", "emoji": "🔵"},
+        {"ad": "BTCTÜRK", "key": "btcturk", "emoji": "🟢"},
+        {"ad": "WHITEBIT", "key": "whitebit", "emoji": "⚪"},
+        {"ad": "OKX", "key": "okx", "emoji": "⚫"}
+    ]
+    
+    makas_listesi = []
+    
+    for b in borsalar:
+        data = rates.get(b["key"])
+        if data and isinstance(data, dict) and data.get("last"):
+            fiyat = float(data["last"])
+            # Makas = Kripto Fiyatı - Harem Dolar Satış
+            fark_tl = fiyat - h_usd_satis
+            fark_yuzde = (fark_tl / h_usd_satis) * 100.0 if h_usd_satis > 0 else 0.0
+            kar_tl = tutar * fark_tl
+            makas_listesi.append({
+                "ad": b["ad"],
+                "emoji": b["emoji"],
+                "fiyat": fiyat,
+                "fark_tl": fark_tl,
+                "fark_yuzde": fark_yuzde,
+                "kar_tl": kar_tl
+            })
+            
+    # En karlıdan en az karlıya sırala
+    makas_listesi.sort(key=lambda x: x["fark_tl"], reverse=True)
+    saat = suankiZamaniAl().strftime("%H:%M:%S")
+    
+    yanit = (
+        f"🔄 <b>KAPALIÇARŞI (HAREM) & KRİPTO MAKAS TABLOSU</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"⏰ Canlı Saat: <code>{saat}</code> | 💵 Simülasyon: <b>{tutar:,.0f} $</b>\n"
+        f"🏛️ <b>Harem Dolar (Alış / Satış):</b> <code>{f_tl(h_usd_alis)} / {f_tl(h_usd_satis)}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"📊 <b>BORSA BAZLI ANLIK MAKAS & GETİRİ SIRALAMASI:</b>\n\n"
+    )
+    
+    madalyalar = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+    
+    for idx, item in enumerate(makas_listesi):
+        m_icon = madalyalar[idx] if idx < len(madalyalar) else "🔹"
+        yon_emoji = "🟢" if item["fark_tl"] >= 0 else "🔴"
+        isaret = "+" if item["fark_tl"] >= 0 else ""
+        
+        yanit += (
+            f"{m_icon} {item['emoji']} <b>{item['ad']}</b>\n"
+            f"├ 💵 USDT/TRY: <code>{f_tl(item['fiyat'])}</code>\n"
+            f"├ {yon_emoji} Makas Farkı: <b>{isaret}{item['fark_tl']:.2f} ₺</b> <i>(%{item['fark_yuzde']:+.2f})</i>\n"
+            f"└ 💰 {tutar:,.0f}$ Kar/Fark: <b>{isaret}{paraFormatla(item['kar_tl'])}</b>\n\n"
+        )
+        
+    if makas_listesi:
+        lider = makas_listesi[0]
+        yanit += (
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💎 <b>EN KARLI ARBİTRAJ ROTASI:</b>\n"
+            f"🏛️ Harem'den Dolar Al ➔ {lider['emoji']} <b>{lider['ad']}</b>'de USDT Boz!\n"
+            f"💵 <b>{tutar:,.0f} $ İşlem Başına Net Kazanç: +{paraFormatla(lider['kar_tl'])}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💡 <i>Farklı tutar simülasyonu için: <code>/kurfark 250000</code></i>"
+        )
+    return yanit
+
+def detect_wallet_entity(address: str) -> str:
     """Cüzdanın resmi borsa hesabı mı, ilişkili borsa fon akışı mı yoksa bireysel cüzdan mı olduğunu tespit eder."""
     try:
         url = f"https://apilist.tronscan.org/api/account?address={address}"
@@ -3810,9 +4044,25 @@ def process_telegram_update(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, cari_ekstre_impl, text, goster_bildirim=True)
         elif ana_komut in ["/toplu", "/topluislem", "/hizli"]:
             islemi_analiz_bildirimiyle_yap(chat_id, toplu_islem_impl, text, goster_bildirim=True)
-        elif ana_komut in ["/tarih", "/gecmisgun", "/gun"]:
-            islemi_analiz_bildirimiyle_yap(chat_id, gecmis_gun_sorgula_impl, text, goster_bildirim=True)
-        elif ana_komut in ["/arbitraj", "/makas", "/arb"]:
+        elif ana_komut in ["/hedef", "/kpi", "/cirohedefi"]:
+            p_args = text.split()[1:]
+            yeni_hedef = p_args[0].strip() if p_args else None
+            if yeni_hedef and not yetkili_mi(user_id):
+                telegramMesajGonder(chat_id, "⛔ <b>Yetkisiz İşlem:</b> Ciro hedefini güncelleme yetkisi sadece şirket yöneticilerine aittir.")
+            else:
+                islemi_analiz_bildirimiyle_yap(chat_id, hedef_kpi_raporu_uret, yeni_hedef, goster_bildirim=True)
+        elif ana_komut in ["/trend", "/haftalik", "/haftalık", "/performans"]:
+            p_args = text.split()[1:]
+            gun = 7
+            if p_args:
+                try: gun = int(p_args[0].strip())
+                except: gun = 7
+            islemi_analiz_bildirimiyle_yap(chat_id, haftalik_trend_raporu_uret, gun, goster_bildirim=True)
+        elif ana_komut in ["/kurfark", "/makas", "/spread", "/firsat"]:
+            p_args = text.split()[1:]
+            tutar_str = p_args[0].strip() if p_args else "100000"
+            islemi_analiz_bildirimiyle_yap(chat_id, kur_fark_makas_raporu_uret, tutar_str, goster_bildirim=True)
+        elif ana_komut in ["/arbitraj", "/arb"]:
             islemi_analiz_bildirimiyle_yap(chat_id, arbitraj_raporu_uret_impl, text, goster_bildirim=True)
         elif ana_komut in ["/doviz", "/döviz", "/cevir", "/çevir", "/kurcevir", "/donustur"]:
             islemi_analiz_bildirimiyle_yap(chat_id, doviz_cevirici_impl, text)
