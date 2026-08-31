@@ -365,14 +365,47 @@ def normalize_text(text: str) -> str:
     return re.sub(r"[^A-Z0-9]", "", t)
 
 def grupEmojisiBul(grupAdi: str) -> str:
+    if not grupAdi:
+        return "🔹"
     temiz = normalize_text(grupAdi)
-    if "TIGER" in temiz: return "🐅"
-    if "SACID" in temiz: return "👤"
-    if "BSM" in temiz: return "⚡"
+    
+    # 1. Hayvan & Güç Sembolleri
+    if any(k in temiz for k in ["TIGER", "KAPLAN"]): return "🐅"
+    if any(k in temiz for k in ["LION", "ASLAN"]): return "🦁"
+    if any(k in temiz for k in ["EAGLE", "KARTAL", "SAHIN", "SACID"]): return "🦅"
+    if any(k in temiz for k in ["KURT", "WOLF"]): return "🐺"
+    if any(k in temiz for k in ["PANTER", "PANTHER"]): return "🐆"
+    if any(k in temiz for k in ["BOGA", "BULL"]): return "🐂"
+    if any(k in temiz for k in ["EJDER", "DRAGON"]): return "🐉"
+    if any(k in temiz for k in ["SHARK", "KOPEKBALIGI"]): return "🦈"
+    if any(k in temiz for k in ["AYI", "BEAR"]): return "🐻"
+
+    # 2. Kuyumculuk, Altın & Kripto
+    if any(k in temiz for k in ["KUYUM", "ALTIN", "HAS", "GOLD"]): return "💍"
+    if any(k in temiz for k in ["ELMAS", "PIRLANTA", "DIAMOND", "BSM"]): return "💎"
+    if any(k in temiz for k in ["KRIPTO", "USDT", "BTC", "ETH", "TRON", "TETHER"]): return "🪙"
+    if any(k in temiz for k in ["DOLAR", "USD", "NAKIT", "KASA"]): return "💵"
+    if any(k in temiz for k in ["EURO", "EUR"]): return "💶"
+
+    # 3. Kurumsal, Gayrimenkul & Şirket
+    if any(k in temiz for k in ["EMLAK", "HOLDING", "SIRKET", "OFIS", "CYL", "ARS"]): return "🏢"
+    if any(k in temiz for k in ["HSY"]): return "🏛️"
+    if any(k in temiz for k in ["BANKA", "HAVALE", "EFT"]): return "🏦"
+    if any(k in temiz for k in ["ABI", "YONETIM", "BOSS", "PATRON"]): return "👑"
+    if any(k in temiz for k in ["VIP", "OZEL", "STAR", "YILDIZ"]): return "⭐"
+
+    # 4. Masraf & Lojistik Kalemleri
     if "GENELTOPLAM" in temiz: return "🏆"
-    if "MASRAF" in temiz or "GIDER" in temiz: return "📉"
-    if "KARGO" in temiz: return "📦"
-    return "🔹"
+    if any(k in temiz for k in ["MASRAF", "GIDER"]): return "📉"
+    if any(k in temiz for k in ["KARGO", "LOJISTIK", "TESLIMAT"]): return "📦"
+    if any(k in temiz for k in ["YEMEK", "RESTORAN", "KAFE", "MUTFAK"]): return "🍔"
+    if any(k in temiz for k in ["ARAC", "YAKIT", "BENZIN", "MAZOT", "PETROL"]): return "🚗"
+    if any(k in temiz for k in ["KOMISYON", "KESINTI"]): return "✂️"
+
+    # 5. Diğer Cariler için İsim Tabanlı Benzersiz & Şık Sembol Havuzu
+    PALETTE = ["💎", "👑", "⚡", "🌟", "🛡️", "🔥", "🎯", "🚀", "🏆", "⚜️", "⚓", "🔮", "💰", "🪐", "🍀", "✨", "🔹", "🔶"]
+    h = sum(ord(c) for c in temiz)
+    return PALETTE[h % len(PALETTE)]
 
 def rakamFormatla(sayi) -> str:
     try:
