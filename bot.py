@@ -2461,7 +2461,12 @@ def trc20_varlik_raporu_uret(cuzdan_adresi: str = VARSAYILAN_TRC20_ADRES) -> Tup
 
 def cuzdanQrUret_impl(chat_id: int, komut_metni: str):
     parcalar = komut_metni.strip().split()
-    if len(parcalar) < 2:
+    if len(parcalar) >= 2:
+        cuzdan_adresi = parcalar[1].strip()
+    else:
+        cuzdan_adresi = VARSAYILAN_TRC20_ADRES.strip() if VARSAYILAN_TRC20_ADRES else ""
+        
+    if not cuzdan_adresi or len(cuzdan_adresi) < 10:
         telegramMesajGonder(
             chat_id,
             "⚠️ <b>Hatalı Kullanım!</b>\n"
@@ -2469,11 +2474,6 @@ def cuzdanQrUret_impl(chat_id: int, komut_metni: str):
             "📌 <b>Örnek Kullanım:</b>\n"
             "<code>/qr TQHuwJh5c4ygbKhfFoGqTZTahjQuJAX3iV</code>"
         )
-        return
-        
-    cuzdan_adresi = parcalar[1].strip()
-    if len(cuzdan_adresi) < 10:
-        telegramMesajGonder(chat_id, "⚠️ <b>Geçersiz Cüzdan Adresi:</b> Lütfen geçerli bir borsa veya cüzdan adresi giriniz.")
         return
 
     # Tronscan & Ağ Tespiti
@@ -2487,16 +2487,19 @@ def cuzdanQrUret_impl(chat_id: int, komut_metni: str):
     bakiye_metni = ""
     borsa_metni = ""
     if is_tron:
-        trx_bal, usdt_bal, total_usd = get_tron_balances(cuzdan_adresi)
-        borsa_analiz = analyze_tron_wallet(cuzdan_adresi)
-        borsa_metni = f"{borsa_analiz}\n"
-        bakiye_metni = (
-            f"💰 <b>HESAPTAKİ ANLIK VARLIKLAR:</b>\n"
-            f"💵 <b>USDT (TRC20):</b> <code>{usdt_bal:,.2f} USDT</code>\n"
-            f"🪙 <b>TRX Bakiyesi:</b> <code>{trx_bal:,.2f} TRX</code>\n"
-            f"📊 <b>Toplam Cüzdan Değeri:</b> <code>~{total_usd:,.2f} $</code>\n"
-            f"━━━━━━━━━━━\n"
-        )
+        try:
+            trx_bal, usdt_bal, total_usd = get_tron_balances(cuzdan_adresi)
+            borsa_analiz = detect_wallet_entity(cuzdan_adresi)
+            borsa_metni = f"{borsa_analiz}\n"
+            bakiye_metni = (
+                f"💰 <b>HESAPTAKİ ANLIK VARLIKLAR:</b>\n"
+                f"💵 <b>USDT (TRC20):</b> <code>{usdt_bal:,.2f} USDT</code>\n"
+                f"🪙 <b>TRX Bakiyesi:</b> <code>{trx_bal:,.2f} TRX</code>\n"
+                f"📊 <b>Toplam Cüzdan Değeri:</b> <code>~{total_usd:,.2f} $</code>\n"
+                f"━━━━━━━━━━━\n"
+            )
+        except Exception as e:
+            print(f"TRON analiz hatası ({cuzdan_adresi}): {e}")
 
     qr_foto_url = f"https://api.qrserver.com/v1/create-qr-code/?size=500x500&data={urllib.parse.quote(cuzdan_adresi)}&margin=15"
     
@@ -2526,7 +2529,9 @@ def cuzdanQrUret_impl(chat_id: int, komut_metni: str):
     res = telegramFotoGonder(chat_id, qr_foto_url, caption, klavye)
     if not res.get("ok"):
         fallback_qr = f"https://quickchart.io/qr?text={urllib.parse.quote(cuzdan_adresi)}&size=500&margin=2"
-        telegramFotoGonder(chat_id, fallback_qr, caption, klavye)
+        res2 = telegramFotoGonder(chat_id, fallback_qr, caption, klavye)
+        if not res2.get("ok"):
+            telegramMesajGonder(chat_id, caption, klavye)
 
 def hesapMakinesi_impl(orijinalMetin: str) -> str:
     args = orijinalMetin.strip().split()
