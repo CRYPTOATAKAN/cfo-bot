@@ -686,10 +686,19 @@ def aktif_ibani_olan_carileri_bul(veriler: List[List[str]] = None) -> Set[str]:
             
     return aktif_cariler
 
+def format_satir_satir_cariler(isimler: List[str], chunk_size: int = 3) -> str:
+    if not isimler:
+        return "• <i>Yok</i>"
+    lines = []
+    for i in range(0, len(isimler), chunk_size):
+        chunk = isimler[i:i+chunk_size]
+        lines.append("• " + ", ".join(chunk))
+    return "\n".join(lines)
+
 def toplu_duyuru_hazirla_paneli(komut_metni: str, gonderen_id: int) -> Tuple[str, Optional[dict]]:
     """
     Yönetici /duyuru [Metin] yazdığında hemen duyuru göndermez;
-    Önce hedef kitle analizi yapar (İBAN'ı aktif olan gruplar vs Tüm bağlı gruplar)
+    Önce hedef kitle analizi yapar (İBAN'ı aktif olan gruplar, Tüm bağlı gruplar, Özel tek grup)
     ve seçim yapması için etkileşimli kontrol paneli sunar.
     """
     parcalar = komut_metni.strip().split(maxsplit=1)
@@ -739,17 +748,42 @@ def toplu_duyuru_hazirla_paneli(komut_metni: str, gonderen_id: int) -> Tuple[str
         "tum_idler": list(baglantilar.keys())
     }
     
-    def _format_cari_listesi(isimler: List[str], max_adet: int = 12) -> str:
-        if not isimler:
-            return "<i>Yok</i>"
-        if len(isimler) <= max_adet:
-            return ", ".join(isimler)
-        gosterilen = ", ".join(isimler[:max_adet])
-        kalan = len(isimler) - max_adet
-        return f"{gosterilen} <i>(+{kalan} cari daha)</i>"
+    return toplu_duyuru_ana_panel_uret(draft_id)
 
-    ibanli_adlar = _format_cari_listesi(sorted(list(set(item[1] for item in bagli_ibanli_gruplar))), 12)
-    ibansiz_adlar = _format_cari_listesi(sorted(list(set(item[1] for item in bagli_ibansiz_gruplar))), 8)
+def toplu_duyuru_ana_panel_uret(draft_id: str) -> Tuple[str, dict]:
+    taslaklar = app_state.get("DUYURU_TASLAKLARI", {})
+    if draft_id not in taslaklar:
+        return (
+            "⚠️ <b>Duyuru taslağının süresi dolmuş veya işlem tamamlanmış.</b>",
+            {"inline_keyboard": [[{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]]}
+        )
+    
+    taslak = taslaklar[draft_id]
+    duyuru_icerik = taslak["metin"]
+    
+    grup_baglantilarini_guncelle()
+    baglantilar = app_state.get("GRUP_BAGLANTILARI", {})
+    
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    veriler = get_sheet_values_fast(sayfa)
+    aktif_iban_carileri = aktif_ibani_olan_carileri_bul(veriler)
+    
+    bagli_ibanli_gruplar = []
+    bagli_ibansiz_gruplar = []
+    
+    for c_id, info in baglantilar.items():
+        grup_adi = info.get("grup", "Bilinmeyen")
+        if normalize_text(grup_adi) in aktif_iban_carileri:
+            bagli_ibanli_gruplar.append((c_id, grup_adi))
+        else:
+            bagli_ibansiz_gruplar.append((c_id, grup_adi))
+            
+    ibanli_isimler = sorted(list(set(item[1] for item in bagli_ibanli_gruplar)))
+    ibansiz_isimler = sorted(list(set(item[1] for item in bagli_ibansiz_gruplar)))
+    
+    ibanli_blok = format_satir_satir_cariler(ibanli_isimler, 3)
+    ibansiz_blok = format_satir_satir_cariler(ibansiz_isimler, 3)
     
     metin = (
         f"📢 <b>TOPLU DUYURU KONTROL PANELİ</b>\n"
@@ -757,26 +791,157 @@ def toplu_duyuru_hazirla_paneli(komut_metni: str, gonderen_id: int) -> Tuple[str
         f"📝 <b>İletilecek Mesaj:</b>\n"
         f"<i>« {duyuru_icerik} »</i>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📊 <b>HEDEF KİTLE ANALİZİ:</b>\n\n"
-        f"🟢 <b>İBAN'ı Aktif Cariler ({len(bagli_ibanli_gruplar)} Adet):</b>\n"
-        f"<i>{ibanli_adlar}</i>\n\n"
-        f"⚪ <b>İBAN'ı Olmayan Cariler ({len(bagli_ibansiz_gruplar)} Adet):</b>\n"
-        f"<i>{ibansiz_adlar}</i>\n\n"
-        f"👥 <b>Toplam Bağlı Grup:</b> <b>{len(baglantilar)} Grup</b>\n"
+        f"📊 <b>HEDEF KİTLE ÖZETİ:</b>\n"
+        f"• 🟢 <b>İBAN'ı Aktif:</b> <code>{len(bagli_ibanli_gruplar)} Grup</code>\n"
+        f"• ⚪ <b>İBAN'ı Olmayan:</b> <code>{len(bagli_ibansiz_gruplar)} Grup</code>\n"
+        f"• 👥 <b>Toplam Bağlı:</b> <b>{len(baglantilar)} Grup</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"👇 <i>Lütfen duyurunun iletileceği hedef kitleyi seçiniz:</i>"
+        f"🏢 <b>GRUPLAR DETAYI:</b>\n\n"
+        f"🟢 <b>Aktif İBAN'lı Gruplar ({len(bagli_ibanli_gruplar)}):</b>\n"
+        f"{ibanli_blok}\n\n"
+        f"⚪ <b>İBAN'sız Gruplar ({len(bagli_ibansiz_gruplar)}):</b>\n"
+        f"{ibansiz_blok}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👇 <i>Lütfen duyurunun iletileceği hedefi seçiniz:</i>"
     )
     
     butonlar = []
     if bagli_ibanli_gruplar:
-        butonlar.append([{"text": f"🟢 Sadece İBAN'ı Aktif Gruplara Gönder ({len(bagli_ibanli_gruplar)} Grup)", "callback_data": f"duyuru_gonder_iban_{draft_id}"}])
+        butonlar.append([{"text": f"🟢 Sadece İBAN'ı Aktif Gruplara ({len(bagli_ibanli_gruplar)} Grup)", "callback_data": f"duyuru_gonder_iban_{draft_id}"}])
     else:
         butonlar.append([{"text": "⚪ Sadece İBAN'ı Aktif Gruplara (0 Grup)", "callback_data": f"duyuru_bos_uyari_{draft_id}"}])
         
     butonlar.append([{"text": f"🌐 Tüm Bağlı Gruplara Gönder ({len(baglantilar)} Grup)", "callback_data": f"duyuru_gonder_tumu_{draft_id}"}])
+    butonlar.append([{"text": f"🎯 Özel Tek Bir Grup Seç ({len(baglantilar)} Grup)", "callback_data": f"duyuru_ozel_menu_{draft_id}"}])
     butonlar.append([{"text": "❌ Gönderimi İptal Et", "callback_data": f"duyuru_iptal_{draft_id}"}])
     
     return metin, {"inline_keyboard": butonlar}
+
+def duyuru_ozel_grup_secim_ekrani(draft_id: str) -> Tuple[str, dict]:
+    """
+    Yöneticinin bağlı olan tüm gruplar arasından tek bir grubu seçip özel duyuru gönderebileceği 2 sütunlu seçim ekranı üretir.
+    """
+    taslaklar = app_state.get("DUYURU_TASLAKLARI", {})
+    if draft_id not in taslaklar:
+        return (
+            "⚠️ <b>Duyuru taslağının süresi dolmuş veya işlem tamamlanmış.</b>",
+            {"inline_keyboard": [[{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]]}
+        )
+        
+    taslak = taslaklar[draft_id]
+    duyuru_icerik = taslak["metin"]
+    
+    grup_baglantilarini_guncelle()
+    baglantilar = app_state.get("GRUP_BAGLANTILARI", {})
+    
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    veriler = get_sheet_values_fast(sayfa)
+    aktif_iban_carileri = aktif_ibani_olan_carileri_bul(veriler)
+    
+    metin = (
+        f"🎯 <b>ÖZEL TEK GRUP SEÇİM EKRANI</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📝 <b>Duyuru Metni:</b>\n"
+        f"<i>« {duyuru_icerik} »</i>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👇 <i>Duyurunun yalnızca iletileceği <b>tek bir grubu</b> seçiniz:</i>"
+    )
+    
+    sirali_gruplar = sorted(
+        baglantilar.items(),
+        key=lambda x: (0 if normalize_text(x[1].get("grup", "")) in aktif_iban_carileri else 1, x[1].get("grup", ""))
+    )
+    
+    buton_satirlari = []
+    for i in range(0, len(sirali_gruplar), 2):
+        satir = []
+        c_id1, info1 = sirali_gruplar[i]
+        g_ad1 = info1.get("grup", "Grup")
+        icon1 = "🟢" if normalize_text(g_ad1) in aktif_iban_carileri else "⚪"
+        satir.append({"text": f"{icon1} {g_ad1}", "callback_data": f"duyuru_tek_{draft_id}_{c_id1}"})
+        
+        if i + 1 < len(sirali_gruplar):
+            c_id2, info2 = sirali_gruplar[i+1]
+            g_ad2 = info2.get("grup", "Grup")
+            icon2 = "🟢" if normalize_text(g_ad2) in aktif_iban_carileri else "⚪"
+            satir.append({"text": f"{icon2} {g_ad2}", "callback_data": f"duyuru_tek_{draft_id}_{c_id2}"})
+        buton_satirlari.append(satir)
+        
+    buton_satirlari.append([
+        {"text": "🔙 Ana Menüye Dön", "callback_data": f"duyuru_ana_menu_{draft_id}"},
+        {"text": "❌ İptal", "callback_data": f"duyuru_iptal_{draft_id}"}
+    ])
+    
+    return metin, {"inline_keyboard": buton_satirlari}
+
+def toplu_duyuru_tek_grup_yayinla_callback(draft_id: str, hedef_chat_id: int, gonderen_id: int) -> Tuple[str, dict]:
+    """
+    Seçilen tek bir özel gruba duyuruyu iletir ve rapor döner.
+    """
+    taslaklar = app_state.get("DUYURU_TASLAKLARI", {})
+    if draft_id not in taslaklar:
+        return (
+            "⚠️ <b>Duyuru taslağının süresi dolmuş veya işlem tamamlanmış.</b>",
+            {"inline_keyboard": [[{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]]}
+        )
+        
+    taslak = taslaklar.pop(draft_id)
+    duyuru_icerik = taslak["metin"]
+    
+    grup_baglantilarini_guncelle()
+    baglantilar = app_state.get("GRUP_BAGLANTILARI", {})
+    grup_adi = baglantilar.get(hedef_chat_id, {}).get("grup", "Seçilen Cari")
+    
+    saat_tarih = suankiZamaniAl().strftime("%d.%m.%Y %H:%M")
+    duyuru_mesaji = (
+        f"📢 <b>ŞİRKET DUYURUSU</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"{duyuru_icerik}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"⏰ <i>{saat_tarih}</i>  •  🏛️ <b>CFO Yönetim</b>"
+    )
+    
+    ok = False
+    hata_str = ""
+    try:
+        res = telegramMesajGonder(hedef_chat_id, duyuru_mesaji)
+        if res and res.get("ok"):
+            ok = True
+        else:
+            hata_str = res.get("description", "Yanıt alınamadı") if isinstance(res, dict) else "Hata"
+    except Exception as e:
+        hata_str = str(e)
+        
+    sistemeLogYaz(
+        "Özel Grup Duyurusu",
+        f"Gönderen: {gonderen_id} | Grup: {grup_adi} ({hedef_chat_id}) | Durum: {'Başarılı' if ok else hata_str}"
+    )
+    
+    if ok:
+        rapor = (
+            f"📢 <b>ÖZEL GRUP DUYURU RAPORU</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"🎯 <b>Hedef Grup:</b> <b>{grup_adi}</b>\n"
+            f"✅ <b>Durum:</b> <b>Başarıyla İletildi</b>\n"
+            f"⏰ <b>Saat:</b> <code>{saat_tarih}</code>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💡 <i>Duyuru yalnızca <b>{grup_adi}</b> grubuna özel olarak iletilmiştir.</i>"
+        )
+    else:
+        rapor = (
+            f"❌ <b>Özel Duyuru Gönderilemedi!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"🎯 <b>Hedef Grup:</b> <b>{grup_adi}</b>\n"
+            f"⚠️ <b>Hata:</b> {hata_str}\n"
+        )
+        
+    klavye = {
+        "inline_keyboard": [
+            [{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]
+        ]
+    }
+    return rapor, klavye
 
 def toplu_duyuru_yayinla_callback(draft_id: str, hedef_filtre: str, gonderen_id: int) -> Tuple[str, dict]:
     """
@@ -4260,6 +4425,36 @@ def process_telegram_update(update: dict):
                 telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
             else:
                 telegramMesajGonder(chat_id, metin, klavye)
+        elif data.startswith("duyuru_ozel_menu_"):
+            draft_id = data.replace("duyuru_ozel_menu_", "").strip()
+            msg_id = cq.get("message", {}).get("message_id")
+            metin, klavye = duyuru_ozel_grup_secim_ekrani(draft_id)
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+            else:
+                telegramMesajGonder(chat_id, metin, klavye)
+        elif data.startswith("duyuru_ana_menu_"):
+            draft_id = data.replace("duyuru_ana_menu_", "").strip()
+            msg_id = cq.get("message", {}).get("message_id")
+            metin, klavye = toplu_duyuru_ana_panel_uret(draft_id)
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+            else:
+                telegramMesajGonder(chat_id, metin, klavye)
+        elif data.startswith("duyuru_tek_"):
+            parcalar = data.split("_", 3)
+            if len(parcalar) >= 4:
+                draft_id = parcalar[2]
+                try:
+                    hedef_c_id = int(parcalar[3])
+                    msg_id = cq.get("message", {}).get("message_id")
+                    metin, klavye = toplu_duyuru_tek_grup_yayinla_callback(draft_id, hedef_c_id, user_id)
+                    if msg_id:
+                        telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+                    else:
+                        telegramMesajGonder(chat_id, metin, klavye)
+                except ValueError:
+                    pass
         elif data.startswith("duyuru_iptal_"):
             draft_id = data.replace("duyuru_iptal_", "").strip()
             app_state.get("DUYURU_TASLAKLARI", {}).pop(draft_id, None)
