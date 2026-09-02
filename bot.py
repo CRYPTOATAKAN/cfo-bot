@@ -662,6 +662,135 @@ def grup_baglantilari_listesi_impl() -> str:
         out += f"🏢 <b>Excel Cari:</b> <code>{g_ad}</code>\n💬 <b>Grup ID:</b> <code>{c_id}</code>{title_str}\n\n"
     return out
 
+def grup_senkronize_impl() -> str:
+    """
+    Google Sheets (GRUP_BAGLANTILARI sayfası ve Günlük Cari Sayfası) ile
+    Telegram grupları arasındaki tüm bağlantıları, cari isimlerini ve grup başlıklarını
+    canlı olarak sorgular, senkronize eder ve tüm sistem önbelleklerini anında günceller.
+    """
+    global _cached_sheet_matrix, _cached_sheet_matrix_time, _cached_spreadsheet, _cached_sh_time
+    _cached_sheet_matrix = None
+    _cached_sheet_matrix_time = 0
+    _cached_spreadsheet = None
+    _cached_sh_time = 0
+    app_state["BAGLANTI_CACHE_TIME"] = 0
+    
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    gunluk_veriler = get_sheet_values_fast(sayfa)
+    
+    gunluk_cariler = set()
+    for row in gunluk_veriler[1:]:
+        if len(row) >= 2 and row[1].strip():
+            gunluk_cariler.add(row[1].strip())
+            
+    try:
+        baglanti_sayfasi = sh.worksheet(BAGLANTI_SAYFASI)
+    except gspread.exceptions.WorksheetNotFound:
+        baglanti_sayfasi = sh.add_worksheet(title=BAGLANTI_SAYFASI, rows=100, cols=5)
+        baglanti_sayfasi.append_row(["Chat ID", "Grup Adı", "Telegram Grup Başlığı", "Ekleyen ID", "Tarih"])
+        
+    satirlar = baglanti_sayfasi.get_all_values()
+    if len(satirlar) <= 1:
+        app_state["GRUP_BAGLANTILARI"] = {}
+        return (
+            "📭 <b>Bağlı Grup Bulunamadı!</b>\n\n"
+            "Google Sheets'te henüz bağlanmış bir Telegram grubu kaydı bulunmuyor.\n"
+            "Gruplarda <code>/grupbagla [Cari Adı]</code> yaparak bağlantı oluşturabilirsiniz."
+        )
+        
+    yeni_dict = {}
+    guncellenen_sayisi = 0
+    aktif_bagli_sayisi = 0
+    uyarilar = []
+    
+    for idx, r in enumerate(satirlar[1:], start=2):
+        if len(r) >= 2 and r[0].strip():
+            try:
+                c_id = int(r[0].strip())
+                cari_adi = r[1].strip()
+                mevcut_title = r[2].strip() if len(r) > 2 else ""
+                
+                canli_title = mevcut_title
+                try:
+                    chat_res = telegram_api("getChat", {"chat_id": c_id})
+                    if chat_res and chat_res.get("ok"):
+                        canli_title = chat_res.get("result", {}).get("title", mevcut_title)
+                except Exception:
+                    pass
+                    
+                if canli_title and canli_title != mevcut_title:
+                    try:
+                        baglanti_sayfasi.update_cell(idx, 3, canli_title)
+                        guncellenen_sayisi += 1
+                    except Exception:
+                        pass
+                        
+                # Günlük cari tablosuyla isim güncelleme senkronizasyonu
+                if cari_adi not in gunluk_cariler:
+                    norm_bulunan = None
+                    for g_c in gunluk_cariler:
+                        if normalize_text(g_c) == normalize_text(cari_adi):
+                            norm_bulunan = g_c
+                            break
+                    if not norm_bulunan and len(cari_adi) >= 3:
+                        for g_c in gunluk_cariler:
+                            if normalize_text(g_c).startswith(normalize_text(cari_adi)) or normalize_text(cari_adi).startswith(normalize_text(g_c)):
+                                norm_bulunan = g_c
+                                break
+                    if norm_bulunan and norm_bulunan != cari_adi:
+                        try:
+                            baglanti_sayfasi.update_cell(idx, 2, norm_bulunan)
+                            cari_adi = norm_bulunan
+                            guncellenen_sayisi += 1
+                        except Exception:
+                            pass
+                    elif not norm_bulunan:
+                        uyarilar.append(f"• ⚠️ <b>{cari_adi}</b> <i>(Günlük Excel sayfasında bulunamadı)</i>")
+                        
+                yeni_dict[c_id] = {"grup": cari_adi, "title": canli_title}
+                aktif_bagli_sayisi += 1
+            except ValueError:
+                pass
+                
+    app_state["GRUP_BAGLANTILARI"] = yeni_dict
+    app_state["BAGLANTI_CACHE_TIME"] = time.time()
+    
+    sistemeLogYaz(
+        "Grup Senkronizasyonu",
+        f"Toplam Bağlı: {aktif_bagli_sayisi} | Güncellenen: {guncellenen_sayisi}"
+    )
+    
+    rapor = (
+        f"🔄 <b>EXCEL & TELEGRAM GRUP SENKRONİZASYONU</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"✅ <b>Durum:</b> <b>Tüm İsimler Başarıyla Eşitlendi</b>\n"
+        f"👥 <b>Toplam Bağlı Grup:</b> <code>{aktif_bagli_sayisi} Adet</code>\n"
+        f"📝 <b>Güncellenen Kayıt:</b> <code>{guncellenen_sayisi} Adet</code>\n"
+        f"📑 <b>Aktif Günlük Sayfa:</b> <code>{sayfa.title}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+    )
+    
+    if yeni_dict:
+        rapor += "🏢 <b>Eşleşen Güncel Cariler:</b>\n"
+        sirali_baglantilar = sorted(yeni_dict.values(), key=lambda x: x.get("grup", ""))
+        for info in sirali_baglantilar[:15]:
+            g_ad = info.get("grup", "")
+            t_title = info.get("title", "")
+            title_str = f" <i>({t_title})</i>" if t_title else ""
+            rapor += f"• <b>{g_ad}</b>{title_str}\n"
+        if len(sirali_baglantilar) > 15:
+            rapor += f"<i>(+{len(sirali_baglantilar) - 15} grup daha eşitlendi)</i>\n"
+            
+    if uyarilar:
+        rapor += "\n⚠️ <b>Eksik / Değişen Cari Uyarıları:</b>\n" + "\n".join(uyarilar) + "\n"
+        
+    rapor += (
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 <i>Excel'de yaptığınız tüm isim değişiklikleri bota anında aktarılmıştır.</i>"
+    )
+    return rapor
+
 def aktif_ibani_olan_carileri_bul(veriler: List[List[str]] = None) -> Set[str]:
     """
     Excel tablosunda Sol Blok (Col 14: Cari) ve Sağ Blok (Col 17: Cari) üzerinde
@@ -1182,6 +1311,7 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/grupbagla [Grup Adı]</code> : <i>Bu Telegram grubunu Excel'deki cari satırına bağlar.</i>\n"
             "• <code>/grupkopar</code> : <i>İçinde bulunulan grubun Excel eşleştirmesini kaldırır.</i>\n"
             "• <code>/gruplar</code> : <i>Hangi Telegram grubunun hangi Excel carisine bağlı olduğunu listeler.</i>\n"
+            "• <code>/senkron</code> veya <code>/grupguncelle</code> : 🔄 <i>Excel'de değiştirilen grup/cari isimlerini botla anında eşitler.</i>\n"
             "• <code>/duyuru [Metin]</code> : 📢 <i>Yalnızca Excel'e bağlı carilerin gruplarına toplu duyuru geçer.</i>"
         )
     elif kategori == "rapor":
@@ -1228,6 +1358,8 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/adminler</code> : <i>Sistemde yetkilendirilmiş şirket yöneticilerini listeler.</i>\n"
             "• <code>/adminekle [ID] [İsim]</code> : <i>Yeni yönetici yetkilendirir (Sadece Kurucu).</i>\n"
             "• <code>/adminsil [ID]</code> : <i>Yöneticinin bot yetkisini geri alır.</i>\n"
+            "• <code>/senkron</code> : 🔄 <i>Excel'deki güncel grup ve cari isimlerini bota aktarır.</i>\n"
+            "• <code>/duyuru [Metin]</code> : 📢 <i>Bağlı cari gruplarına akıllı hedef seçimli duyuru paneli açar.</i>\n"
             "• <code>/kapanis</code> : 🌙 <i>Gün sonu kapanış bilançosunu anında özelinize gönderir (Sadece Kurucu).</i>\n"
             "• <code>/kapanissaati [SS:DD]</code> : <i>Otomatik gün sonu bildirim saatini ayarlar (Örn: /kapanissaati 23:00).</i>\n"
             "• <code>/panel</code> : <i>Canlı CFO Web Dashboard bağlantı linkini verir.</i>\n"
@@ -1259,7 +1391,9 @@ def rehber_kategori_metni(kategori: str) -> str:
             "👥 <b>GRUP VE CARİ EŞLEŞTİRME</b>\n"
             "• <code>/grupbagla [Grup Adı]</code> : Grubu Excel satırına bağlar.\n"
             "• <code>/grupkopar</code> : Grubun Excel bağlantısını kaldırır.\n"
-            "• <code>/gruplar</code> : Bağlı grupları listeler.\n\n"
+            "• <code>/gruplar</code> : Bağlı grupları listeler.\n"
+            "• <code>/senkron</code> veya <code>/grupguncelle</code> : 🔄 Excel'de değiştirilen grup/cari isimlerini botla anında eşitler.\n"
+            "• <code>/duyuru [Metin]</code> : 📢 Bağlı cari gruplarına akıllı hedef seçimli toplu/özel duyuru geçer.\n\n"
             "📊 <b>GÜNLÜK DÖNGÜ VE RAPORLAR</b>\n"
             "• <code>/hedef</code> : 🎯 Canlı ciro hedefi & ilerleme çubuğu.\n"
             "• <code>/trend</code> : 📈 Haftalık konsolide büyüme ve cari hacimleri.\n"
@@ -4502,6 +4636,22 @@ def process_telegram_update(update: dict):
             )
             return
 
+        # =========================================================================
+        # ⛔ KESİN VE TEK YETKİ KONTROLÜ (Grup & Özel Sohbet Dahil Tüm Bot Fonksiyonları)
+        # Kurucu ve Ek Yöneticiler haricindeki hiç kimse hiçbir komutu çalıştıramaz!
+        # Yetkisiz kullanıcıya İLK denemesinde TEK SEFERLİK uyarı verilir;
+        # sonraki tüm mesajlarında bot SESSİZ MODA geçer ve kullanıcıyı tamamen yok sayar.
+        # =========================================================================
+        if not yetkili_mi(user_id):
+            yetkisiz_uyari_gonder(
+                chat_id,
+                user_id,
+                f"⛔ <b>Erişim Reddedildi!</b>\n"
+                f"Bu işlem sadece yetkili şirket yöneticilerine özeldir.\n"
+                f"Kullanıcı ID'niz: <code>{user_id}</code>"
+            )
+            return
+
         # /t veya /rezerv veya /varlik (TRC-20 Canlı Rezerv & Varlık Raporu)
         if ana_komut in ["/t", "/rezerv", "/varlik"]:
             if user_id != KURUCU_ID:
@@ -4517,39 +4667,26 @@ def process_telegram_update(update: dict):
 
         # /grupbagla veya /bagla
         if ana_komut in ["/grupbagla", "/bagla"]:
-            if not yetkili_mi(user_id):
-                yetkisiz_uyari_gonder(chat_id, user_id, f"⛔ <b>Yetkisiz İşlem:</b> Telegram grubunu Excel'e bağlama yetkisi sadece şirket yöneticilerine aittir.\nKullanıcı ID: <code>{user_id}</code>")
-                return
             islemi_analiz_bildirimiyle_yap(chat_id, grup_bagla_impl, chat_id, user_id, text, chat_title)
             return
 
         # /grupkopar veya /baglantikes
         if ana_komut in ["/grupkopar", "/baglantikes", "/grupbaglasil"]:
-            if not yetkili_mi(user_id):
-                yetkisiz_uyari_gonder(chat_id, user_id, f"⛔ <b>Yetkisiz İşlem:</b> Grup bağlantısını kaldırma yetkisi sadece şirket yöneticilerine aittir.\nKullanıcı ID: <code>{user_id}</code>")
-                return
             islemi_analiz_bildirimiyle_yap(chat_id, grup_kopar_impl, chat_id, user_id)
             return
 
         # /grupbaglantilari veya /gruplar
         if ana_komut in ["/grupbaglantilari", "/gruplar", "/baglantilar"]:
-            if not yetkili_mi(user_id):
-                yetkisiz_uyari_gonder(chat_id, user_id, f"⛔ <b>Yetkisiz İşlem:</b> Bu listeyi sadece şirket yöneticileri görebilir.")
-                return
             islemi_analiz_bildirimiyle_yap(chat_id, grup_baglantilari_listesi_impl)
+            return
+
+        # /senkron veya /grupguncelle (Excel & Telegram Grup İsim Eşitleme)
+        if ana_komut in ["/senkron", "/senkronize", "/grupguncelle", "/grupgüncelle", "/esitle", "/eşitle", "/sync"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, grup_senkronize_impl, goster_bildirim=True)
             return
 
         # /kasa veya /durum
         if ana_komut in ["/kasa", "/durum"]:
-            if not yetkili_mi(user_id):
-                yetkisiz_uyari_gonder(
-                    chat_id,
-                    user_id,
-                    f"⛔ <b>Yetkisiz İşlem:</b> Kasa durumunu sorgulama veya işlem yapma yetkisi sadece şirket yöneticilerine aittir.\n"
-                    f"Kullanıcı ID: <code>{user_id}</code>"
-                )
-                return
-
             args = komut_parcalari[1:]
             baglantilar = app_state.get("GRUP_BAGLANTILARI", {})
 
@@ -4606,17 +4743,6 @@ def process_telegram_update(update: dict):
             else:
                 islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 4, "Kasa Ekleme", 1)
                 return
-
-        # Diğer tüm komutlar için yönetici yetkisi zorunludur
-        if not yetkili_mi(user_id):
-            yetkisiz_uyari_gonder(
-                chat_id,
-                user_id,
-                f"⛔ <b>Erişim Reddedildi!</b>\n"
-                f"Bu işlem sadece yetkili şirket yöneticilerine özeldir.\n"
-                f"Kullanıcı ID'niz: <code>{user_id}</code>"
-            )
-            return
 
         if ana_komut in ["/start", "/menu", "/menü"]:
             telegramMesajGonder(chat_id, "👋 <b>CFO ve Finans Yönetim Botu</b>\nLütfen bir işlem seçin:\n\n👨💻 <i>Yazılım: @CRYPTOATAKAN © 2026</i>", menuKlavyesiOlustur(is_group))
