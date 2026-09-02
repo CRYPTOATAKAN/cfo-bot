@@ -3,6 +3,7 @@ import re
 import io
 import json
 import time
+import uuid
 import datetime
 import threading
 import unicodedata
@@ -661,6 +662,209 @@ def grup_baglantilari_listesi_impl() -> str:
         out += f"🏢 <b>Excel Cari:</b> <code>{g_ad}</code>\n💬 <b>Grup ID:</b> <code>{c_id}</code>{title_str}\n\n"
     return out
 
+def aktif_ibani_olan_carileri_bul(veriler: List[List[str]] = None) -> Set[str]:
+    """
+    Excel tablosunda Sol Blok (Col 14: Cari) ve Sağ Blok (Col 17: Cari) üzerinde
+    şu anda bir İBAN'a tahsis edilmiş (dolu) olan tüm normalize edilmiş cari adlarını döner.
+    """
+    if veriler is None:
+        sh = get_spreadsheet()
+        sayfa = get_active_daily_sheet(sh)
+        veriler = get_sheet_values_fast(sayfa)
+        
+    aktif_cariler = set()
+    for row in veriler[1:]:
+        # Sol Blok Cari (Col O, index 14)
+        if len(row) > 14 and row[14].strip():
+            c1 = row[14].strip()
+            aktif_cariler.add(normalize_text(c1))
+            
+        # Sağ Blok Cari (Col R, index 17)
+        if len(row) > 17 and row[17].strip():
+            c2 = row[17].strip()
+            aktif_cariler.add(normalize_text(c2))
+            
+    return aktif_cariler
+
+def toplu_duyuru_hazirla_paneli(komut_metni: str, gonderen_id: int) -> Tuple[str, Optional[dict]]:
+    """
+    Yönetici /duyuru [Metin] yazdığında hemen duyuru göndermez;
+    Önce hedef kitle analizi yapar (İBAN'ı aktif olan gruplar vs Tüm bağlı gruplar)
+    ve seçim yapması için etkileşimli kontrol paneli sunar.
+    """
+    parcalar = komut_metni.strip().split(maxsplit=1)
+    if len(parcalar) < 2 or not parcalar[1].strip():
+        return (
+            "⚠️ <b>Eksik Duyuru Metni!</b>\n\n"
+            "Kullanım: <code>/duyuru [Duyuru Metniniz]</code>\n"
+            "Örnek: <code>/duyuru Değerli iş ortaklarımız, banka hesaplarımız güncellenmiştir.</code>\n\n"
+            "💡 <i>Komutu çalıştırdığınızda hedef grup seçimi için onay paneli açılacaktır.</i>",
+            None
+        )
+        
+    duyuru_icerik = parcalar[1].strip()
+    grup_baglantilarini_guncelle()
+    baglantilar = app_state.get("GRUP_BAGLANTILARI", {})
+    
+    if not baglantilar:
+        return (
+            "📭 <b>Bağlı Grup Bulunamadı!</b>\n\n"
+            "Sistemde henüz Excel'e bağlanmış hiçbir Telegram grubu bulunmuyor.\n"
+            "Duyuru gönderebilmek için önce ilgili gruplarda <code>/grupbagla [Cari Adı]</code> yapmalısınız.",
+            None
+        )
+        
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    veriler = get_sheet_values_fast(sayfa)
+    aktif_iban_carileri = aktif_ibani_olan_carileri_bul(veriler)
+    
+    bagli_ibanli_gruplar = []
+    bagli_ibansiz_gruplar = []
+    
+    for c_id, info in baglantilar.items():
+        grup_adi = info.get("grup", "Bilinmeyen")
+        if normalize_text(grup_adi) in aktif_iban_carileri:
+            bagli_ibanli_gruplar.append((c_id, grup_adi))
+        else:
+            bagli_ibansiz_gruplar.append((c_id, grup_adi))
+            
+    # Benzersiz taslak ID üret ve sakla
+    draft_id = uuid.uuid4().hex[:8]
+    app_state.setdefault("DUYURU_TASLAKLARI", {})[draft_id] = {
+        "metin": duyuru_icerik,
+        "gonderen_id": gonderen_id,
+        "zaman": time.time(),
+        "ibanli_idler": [item[0] for item in bagli_ibanli_gruplar],
+        "tum_idler": list(baglantilar.keys())
+    }
+    
+    ibanli_adlar = ", ".join(sorted(list(set(item[1] for item in bagli_ibanli_gruplar)))) if bagli_ibanli_gruplar else "Yok"
+    ibansiz_adlar = ", ".join(sorted(list(set(item[1] for item in bagli_ibansiz_gruplar)))) if bagli_ibansiz_gruplar else "Yok"
+    
+    metin = (
+        f"📢 <b>TOPLU DUYURU HEDEF SEÇİM PANELİ</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📝 <b>Duyuru Metni:</b>\n"
+        f"<i>\"{duyuru_icerik}\"</i>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📊 <b>HEDEF KİTLE ANALİZİ:</b>\n"
+        f"• 💳 <b>İBAN'ı Aktif Cariler ({len(bagli_ibanli_gruplar)}):</b> <code>{ibanli_adlar}</code>\n"
+        f"• ⚪ <b>İBAN'ı Olmayan Cariler ({len(bagli_ibansiz_gruplar)}):</b> <code>{ibansiz_adlar}</code>\n"
+        f"• 👥 <b>Toplam Bağlı Grup:</b> <code>{len(baglantilar)} Adet</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"👇 <i>Duyurunun hangi gruplara gönderileceğini seçiniz:</i>"
+    )
+    
+    butonlar = []
+    if bagli_ibanli_gruplar:
+        butonlar.append([{"text": f"💳 Sadece İBAN'ı Aktif Gruplara ({len(bagli_ibanli_gruplar)} Grup)", "callback_data": f"duyuru_gonder_iban_{draft_id}"}])
+    else:
+        butonlar.append([{"text": "💳 Sadece İBAN'ı Aktif Gruplara (0 Grup)", "callback_data": f"duyuru_bos_uyari_{draft_id}"}])
+        
+    butonlar.append([{"text": f"🌐 Tüm Bağlı Gruplara ({len(baglantilar)} Grup)", "callback_data": f"duyuru_gonder_tumu_{draft_id}"}])
+    butonlar.append([{"text": "❌ İptal Et", "callback_data": f"duyuru_iptal_{draft_id}"}])
+    
+    return metin, {"inline_keyboard": butonlar}
+
+def toplu_duyuru_yayinla_callback(draft_id: str, hedef_filtre: str, gonderen_id: int) -> Tuple[str, dict]:
+    """
+    Yönetici seçim butonuna bastığında onaylanan hedef kitleye duyuruyu anında iletir.
+    """
+    taslaklar = app_state.get("DUYURU_TASLAKLARI", {})
+    if draft_id not in taslaklar:
+        return (
+            "⚠️ <b>Duyuru taslağının süresi dolmuş veya işlem zaten tamamlanmış.</b>",
+            {"inline_keyboard": [[{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]]}
+        )
+        
+    taslak = taslaklar.pop(draft_id)
+    duyuru_icerik = taslak["metin"]
+    
+    grup_baglantilarini_guncelle()
+    baglantilar = app_state.get("GRUP_BAGLANTILARI", {})
+    
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    veriler = get_sheet_values_fast(sayfa)
+    aktif_iban_carileri = aktif_ibani_olan_carileri_bul(veriler)
+    
+    hedef_chat_idler = []
+    hedef_aciklama = ""
+    
+    if hedef_filtre == "iban_aktif":
+        hedef_aciklama = "💳 Sadece İBAN'ı Aktif Gruplar"
+        for c_id, info in baglantilar.items():
+            grup_adi = info.get("grup", "")
+            if normalize_text(grup_adi) in aktif_iban_carileri:
+                hedef_chat_idler.append((c_id, grup_adi))
+    else:
+        hedef_aciklama = "🌐 Tüm Bağlı Gruplar"
+        for c_id, info in baglantilar.items():
+            hedef_chat_idler.append((c_id, info.get("grup", "")))
+            
+    if not hedef_chat_idler:
+        return (
+            "⚠️ <b>Seçilen hedef kitlede aktif grup bulunamadı!</b>",
+            {"inline_keyboard": [[{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]]}
+        )
+        
+    saat_tarih = suankiZamaniAl().strftime("%d.%m.%Y %H:%M")
+    duyuru_mesaji = (
+        f"📢 <b>ŞİRKET DUYURUSU</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"{duyuru_icerik}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"⏰ <i>{saat_tarih}</i>"
+    )
+    
+    basarili_gruplar = []
+    basarisiz_gruplar = []
+    
+    for c_id, g_ad in hedef_chat_idler:
+        try:
+            res = telegramMesajGonder(c_id, duyuru_mesaji)
+            if res and res.get("ok"):
+                basarili_gruplar.append(g_ad)
+            else:
+                hata_detay = res.get("description", "Bilinmeyen hata") if isinstance(res, dict) else "Yanıt alınamadı"
+                basarisiz_gruplar.append(f"{g_ad} ({hata_detay})")
+        except Exception as e:
+            basarisiz_gruplar.append(f"{g_ad} ({e})")
+            
+    sistemeLogYaz(
+        "Toplu Duyuru Yayınlandı",
+        f"Gönderen: {gonderen_id} | Filtre: {hedef_filtre} | Başarılı: {len(basarili_gruplar)}/{len(hedef_chat_idler)}"
+    )
+    
+    rapor = (
+        f"📢 <b>TOPLU DUYURU RAPORU</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🎯 <b>Hedef Kitle:</b> <b>{hedef_aciklama}</b>\n"
+        f"✅ <b>Başarılı Gönderim:</b> <code>{len(basarili_gruplar)} Grup</code>\n"
+    )
+    if basarili_gruplar:
+        rapor += f"🏢 <b>İletilen Cariler:</b> <i>{', '.join(sorted(list(set(basarili_gruplar))))}</i>\n"
+        
+    if basarisiz_gruplar:
+        rapor += (
+            f"\n❌ <b>Ulaşılamayan Gruplar ({len(basarisiz_gruplar)}):</b>\n"
+            f"• " + "\n• ".join(basarisiz_gruplar) + "\n"
+        )
+        
+    rapor += (
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"⏰ <b>Saat:</b> <code>{saat_tarih}</code>\n"
+        f"💡 <i>Duyuru başarıyla seçilen gruplara iletilmiştir.</i>"
+    )
+    
+    klavye = {
+        "inline_keyboard": [
+            [{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]
+        ]
+    }
+    return rapor, klavye
+
 def grup_kasa_analiz_fisi_uret(grup_ham: str) -> str:
     hedef_norm = normalize_text(grup_ham)
     if not hedef_norm:
@@ -799,7 +1003,8 @@ def rehber_kategori_metni(kategori: str) -> str:
             "━━━━━━━━━━━━━━━━\n\n"
             "• <code>/grupbagla [Grup Adı]</code> : <i>Bu Telegram grubunu Excel'deki cari satırına bağlar.</i>\n"
             "• <code>/grupkopar</code> : <i>İçinde bulunulan grubun Excel eşleştirmesini kaldırır.</i>\n"
-            "• <code>/gruplar</code> : <i>Hangi Telegram grubunun hangi Excel carisine bağlı olduğunu listeler.</i>"
+            "• <code>/gruplar</code> : <i>Hangi Telegram grubunun hangi Excel carisine bağlı olduğunu listeler.</i>\n"
+            "• <code>/duyuru [Metin]</code> : 📢 <i>Yalnızca Excel'e bağlı carilerin gruplarına toplu duyuru geçer.</i>"
         )
     elif kategori == "rapor":
         return (
@@ -4026,6 +4231,36 @@ def process_telegram_update(update: dict):
             msg_id = cq.get("message", {}).get("message_id")
             if msg_id:
                 telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+        elif data.startswith("duyuru_gonder_iban_"):
+            draft_id = data.replace("duyuru_gonder_iban_", "").strip()
+            msg_id = cq.get("message", {}).get("message_id")
+            metin, klavye = toplu_duyuru_yayinla_callback(draft_id, "iban_aktif", user_id)
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+            else:
+                telegramMesajGonder(chat_id, metin, klavye)
+        elif data.startswith("duyuru_gonder_tumu_"):
+            draft_id = data.replace("duyuru_gonder_tumu_", "").strip()
+            msg_id = cq.get("message", {}).get("message_id")
+            metin, klavye = toplu_duyuru_yayinla_callback(draft_id, "tumu", user_id)
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+            else:
+                telegramMesajGonder(chat_id, metin, klavye)
+        elif data.startswith("duyuru_iptal_"):
+            draft_id = data.replace("duyuru_iptal_", "").strip()
+            app_state.get("DUYURU_TASLAKLARI", {}).pop(draft_id, None)
+            msg_id = cq.get("message", {}).get("message_id")
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, "❌ <b>Toplu duyuru gönderimi iptal edildi.</b>", None)
+            else:
+                telegramMesajGonder(chat_id, "❌ <b>Toplu duyuru gönderimi iptal edildi.</b>")
+        elif data.startswith("duyuru_bos_uyari_"):
+            telegram_api("answerCallbackQuery", {
+                "callback_query_id": cq["id"],
+                "text": "⚠️ Şu anda İBAN'ı aktif olarak atanmış bir grup bulunmuyor.",
+                "show_alert": True
+            })
         elif data in ["mesaj_kapat", "panel_kapat", "kapat"]:
             msg_id = cq.get("message", {}).get("message_id")
             if msg_id:
@@ -4098,6 +4333,15 @@ def process_telegram_update(update: dict):
 
         # /kasa veya /durum
         if ana_komut in ["/kasa", "/durum"]:
+            if not yetkili_mi(user_id):
+                yetkisiz_uyari_gonder(
+                    chat_id,
+                    user_id,
+                    f"⛔ <b>Yetkisiz İşlem:</b> Kasa durumunu sorgulama veya işlem yapma yetkisi sadece şirket yöneticilerine aittir.\n"
+                    f"Kullanıcı ID: <code>{user_id}</code>"
+                )
+                return
+
             args = komut_parcalari[1:]
             baglantilar = app_state.get("GRUP_BAGLANTILARI", {})
 
@@ -4116,9 +4360,6 @@ def process_telegram_update(update: dict):
                         )
                         return
                     else:
-                        if not yetkili_mi(user_id):
-                            yetkisiz_uyari_gonder(chat_id, user_id, f"⛔ <b>Erişim Reddedildi!</b>\nKullanıcı ID'niz: <code>{user_id}</code>")
-                            return
                         telegramMesajGonder(
                             chat_id,
                             "💡 <b>Kasa Komutu Kullanım Rehberi:</b>\n━━━━━━━━━━━\n"
@@ -4145,9 +4386,6 @@ def process_telegram_update(update: dict):
                     return
                 else:
                     # Sayı girilmiş -> Bağlı grupta ise o grubun kasasına ekle
-                    if not yetkili_mi(user_id):
-                        yetkisiz_uyari_gonder(chat_id, user_id, f"⛔ <b>Yetkisiz İşlem:</b> Kasaya para ekleme işlemi sadece yöneticilere açıktır.")
-                        return
                     if chat_id in baglantilar:
                         grup_adi = baglantilar[chat_id]["grup"]
                         islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, f"/kasa {grup_adi} {args[0]}", 4, "Kasa Ekleme", 1)
@@ -4158,9 +4396,6 @@ def process_telegram_update(update: dict):
 
             # 3. İki veya daha fazla parametre girildiğinde (/kasa SACİD 1500)
             else:
-                if not yetkili_mi(user_id):
-                    yetkisiz_uyari_gonder(chat_id, user_id, f"⛔ <b>Yetkisiz İşlem:</b> Kasaya para ekleme işlemi sadece yöneticilere açıktır.")
-                    return
                 islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 4, "Kasa Ekleme", 1)
                 return
 
@@ -4257,6 +4492,8 @@ def process_telegram_update(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, iban_bosalt_impl, text)
         elif ana_komut in ["/ekstre", "/gecmis", "/hesapdokumu", "/dokum"]:
             islemi_analiz_bildirimiyle_yap(chat_id, cari_ekstre_impl, text, goster_bildirim=True)
+        elif ana_komut in ["/duyuru", "/topluduyuru", "/broadcast", "/yayin", "/yayım"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, toplu_duyuru_hazirla_paneli, text, user_id, goster_bildirim=True)
         elif ana_komut in ["/toplu", "/topluislem", "/hizli"]:
             islemi_analiz_bildirimiyle_yap(chat_id, toplu_islem_impl, text, goster_bildirim=True)
         elif ana_komut in ["/hedef", "/kpi", "/cirohedefi"]:
