@@ -754,147 +754,86 @@ def rehber_kategori_metni(kategori: str) -> str:
         return (
             "🏢 <b>KASA VE ÖDEME İŞLEMLERİ</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "• <code>/kasa</code>\n"
-            "  └ <i>Bağlı Telegram grubunda tek tuşla canlı kasa durum fişini döker.</i>\n\n"
-            "• <code>/kasa [Grup] [Tutar]</code>\n"
-            "  └ <i>Kasaya nakit ekler.</i>\n"
-            "  └ <i>Örnek:</i> <code>/kasa SACİD 500.000</code> veya <code>/kasa TİGER 1.250,50</code>\n\n"
-            "• <code>/kasasil [Grup] [Tutar]</code>\n"
-            "  └ <i>Kasa tutarından düşer.</i>\n"
-            "  └ <i>Örnek:</i> <code>/kasasil SACİD 50.000</code>\n\n"
-            "• <code>/odeme [Grup] [Tutar]</code>\n"
-            "  └ <i>Yapılan ödemeyi işler.</i>\n"
-            "  └ <i>Örnek:</i> <code>/odeme SACİD 100.000</code>\n\n"
-            "• <code>/odemesil [Grup] [Tutar]</code>\n"
-            "  └ <i>Ödenen tutardan düşer.</i>\n\n"
-            "• <code>/devir [Grup] [Tutar]</code>\n"
-            "  └ <i>Cari satırına devir / borç bakiyesi ekler.</i>\n"
-            "  └ <i>Örnek:</i> <code>/devir TİGER 250.000</code>\n\n"
-            "• <code>/devirsil [Grup] [Tutar]</code>\n"
-            "  └ <i>Devir tutarından düşer.</i>\n\n"
-            "• <code>/toplu</code>\n"
-            "  └ <i>⚡ Çoklu hızlı işlem: Birden fazla kasa, ödeme, masraf hareketini tek mesajda işler.</i>\n\n"
-            "• <code>/gerial</code>\n"
-            "  └ <i>En son yapılan hatalı işlemi hafızadan geri alır.</i>\n\n"
-            "• <code>/not [Metin]</code>\n"
-            "  └ <i>Şirket hafızasına kalıcı not ekler (Örn: /not SACİD saat 18:00'de ödeme yapacak).</i>\n\n"
-            "• <code>/notlar</code>\n"
-            "  └ <i>Kaydedilmiş son şirket notlarını listeler.</i>"
+            "• <code>/kasa</code> : <i>Bağlı Telegram grubunda tek tuşla canlı kasa durum fişini döker.</i>\n"
+            "• <code>/kasa [Grup] [Tutar]</code> : <i>Kasaya nakit ekler (Örn: /kasa SACİD 500.000).</i>\n"
+            "• <code>/kasasil [Grup] [Tutar]</code> : <i>Kasa tutarından düşer (Örn: /kasasil SACİD 50.000).</i>\n"
+            "• <code>/odeme [Grup] [Tutar]</code> : <i>Yapılan ödemeyi işler (Örn: /odeme SACİD 100.000).</i>\n"
+            "• <code>/odemesil [Grup] [Tutar]</code> : <i>Ödenen tutardan düşer.</i>\n"
+            "• <code>/devir [Grup] [Tutar]</code> : <i>Cari satırına devir/borç ekler (Örn: /devir TİGER 250.000).</i>\n"
+            "• <code>/devirsil [Grup] [Tutar]</code> : <i>Devir tutarından düşer.</i>\n"
+            "• <code>/toplu</code> : ⚡ <i>Çoklu hızlı işlem: Birden fazla kasa, ödeme, masraf hareketini tek mesajda işler.</i>\n"
+            "• <code>/gerial</code> : <i>En son yapılan hatalı işlemi hafızadan geri alır.</i>\n"
+            "• <code>/not [Metin]</code> : <i>Şirket hafızasına kalıcı not ekler (Örn: /not SACİD saat 18:00'de ödeme yapacak).</i>\n"
+            "• <code>/notlar</code> : <i>Kaydedilmiş son şirket notlarını listeler.</i>"
         )
     elif kategori == "masraf":
         return (
             "📉 <b>MASRAF VE GİDER YÖNETİMİ</b>\n"
             "━━━━━━━━━━━━━━━\n\n"
-            "• <code>/masrafekle [Kalem] [Tutar]</code>\n"
-            "  └ <i>Excel'deki ilk boş satıra yeni masraf kalemi olarak işler.</i>\n"
-            "  └ <i>Örnek:</i> <code>/masrafekle Yemek 1.250,50</code>\n"
-            "  └ <i>Örnek:</i> <code>/masrafekle ABI 500.000</code>\n\n"
-            "• <code>/masrafsil [Kalem] [Tutar]</code>\n"
-            "  └ <i>İlgili masrafı son eklenen satırdan siler veya tutarını düşer.</i>\n"
-            "  └ <i>Örnek:</i> <code>/masrafsil Yemek 250</code>\n\n"
-            "• <code>/masraf</code> veya <code>/gider</code>\n"
-            "  └ <i>Günün tüm masraf kalemlerini ve toplam gider bilançosunu listeler.</i>"
+            "• <code>/masrafekle [Kalem] [Tutar]</code> : <i>Excel'deki ilk boş satıra yeni masraf kalemi olarak işler.</i>\n"
+            "• <code>/masrafsil [Kalem] [Tutar]</code> : <i>İlgili masrafı siler veya tutarını düşer.</i>\n"
+            "• <code>/masraf</code> veya <code>/gider</code> : <i>Günün tüm masraf kalemlerini ve toplam gider bilançosunu listeler.</i>"
         )
     elif kategori == "grup":
         return (
             "👥 <b>GRUP VE CARİ EŞLEŞTİRME</b>\n"
             "━━━━━━━━━━━━━━━━\n\n"
-            "• <code>/grupbagla [Grup Adı]</code>\n"
-            "  └ <i>Bu Telegram grubunu Excel'deki cari satırına bağlar (Grupta bir kez çalıştırılır).</i>\n"
-            "  └ <i>Örnek:</i> <code>/grupbagla SACİD</code>\n\n"
-            "• <code>/grupkopar</code>\n"
-            "  └ <i>İçinde bulunulan grubun Excel eşleştirmesini kaldırır.</i>\n\n"
-            "• <code>/gruplar</code>\n"
-            "  └ <i>Hangi Telegram grubunun hangi Excel carisine bağlı olduğunu listeler.</i>"
+            "• <code>/grupbagla [Grup Adı]</code> : <i>Bu Telegram grubunu Excel'deki cari satırına bağlar.</i>\n"
+            "• <code>/grupkopar</code> : <i>İçinde bulunulan grubun Excel eşleştirmesini kaldırır.</i>\n"
+            "• <code>/gruplar</code> : <i>Hangi Telegram grubunun hangi Excel carisine bağlı olduğunu listeler.</i>"
         )
     elif kategori == "rapor":
         return (
             "📊 <b>GÜNLÜK DÖNGÜ VE RAPORLAR</b>\n"
             "━━━━━━━━━━━━━━━\n\n"
-            "• <code>/hedef</code> veya <code>/kpi</code>\n"
-            "  └ <i>🎯 Canlı ciro hedefi doluluk oranı, ilerleme çubuğu ve kalan tutar.</i>\n\n"
-            "• <code>/trend</code> veya <code>/haftalik</code>\n"
-            "  └ <i>📈 Son 7 günün konsolide bilançosu, büyüme trendi ve en yüksek hacimli carileri.</i>\n\n"
-            "• <code>/dashboard</code>\n"
-            "  └ <i>📱 Sohbet içi görsel canlı finans ve cari dashboard kartı.</i>\n\n"
-            "• <code>/bakiye</code> veya <code>/sirala</code>\n"
-            "  └ <i>⚖️ Konsolide risk ve bakiye sıralaması: Borçlu carileri ve en yüksek pozitif kasaları tek ekranda listeler.</i>\n\n"
-            "• <code>/borclular</code> veya <code>/borc</code>\n"
-            "  └ <i>🚨 Yalnızca eksi bakiyedeki / şirkete borçlu riskli carileri listeler.</i>\n\n"
-            "• <code>/alacaklar</code>\n"
-            "  └ <i>💰 Pozitif emanet kasası olan carileri büyükten küçüğe sıralar.</i>\n\n"
-            "• <code>/ozet</code>\n"
-            "  └ <i>Toplam devir, kasa, ödeme, komisyon ve net kalan anlık şirket bilançosu.</i>\n\n"
-            "• <code>/rapor</code>\n"
-            "  └ <i>Tüm aktif grupların ayrıntılı döküm raporunu verir.</i>\n\n"
-            "• <code>/tarih [GG.AA.YYYY] [Cari (Opsiyonel)]</code>\n"
-            "  └ <i>📅 Geçmiş herhangi bir günün genel bilançosunu veya o tarihteki cari fişini döker.</i>\n\n"
-            "• <code>/ekstre [Cari] [Gün]</code>\n"
-            "  └ <i>Carinin son 5 günlük Devir, Kasa, Ödeme ve Kalan hesap ekstresini döker.</i>\n\n"
-            "• <code>/yenigun</code>\n"
-            "  └ <i>🌅 Gün sonu devir işlemi: Dünün net kalan kasasını yeni günün devrine aktarır, güncel kasa ve ödemeleri sıfırlayarak yeni sayfa açar.</i>\n\n"
-            "• <code>/kapanis</code>\n"
-            "  └ <i>🌙 Kurucuya özel gün sonu kapanış bilançosu.</i>"
+            "• <code>/hedef</code> veya <code>/kpi</code> : 🎯 <i>Canlı ciro hedefi doluluk oranı, ilerleme çubuğu ve kalan tutar.</i>\n"
+            "• <code>/trend</code> veya <code>/haftalik</code> : 📈 <i>Son 7 günün konsolide bilançosu, büyüme trendi ve en aktif carileri.</i>\n"
+            "• <code>/dashboard</code> : 📱 <i>Sohbet içi görsel canlı finans ve cari dashboard kartı.</i>\n"
+            "• <code>/bakiye</code> veya <code>/sirala</code> : ⚖️ <i>Konsolide risk ve bakiye sıralaması.</i>\n"
+            "• <code>/borclular</code> veya <code>/borc</code> : 🚨 <i>Yalnızca eksi bakiyedeki / şirkete borçlu riskli carileri listeler.</i>\n"
+            "• <code>/alacaklar</code> : 💰 <i>Pozitif emanet kasası olan carileri büyükten küçüğe sıralar.</i>\n"
+            "• <code>/ozet</code> : <i>Toplam devir, kasa, ödeme, komisyon ve net kalan şirket bilançosu.</i>\n"
+            "• <code>/rapor</code> : <i>Tüm aktif grupların ayrıntılı döküm raporunu verir.</i>\n"
+            "• <code>/tarih [GG.AA.YYYY]</code> : 📅 <i>Geçmiş günün genel bilançosunu veya cari fişini döker.</i>\n"
+            "• <code>/ekstre [Cari] [Gün]</code> : <i>Carinin son 5 günlük Devir, Kasa, Ödeme ve Kalan hesap ekstresini döker.</i>\n"
+            "• <code>/yenigun</code> : 🌅 <i>Gün sonu devir işlemi: Dünün net kalan kasasını yeni günün devrine aktarır.</i>\n"
+            "• <code>/kapanis</code> : 🌙 <i>Kurucuya özel gün sonu kapanış bilançosu.</i>"
         )
     elif kategori == "kripto":
         return (
             "🪙 <b>KRİPTO, KUR VE FİNANS ARAÇLARI</b>\n"
             "━━━━━━━━━━━━━━━\n\n"
-            "• <code>/kur</code>\n"
-            "  └ <i>Binance, Paribu, BtcTurk, WhiteBIT canlı USDT/TRY ve Kapalıçarşı Harem kurları.</i>\n\n"
-            "• <code>/kurfark</code> veya <code>/makas</code>\n"
-            "  └ <i>🔄 Kapalıçarşı Harem Doları ile 5 büyük borsa (Binance, Paribu, BtcTurk, WhiteBIT, OKX) anlık makas ve arbitraj kar sıralaması.</i>\n\n"
-            "• <code>/arbitraj [Tutar]</code>\n"
-            "  └ <i>⚡ Kapalıçarşı Doları vs Kripto Borsa USDT canlı makas ve arbitraj analizi.</i>\n\n"
-            "• <code>/doviz [Tutar] [Birim]</code>\n"
-            "  └ <i>💱 Çoklu döviz/kripto çevirici (USD, EUR, USDT, TL anlık dönüşümü).</i>\n\n"
-            "• <code>/portfoy</code>\n"
-            "  └ <i>💼 Şirket konsolide hazine ve portföy bilançosu (TL, USD, EUR, USDT).</i>\n\n"
-            "• <code>/canlikur</code>\n"
-            "  └ <i>Dünya para birimleri (USD, EUR, GBP) ve global piyasa kurları.</i>\n\n"
-            "• <code>/hesap [Grup] [Kom%] [Kur]</code>\n"
-            "  └ <i>Tether / Komisyon hesap makinesi (Örn: /hesap SACİD 2 48.00).</i>\n\n"
-            "• <code>/iban</code>\n"
-            "  └ <i>Kullanımdaki ve boşta olan şirket İBAN'larını listeler.</i>\n\n"
-            "• <code>/sablon [Hesap]</code> (veya <code>/[Hesap Adı]</code>)\n"
-            "  └ <i>📋 Excel resmi ödeme şablonunu çeker ve grupta otomatik tahsis eder (Örn: /HSY EMLAK 3).</i>\n\n"
-            "• <code>/ibantahsis [Hesap] [Cari]</code>\n"
-            "  └ <i>İBAN'ı cariye tahsis edip 'Kullanımda' yapar (Örn: /ibantahsis CYL1 SACİD).</i>\n\n"
-            "• <code>/ibanbosalt [Hesap]</code>\n"
-            "  └ <i>İBAN'ı boşa çıkarır ve 'Müsait' yapar (Örn: /ibanbosalt CYL1).</i>\n\n"
-            "• <code>/ibancoz [İBAN]</code>\n"
-            "  └ <i>İBAN'ı doğrular (MOD-97), bankasını bulur ve temiz kopyalama formatı üretir.</i>\n\n"
-            "• <code>/t [Cüzdan Adresi]</code>\n"
-            "  └ <i>🏛️ TRC-20 canlı blokzincir USDT rezervini ve TL karşılığını raporlar (Sadece Kurucu).</i>\n\n"
-            "• <code>/qr [Cüzdan Adresi]</code>\n"
-            "  └ <i>⚡ Hızlı ödeme QR kodu üretir ve borsa/istihbarat analizi yapar.</i>"
+            "• <code>/kur</code> : <i>Binance, Paribu, BtcTurk, WhiteBIT canlı USDT/TRY ve Kapalıçarşı Harem kurları.</i>\n"
+            "• <code>/kurfark</code> veya <code>/makas</code> : 🔄 <i>Kapalıçarşı Harem Doları ile 5 büyük borsa anlık makas ve kar sıralaması.</i>\n"
+            "• <code>/arbitraj [Tutar]</code> : ⚡ <i>Kapalıçarşı Doları vs Kripto Borsa USDT canlı makas ve arbitraj analizi.</i>\n"
+            "• <code>/doviz [Tutar] [Birim]</code> : 💱 <i>Çoklu döviz/kripto çevirici (USD, EUR, USDT, TL anlık dönüşümü).</i>\n"
+            "• <code>/portfoy</code> : 💼 <i>Şirket konsolide hazine ve portföy bilançosu (TL, USD, EUR, USDT).</i>\n"
+            "• <code>/canlikur</code> : <i>Dünya para birimleri (USD, EUR, GBP) ve global piyasa kurları.</i>\n"
+            "• <code>/hesap [Grup] [Kom%] [Kur]</code> : <i>Tether / Komisyon hesap makinesi.</i>\n"
+            "• <code>/iban</code> : <i>Kullanımdaki ve boşta olan şirket İBAN'larını listeler.</i>\n"
+            "• <code>/hesaplar</code> veya <code>/grupiban</code> : 📋 <i>Gruba bağlı tüm aktif İBAN'ları listeler ve butonla silme imkanı sunar.</i>\n"
+            "• <code>/sablon [Hesap]</code> : 📋 <i>Excel resmi ödeme şablonunu çeker ve grupta otomatik tahsis eder.</i>\n"
+            "• <code>/ibantahsis [Hesap] [Cari]</code> : <i>İBAN'ı cariye tahsis edip 'Kullanımda' yapar.</i>\n"
+            "• <code>/ibanbosalt [Hesap]</code> : <i>İBAN'ı boşa çıkarır ve 'Müsait' yapar.</i>\n"
+            "• <code>/ibancoz [İBAN]</code> : <i>İBAN'ı doğrular (MOD-97), bankasını bulur ve temiz format üretir.</i>\n"
+            "• <code>/t [Cüzdan]</code> : 🏛️ <i>Canlı TRC-20 rezerv ve TL karşılığı (Sadece Kurucu).</i>\n"
+            "• <code>/qr [Cüzdan]</code> : ⚡ <i>Hızlı ödeme QR kodu üretir ve borsa analizi yapar.</i>"
         )
     elif kategori == "admin":
         return (
             "🛡️ <b>YÖNETİCİ KONTROLLERİ</b>\n"
             "━━━━━━━━━━━━━━━\n\n"
-            "• <code>/adminler</code>\n"
-            "  └ <i>Sistemde yetkilendirilmiş şirket yöneticilerini listeler.</i>\n\n"
-            "• <code>/adminekle [Telegram ID] [İsim]</code>\n"
-            "  └ <i>Botu kullanabilmesi için yeni bir yönetici yetkilendirir (Sadece Kurucu).</i>\n\n"
-            "• <code>/adminsil [Telegram ID]</code>\n"
-            "  └ <i>Yöneticinin bot yetkisini geri alır.</i>\n\n"
-            "• <code>/kapanis</code>\n"
-            "  └ <i>🌙 Gün sonu kapanış bilançosunu anında özelinize gönderir (Sadece Kurucu).</i>\n\n"
-            "• <code>/kapanissaati [SS:DD]</code>\n"
-            "  └ <i>Otomatik gün sonu bildirim saatini ayarlar (Örn: /kapanissaati 23:00).</i>\n\n"
-            "• <code>/panel</code>\n"
-            "  └ <i>Canlı CFO Web Dashboard bağlantı linkini verir.</i>\n\n"
-            "• <code>/dashboard</code>\n"
-            "  └ <i>Sohbet içi görsel canlı finans dashboard kartı döker.</i>\n\n"
-            "• <code>/not [Metin]</code>\n"
-            "  └ <i>Şirket hafızasına kalıcı not ekler.</i>\n\n"
-            "• <code>/notlar</code>\n"
-            "  └ <i>Şirket hafızasındaki son notları listeler.</i>\n\n"
-            "• <code>/debug</code>\n"
-            "  └ <i>Sistemi test eder, gecikmeyi (ping) ölçer, önbelleği ve performansı optimize eder.</i>\n\n"
-            "• <code>/id</code>\n"
-            "  └ <i>Kendi Telegram kullanıcı ID numaranızı görüntüler.</i>"
+            "• <code>/adminler</code> : <i>Sistemde yetkilendirilmiş şirket yöneticilerini listeler.</i>\n"
+            "• <code>/adminekle [ID] [İsim]</code> : <i>Yeni yönetici yetkilendirir (Sadece Kurucu).</i>\n"
+            "• <code>/adminsil [ID]</code> : <i>Yöneticinin bot yetkisini geri alır.</i>\n"
+            "• <code>/kapanis</code> : 🌙 <i>Gün sonu kapanış bilançosunu anında özelinize gönderir (Sadece Kurucu).</i>\n"
+            "• <code>/kapanissaati [SS:DD]</code> : <i>Otomatik gün sonu bildirim saatini ayarlar (Örn: /kapanissaati 23:00).</i>\n"
+            "• <code>/panel</code> : <i>Canlı CFO Web Dashboard bağlantı linkini verir.</i>\n"
+            "• <code>/dashboard</code> : <i>Sohbet içi görsel canlı finans dashboard kartı döker.</i>\n"
+            "• <code>/not [Metin]</code> : <i>Şirket hafızasına kalıcı not ekler.</i>\n"
+            "• <code>/notlar</code> : <i>Şirket hafızasındaki son notları listeler.</i>\n"
+            "• <code>/debug</code> : <i>Sistemi test eder, gecikmeyi (ping) ölçer, performansı optimize eder.</i>\n"
+            "• <code>/id</code> : <i>Kendi Telegram kullanıcı ID numaranızı görüntüler.</i>"
         )
     else:  # "tumu"
         return (
@@ -940,6 +879,7 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/portfoy</code> : Şirket konsolide hazine ve portföy bilançosu.\n"
             "• <code>/hesap [Grup] [Kom%] [Kur]</code> : Tether hesap makinesi.\n"
             "• <code>/iban</code> : Şirket İBAN listesi.\n"
+            "• <code>/hesaplar</code> : 📋 Gruba bağlı aktif İBAN'ları listeler ve butonla siler.\n"
             "• <code>/sablon [Hesap]</code> : Excel ödeme şablonunu çeker ve grupta otomatik tahsis eder.\n"
             "• <code>/ibantahsis [Hesap] [Cari]</code> : İBAN'ı cariye tahsis eder.\n"
             "• <code>/ibanbosalt [Hesap]</code> : İBAN'ı boşa çıkarır.\n"
@@ -1245,39 +1185,21 @@ def tumGruplarRaporu_impl() -> str:
     return mesaj
 
 def bakiye_risk_raporu_uret(filtre_turu: str = "tumu") -> Tuple[str, dict]:
-    """
-    Tüm aktif carileri analiz eder; borçlu (negatif bakiye) olanları risk sırasına göre,
-    pozitif bakiyesi olanları en yüksekten en düşüğe sıralar.
-    Filtre türleri: 'borclular', 'pozitif', 'tumu'
-    """
     sh = get_spreadsheet()
     sayfa = get_active_daily_sheet(sh)
     veriler = get_sheet_values_fast(sayfa)
     finans = tablodan_finans_ozeti_hesapla(veriler)
     saat = suankiZamaniAl().strftime("%H:%M")
     
-    aktif_cariler = finans.get("aktif_gruplar", [])
-    
-    borclular = [g for g in aktif_cariler if g["kalan"] < -0.001]
-    borclular.sort(key=lambda x: x["kalan"])  # En çok eksi olan en başta
-    
-    pozitifler = [g for g in aktif_cariler if g["kalan"] > 0.001]
-    pozitifler.sort(key=lambda x: x["kalan"], reverse=True)  # En yüksek pozitif en başta
-    
-    sifirlar = [g for g in aktif_cariler if abs(g["kalan"]) <= 0.001]
-    
-    toplam_borc = sum(g["kalan"] for g in borclular)  # negatif toplam
-    toplam_pozitif = sum(g["kalan"] for g in pozitifler)
-    net_kasa = toplam_pozitif + toplam_borc
-    
     klavye = {
         "inline_keyboard": [
             [
-                {"text": "🚨 Sadece Borçlular", "callback_data": "risk_borclular"},
-                {"text": "💰 Pozitif Bakiyeler", "callback_data": "risk_pozitif"}
+                {"text": "🚨 Borçlular", "callback_data": "risk_borclular"},
+                {"text": "💰 Pozitifler", "callback_data": "risk_pozitif"},
+                {"text": "⚖️ Tümü", "callback_data": "risk_tumu"}
             ],
             [
-                {"text": "📊 Genel Risk Tablosu", "callback_data": "risk_tumu"},
+                {"text": "🖥️ CFO Dashboard", "callback_data": "cfo_dashboard"},
                 {"text": "🔄 Yenile", "callback_data": f"risk_{filtre_turu}"}
             ],
             [
@@ -1286,22 +1208,26 @@ def bakiye_risk_raporu_uret(filtre_turu: str = "tumu") -> Tuple[str, dict]:
         ]
     }
     
-    if not aktif_cariler:
-        return (
-            f"⚖️ <b>RİSK & BAKİYE SIRALAMASI</b>\n"
-            f"━━━━━━━━━━━━━━━\n"
-            f"📅 Tarih: {sayfa.title} | ⏰ Saat: <code>{saat}</code>\n\n"
-            f"📭 <b>Bugün için henüz işlem görmüş aktif bir cari/grup bulunmuyor.</b>",
-            klavye
-        )
+    aktif_cariler = finans.get("aktif_gruplar", [])
+    borclular = [g for g in aktif_cariler if g["kalan"] < -0.001]
+    borclular.sort(key=lambda x: x["kalan"])  # en çok borçlu olan en başta
     
-    if filtre_turu in ["borclular", "borc"]:
+    pozitifler = [g for g in aktif_cariler if g["kalan"] > 0.001]
+    pozitifler.sort(key=lambda x: x["kalan"], reverse=True)  # en yüksek pozitif en başta
+    
+    sifirlar = [g for g in aktif_cariler if abs(g["kalan"]) <= 0.001]
+    
+    toplam_borc = sum(g["kalan"] for g in borclular)
+    toplam_pozitif = sum(g["kalan"] for g in pozitifler)
+    net_kasa = finans.get("kalan", 0.0)
+
+    if filtre_turu in ["borclular", "borc", "risk"]:
         mesaj = (
             f"🚨 <b>RİSK & BORÇLU CARİLER LİSTESİ</b>\n"
-            f"━━━━━━━━━━━━━━━━\n"
+            f"━━━━━━━━━━\n"
             f"📅 Tarih: {sayfa.title} | ⏰ Saat: <code>{saat}</code>\n"
-            f"⚠️ <b>Borçlu / Eksi Bakiye Sayısı:</b> <code>{len(borclular)} Cari</code>\n"
-            f"━━━━━━━━━━━━━━━━\n\n"
+            f"👥 <b>Borçlu Cari Sayısı:</b> <code>{len(borclular)} Cari</code>\n"
+            f"━━━━━━━━━━\n\n"
         )
         if not borclular:
             mesaj += "🟢 <b>Harika!</b> Şu anda eksi bakiyede / şirkete borçlu durumda hiçbir cari bulunmuyor.\n\n"
@@ -1310,9 +1236,9 @@ def bakiye_risk_raporu_uret(filtre_turu: str = "tumu") -> Tuple[str, dict]:
                 emoji = grupEmojisiBul(g["ad"])
                 mesaj += (
                     f"🔴 <b>{idx}. {emoji} {g['ad'].upper()}</b>\n"
-                    f"├ 🔄 Devir: {paraFormatla(g['devir'])} | 💰 Kasa: {paraFormatla(g['kasa'])}\n"
-                    f"├ 💸 Ödenen: {paraFormatla(g['odenen'])}\n"
-                    f"└ 🚨 <b>Kalan Risk/Borç: {paraFormatla(g['kalan'])}</b>\n\n"
+                    f"• 🔄 Devir: {paraFormatla(g['devir'])} | 💰 Kasa: {paraFormatla(g['kasa'])}\n"
+                    f"• 💸 Ödenen: {paraFormatla(g['odenen'])}\n"
+                    f"• 🚨 <b>Kalan Risk/Borç: {paraFormatla(g['kalan'])}</b>\n\n"
                 )
             mesaj += (
                 f"━━━━━━━━━━━━━━━\n"
@@ -1339,8 +1265,8 @@ def bakiye_risk_raporu_uret(filtre_turu: str = "tumu") -> Tuple[str, dict]:
                 madalya = madalyalar.get(idx, f"<b>{idx}.</b>")
                 mesaj += (
                     f"{madalya} {emoji} <b>{g['ad'].upper()}</b>\n"
-                    f"├ 💰 Kasa: {paraFormatla(g['kasa'])} | 💸 Ödenen: {paraFormatla(g['odenen'])}\n"
-                    f"└ 🏦 <b>Kalan Bakiye: {paraFormatla(g['kalan'])}</b>\n\n"
+                    f"• 💰 Kasa: {paraFormatla(g['kasa'])} | 💸 Ödenen: {paraFormatla(g['odenen'])}\n"
+                    f"• 🏦 <b>Kalan Bakiye: {paraFormatla(g['kalan'])}</b>\n\n"
                 )
             mesaj += (
                 f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -1364,8 +1290,8 @@ def bakiye_risk_raporu_uret(filtre_turu: str = "tumu") -> Tuple[str, dict]:
             mesaj += f"🚨 <b>RİSK & BORÇLU CARİLER ({len(borclular)} Adet)</b>\n"
             for idx, g in enumerate(borclular, 1):
                 emoji = grupEmojisiBul(g["ad"])
-                mesaj += f"├ 🔴 {idx}. {emoji} <b>{g['ad'].upper()}:</b> <code>{paraFormatla(g['kalan'])}</code>\n"
-            mesaj += f"└ ⚠️ <b>Toplam Risk:</b> <code>{paraFormatla(toplam_borc)}</code>\n\n"
+                mesaj += f"• 🔴 {idx}. {emoji} <b>{g['ad'].upper()}:</b> <code>{paraFormatla(g['kalan'])}</code>\n"
+            mesaj += f"• ⚠️ <b>Toplam Risk:</b> <code>{paraFormatla(toplam_borc)}</code>\n\n"
         else:
             mesaj += "🟢 <b>Risk Masası:</b> Eksi bakiyede cari bulunmuyor.\n\n"
             
@@ -1376,10 +1302,10 @@ def bakiye_risk_raporu_uret(filtre_turu: str = "tumu") -> Tuple[str, dict]:
             for idx, g in enumerate(pozitifler[:10], 1):
                 emoji = grupEmojisiBul(g["ad"])
                 madalya = madalyalar.get(idx, f"{idx}.")
-                mesaj += f"├ {madalya} {emoji} <b>{g['ad'].upper()}:</b> <b>{paraFormatla(g['kalan'])}</b>\n"
+                mesaj += f"• {madalya} {emoji} <b>{g['ad'].upper()}:</b> <b>{paraFormatla(g['kalan'])}</b>\n"
             if len(pozitifler) > 10:
-                mesaj += f"├ <i>... ve {len(pozitifler) - 10} cari daha</i>\n"
-            mesaj += f"└ 💎 <b>Toplam Pozitif Kasa:</b> <code>{paraFormatla(toplam_pozitif)}</code>\n\n"
+                mesaj += f"• <i>... ve {len(pozitifler) - 10} cari daha</i>\n"
+            mesaj += f"• 💎 <b>Toplam Pozitif Kasa:</b> <code>{paraFormatla(toplam_pozitif)}</code>\n\n"
             
         # 3. Kapanmış / Sıfır Bakiyeliler
         if sifirlar:
@@ -1391,9 +1317,9 @@ def bakiye_risk_raporu_uret(filtre_turu: str = "tumu") -> Tuple[str, dict]:
         mesaj += (
             f"━━━━━━━━━━━━\n"
             f"📊 <b>KONSOLİDE NET DURUM:</b>\n"
-            f"├ 💎 Toplam Pozitif Kasa: <b>{paraFormatla(toplam_pozitif)}</b>\n"
-            f"├ 🚨 Toplam Borç/Açık: <b>{paraFormatla(toplam_borc)}</b>\n"
-            f"└ 🏦 <b>NET KALAN KASA: {paraFormatla(net_kasa)}</b>\n"
+            f"• 💎 Toplam Pozitif Kasa: <b>{paraFormatla(toplam_pozitif)}</b>\n"
+            f"• 🚨 Toplam Borç/Açık: <b>{paraFormatla(toplam_borc)}</b>\n"
+            f"• 🏦 <b>NET KALAN KASA: {paraFormatla(net_kasa)}</b>\n"
             f"━━━━━━━━━━━━\n"
             f"💡 <i>Detaylı filtreler için aşağıdaki butonları kullanabilirsiniz.</i>"
         )
@@ -1437,20 +1363,20 @@ def cfo_dashboard_raporu_uret() -> Tuple[str, dict]:
             
         dashboard_metni += (
             f"👤 {emoji} <b>{g['ad'].upper()}</b> ({durum_tag})\n"
-            f"├ 🔄 Devir: <code>{paraFormatla(g['devir'])}</code>\n"
-            f"├ 💰 Kasa: <code>+{paraFormatla(g['kasa'])}</code>\n"
-            f"├ 💸 Ödenen: <code>-{paraFormatla(g['odenen'])}</code>\n"
-            f"├ ✂️ Komisyon: <code>{paraFormatla(g['komisyon'])}</code>\n"
-            f"└ 🏦 <b>Kalan: <code>{paraFormatla(g['kalan'])}</code></b>\n\n"
+            f"• 🔄 Devir: <code>{paraFormatla(g['devir'])}</code>\n"
+            f"• 💰 Kasa: <code>+{paraFormatla(g['kasa'])}</code>\n"
+            f"• 💸 Ödenen: <code>-{paraFormatla(g['odenen'])}</code>\n"
+            f"• ✂️ Komisyon: <code>{paraFormatla(g['komisyon'])}</code>\n"
+            f"• 🏦 <b>Kalan: <code>{paraFormatla(g['kalan'])}</code></b>\n\n"
         )
         
     dashboard_metni += (
         f"━━━━━━━━━━━\n"
         f"🏆 <b>KONSOLİDE GENEL TOPLAM BİLANÇO</b>\n"
-        f"├ 🔄 <b>Toplam Devir:</b> <code>{paraFormatla(finans['devir'])}</code>\n"
-        f"├ 💰 <b>Toplam Eklenen Kasa:</b> <code>+{paraFormatla(finans['kasa'])}</code>\n"
-        f"├ 💸 <b>Toplam Yapılan Ödeme:</b> <code>-{paraFormatla(finans['odenen'])}</code>\n"
-        f"├ ✂️ <b>Toplam Komisyon:</b> <code>{paraFormatla(finans['komisyon'])}</code>\n"
+        f"• 🔄 <b>Toplam Devir:</b> <code>{paraFormatla(finans['devir'])}</code>\n"
+        f"• 💰 <b>Toplam Eklenen Kasa:</b> <code>+{paraFormatla(finans['kasa'])}</code>\n"
+        f"• 💸 <b>Toplam Yapılan Ödeme:</b> <code>-{paraFormatla(finans['odenen'])}</code>\n"
+        f"• ✂️ <b>Toplam Komisyon:</b> <code>{paraFormatla(finans['komisyon'])}</code>\n"
         f"━━━━━━━━━━━\n"
         f"🏦 <b>GÜNCEL NET KALAN KASA: {paraFormatla(finans['kalan'])}</b>\n"
         f"━━━━━━━━━━━"
@@ -1570,7 +1496,7 @@ def gun_sonu_kapanis_raporu_uret() -> str:
                     detay_parts.append(f"💰 Kasa: +{paraFormatla(g['kasa'])}")
                 if has_odenen:
                     detay_parts.append(f"💸 Ödeme: -{paraFormatla(g['odenen'])}")
-                rapor += f"   └ <i>({' | '.join(detay_parts)})</i>\n"
+                rapor += f"   • <i>({' | '.join(detay_parts)})</i>\n"
         rapor += "\n"
         
     if masraflar:
@@ -1892,26 +1818,26 @@ def arbitraj_raporu_uret_impl(komut_metni: str = "") -> str:
         f"━━━━━━━━━━━━━\n"
         f"⏰ Saat: <code>{saat}</code> | 💵 Hacim Bazı: <b>{hacim_str}</b>\n\n"
         f"🏛️ <b>PİYASA KURLARI:</b>\n"
-        f"├ 🏛️ Kapalıçarşı USD: Alış <code>{f_tl(h_alis)}</code> | Satış <code>{f_tl(h_satis)}</code>\n"
+        f"• 🏛️ Kapalıçarşı USD: Alış <code>{f_tl(h_alis)}</code> | Satış <code>{f_tl(h_satis)}</code>\n"
     )
     for b_isim, b_fiyat in borsa_fiyatlari.items():
-        mesaj += f"├ 🪙 {b_isim} USDT: <code>{f_tl(b_fiyat)}</code>\n"
+        mesaj += f"• 🪙 {b_isim} USDT: <code>{f_tl(b_fiyat)}</code>\n"
         
     mesaj += (
         f"\n━━━━━━━━━\n"
         f"🔄 <b>ARBİTRAJ ROTALARI VE KÂR/ZARAR:</b>\n\n"
         f"<b>1️⃣ Rota: USDT Sat ({en_yuksek_borsa[0]}) ➔ Kapalıçarşı USD Al</b>\n"
-        f"├ 📈 Fiyat Makası: <b>%{rota1_yuzde:+.2f}</b>\n"
-        f"└ 💵 {hacim_str} Net Getiri: <b>{rota1_fark_usd:+,.2f} $</b> (<code>{paraFormatla(rota1_fark_tl)}</code>)\n\n"
+        f"• 📈 Fiyat Makası: <b>%{rota1_yuzde:+.2f}</b>\n"
+        f"• 💵 {hacim_str} Net Getiri: <b>{rota1_fark_usd:+,.2f} $</b> (<code>{paraFormatla(rota1_fark_tl)}</code>)\n\n"
         f"<b>2️⃣ Rota: Kapalıçarşı USD Boz ➔ Borsada USDT Al ({en_dusuk_borsa[0]})</b>\n"
-        f"├ 📈 Fiyat Makası: <b>%{rota2_yuzde:+.2f}</b>\n"
-        f"└ 💵 {hacim_str} Net Getiri: <b>{rota2_fark_usdt:+,.2f} USDT</b> (<code>{paraFormatla(rota2_fark_tl)}</code>)\n\n"
+        f"• 📈 Fiyat Makası: <b>%{rota2_yuzde:+.2f}</b>\n"
+        f"• 💵 {hacim_str} Net Getiri: <b>{rota2_fark_usdt:+,.2f} USDT</b> (<code>{paraFormatla(rota2_fark_tl)}</code>)\n\n"
     )
     
     if len(borsa_fiyatlari) > 1 and borsa_makas_yuzde > 0.05:
         mesaj += (
             f"⚡ <b>Borsalar Arası USDT Makası:</b>\n"
-            f"└ <b>{en_dusuk_borsa[0]} ➔ {en_yuksek_borsa[0]}:</b> %{borsa_makas_yuzde:.2f} ({f_tl(en_yuksek_borsa[1] - en_dusuk_borsa[1])})\n\n"
+            f"• <b>{en_dusuk_borsa[0]} ➔ {en_yuksek_borsa[0]}:</b> %{borsa_makas_yuzde:.2f} ({f_tl(en_yuksek_borsa[1] - en_dusuk_borsa[1])})\n\n"
         )
 
     mesaj += (
@@ -1979,12 +1905,12 @@ def doviz_cevirici_impl(komut_metni: str) -> str:
             f"⏰ <b>Saat:</b> {saat}\n"
             f"━━━━━━━━━━━\n\n"
             f"🇹🇷 <b>TÜRK LİRASI (Kapalıçarşı)</b>\n"
-            f"├ 💵 Bozdurursanız (Alış {f_tl(h_usd_alis)}): <b>{paraFormatla(tl_alis)}</b>\n"
-            f"└ 💵 Satın Alırsanız (Satış {f_tl(h_usd_satis)}): <b>{paraFormatla(tl_satis)}</b>\n\n"
+            f"• 💵 Bozdurursanız (Alış {f_tl(h_usd_alis)}): <b>{paraFormatla(tl_alis)}</b>\n"
+            f"• 💵 Satın Alırsanız (Satış {f_tl(h_usd_satis)}): <b>{paraFormatla(tl_satis)}</b>\n\n"
             f"🪙 <b>KRİPTO USDT (Binance: {f_tl(binance_usdt)})</b>\n"
-            f"└ <b>{usdt_karsilik:,.2f} USDT</b>\n\n"
+            f"• <b>{usdt_karsilik:,.2f} USDT</b>\n\n"
             f"🇪🇺 <b>EURO KARŞILIĞI (Parite: {eur_usd:.4f})</b>\n"
-            f"└ <b>{eur_karsilik:,.2f} EUR (€)</b>\n"
+            f"• <b>{eur_karsilik:,.2f} EUR (€)</b>\n"
             f"━━━━━━━━━━━"
         )
 
@@ -2001,12 +1927,12 @@ def doviz_cevirici_impl(komut_metni: str) -> str:
             f"⏰ <b>Saat:</b> {saat}\n"
             f"━━━━━━━━━\n\n"
             f"🇹🇷 <b>TÜRK LİRASI (Kapalıçarşı)</b>\n"
-            f"├ 💶 Bozdurursanız (Alış {f_tl(h_eur_alis)}): <b>{paraFormatla(tl_alis)}</b>\n"
-            f"└ 💶 Satın Alırsanız (Satış {f_tl(h_eur_satis)}): <b>{paraFormatla(tl_satis)}</b>\n\n"
+            f"• 💶 Bozdurursanız (Alış {f_tl(h_eur_alis)}): <b>{paraFormatla(tl_alis)}</b>\n"
+            f"• 💶 Satın Alırsanız (Satış {f_tl(h_eur_satis)}): <b>{paraFormatla(tl_satis)}</b>\n\n"
             f"🇺🇸 <b>DOLAR KARŞILIĞI (Parite: {eur_usd:.4f})</b>\n"
-            f"└ <b>{usd_karsilik:,.2f} USD ($)</b>\n\n"
+            f"• <b>{usd_karsilik:,.2f} USD ($)</b>\n\n"
             f"🪙 <b>KRİPTO USDT (Binance: {f_tl(binance_usdt)})</b>\n"
-            f"└ <b>{usdt_karsilik:,.2f} USDT</b>\n"
+            f"• <b>{usdt_karsilik:,.2f} USDT</b>\n"
             f"━━━━━━━━━━"
         )
 
@@ -2022,11 +1948,11 @@ def doviz_cevirici_impl(komut_metni: str) -> str:
             f"⏰ <b>Saat:</b> {saat}\n"
             f"━━━━━━━━━━\n\n"
             f"🇹🇷 <b>TÜRK LİRASI (Binance: {f_tl(binance_usdt)})</b>\n"
-            f"└ <b>{paraFormatla(tl_karsilik)}</b>\n\n"
+            f"• <b>{paraFormatla(tl_karsilik)}</b>\n\n"
             f"🇺🇸 <b>KAPALIÇARŞI NAKİT DOLAR (Satış: {f_tl(h_usd_satis)})</b>\n"
-            f"└ <b>{usd_kapalicarsi:,.2f} USD ($)</b>\n\n"
+            f"• <b>{usd_kapalicarsi:,.2f} USD ($)</b>\n\n"
             f"🇪🇺 <b>KAPALIÇARŞI EURO (Satış: {f_tl(h_eur_satis)})</b>\n"
-            f"└ <b>{eur_karsilik:,.2f} EUR (€)</b>\n"
+            f"• <b>{eur_karsilik:,.2f} EUR (€)</b>\n"
             f"━━━━━━━━━━"
         )
 
@@ -2042,11 +1968,11 @@ def doviz_cevirici_impl(komut_metni: str) -> str:
             f"⏰ <b>Saat:</b> {saat}\n"
             f"━━━━━━━━━━\n\n"
             f"🇺🇸 <b>KAPALIÇARŞI DOLAR (Satış {f_tl(h_usd_satis)})</b>\n"
-            f"└ Alınabilecek: <b>{usd_alis:,.2f} USD ($)</b>\n\n"
+            f"• Alınabilecek: <b>{usd_alis:,.2f} USD ($)</b>\n\n"
             f"🪙 <b>KRİPTO USDT (Binance {f_tl(binance_usdt)})</b>\n"
-            f"└ Alınabilecek: <b>{usdt_alis:,.2f} USDT</b>\n\n"
+            f"• Alınabilecek: <b>{usdt_alis:,.2f} USDT</b>\n\n"
             f"🇪🇺 <b>KAPALIÇARŞI EURO (Satış {f_tl(h_eur_satis)})</b>\n"
-            f"└ Alınabilecek: <b>{eur_alis:,.2f} EUR (€)</b>\n"
+            f"• Alınabilecek: <b>{eur_alis:,.2f} EUR (€)</b>\n"
             f"━━━━━━━━━━"
         )
 
@@ -2084,18 +2010,18 @@ def sirket_portfoy_raporu_impl() -> str:
         f"📅 Tarih: <b>{sayfa.title}</b> | ⏰ Saat: <code>{saat}</code>\n"
         f"━━━━━━━━━━\n\n"
         f"🏦 <b>MEVCUT VARLIKLAR:</b>\n"
-        f"├ 🇹🇷 Günlük Kalan TL Kasası: <b>{paraFormatla(kalan_tl)}</b>\n"
-        f"└ 🪙 TRC-20 USDT Rezervi: <b>{toplam_usdt_rezerv:,.2f} USDT</b>\n\n"
+        f"• 🇹🇷 Günlük Kalan TL Kasası: <b>{paraFormatla(kalan_tl)}</b>\n"
+        f"• 🪙 TRC-20 USDT Rezervi: <b>{toplam_usdt_rezerv:,.2f} USDT</b>\n\n"
         f"📊 <b>PİYASA KURLARI (Kapalıçarşı & Borsa):</b>\n"
-        f"├ 💵 USD/TRY (Harem Alış): <code>{f_tl(h_usd_alis)}</code>\n"
-        f"├ 💶 EUR/TRY (Harem Alış): <code>{f_tl(h_eur_alis)}</code>\n"
-        f"└ 🪙 USDT/TRY (Binance): <code>{f_tl(binance_usdt)}</code>\n\n"
+        f"• 💵 USD/TRY (Harem Alış): <code>{f_tl(h_usd_alis)}</code>\n"
+        f"• 💶 EUR/TRY (Harem Alış): <code>{f_tl(h_eur_alis)}</code>\n"
+        f"• 🪙 USDT/TRY (Binance): <code>{f_tl(binance_usdt)}</code>\n\n"
         f"━━━━━━━━━━\n"
         f"🏆 <b>KONSOLİDE TOPLAM ŞİRKET DEĞERİ:</b>\n"
-        f"├ 🇹🇷 <b>TOPLAM TL:</b> <code>{paraFormatla(toplam_net_tl)}</code>\n"
-        f"├ 🇺🇸 <b>TOPLAM USD:</b> <code>{toplam_usd:,.2f} $</code>\n"
-        f"├ 🪙 <b>TOPLAM USDT:</b> <code>{toplam_usdt:,.2f} USDT</code>\n"
-        f"└ 🇪🇺 <b>TOPLAM EUR:</b> <code>{toplam_eur:,.2f} €</code>\n"
+        f"• 🇹🇷 <b>TOPLAM TL:</b> <code>{paraFormatla(toplam_net_tl)}</code>\n"
+        f"• 🇺🇸 <b>TOPLAM USD:</b> <code>{toplam_usd:,.2f} $</code>\n"
+        f"• 🪙 <b>TOPLAM USDT:</b> <code>{toplam_usdt:,.2f} USDT</code>\n"
+        f"• 🇪🇺 <b>TOPLAM EUR:</b> <code>{toplam_eur:,.2f} €</code>\n"
         f"━━━━━━━━━\n"
         f"💡 <i>Tüm cari bakiyeler ve döviz varlıkları anlık konsolide edilmiştir.</i>"
     )
@@ -2140,9 +2066,9 @@ def hedef_kpi_raporu_uret(yeni_hedef_str: str = None) -> str:
         f"{durum_emoji} <b>HEDEF DOLULUK ORANI:</b>\n"
         f"<code>[{p_bar}] %{yuzde:.1f}</code>\n\n"
         f"📊 <b>GÜNÜN FİNANSAL HACMİ:</b>\n"
-        f"├ 💰 Eklenen Kasa: <code>+{paraFormatla(islenen_kasa)}</code>\n"
-        f"├ 💸 Yapılan Ödemeler: <code>-{paraFormatla(islenen_odeme)}</code>\n"
-        f"└ ⚡ <b>Toplam İşlenen Hacim: <code>{paraFormatla(toplam_hacim)}</code></b>\n"
+        f"• 💰 Eklenen Kasa: <code>+{paraFormatla(islenen_kasa)}</code>\n"
+        f"• 💸 Yapılan Ödemeler: <code>-{paraFormatla(islenen_odeme)}</code>\n"
+        f"• ⚡ <b>Toplam İşlenen Hacim: <code>{paraFormatla(toplam_hacim)}</code></b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
     )
     
@@ -2221,10 +2147,10 @@ def haftalik_trend_raporu_uret(gun_sayisi: int = 7) -> str:
         f"🗓️ <b>Dönem:</b> <code>{baslangic_tarihi} - {bitis_tarihi}</code> ({len(secilen_gunler)} Gün)\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n"
         f"📊 <b>KONSOLİDE DÖNEM BİLANÇOSU:</b>\n"
-        f"├ 💰 Toplam Giriş (Kasa): <code>+{paraFormatla(toplam_haftalik_kasa)}</code>\n"
-        f"├ 💸 Toplam Çıkış (Ödeme): <code>-{paraFormatla(toplam_haftalik_odenen)}</code>\n"
-        f"├ ✂️ Toplam Komisyon: <code>{paraFormatla(toplam_haftalik_komisyon)}</code>\n"
-        f"├ 📉 Toplam Masraf & Gider: <code>{paraFormatla(toplam_haftalik_masraf)}</code>\n"
+        f"• 💰 Toplam Giriş (Kasa): <code>+{paraFormatla(toplam_haftalik_kasa)}</code>\n"
+        f"• 💸 Toplam Çıkış (Ödeme): <code>-{paraFormatla(toplam_haftalik_odenen)}</code>\n"
+        f"• ✂️ Toplam Komisyon: <code>{paraFormatla(toplam_haftalik_komisyon)}</code>\n"
+        f"• 📉 Toplam Masraf & Gider: <code>{paraFormatla(toplam_haftalik_masraf)}</code>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"⚡ <b>TOPLAM İŞLEM HACMİ: {paraFormatla(toplam_haftalik_hacim)}</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n\n"
@@ -2237,13 +2163,13 @@ def haftalik_trend_raporu_uret(gun_sayisi: int = 7) -> str:
             pay = (hacim / toplam_haftalik_hacim * 100.0) if toplam_haftalik_hacim > 0 else 0.0
             emoji = grupEmojisiBul(ad)
             m_simge = madalyalar[idx] if idx < len(madalyalar) else "🔹"
-            yanit += f"├ {m_simge} {emoji} <b>{ad}:</b> <code>{paraFormatla(hacim)}</code> <i>(%{pay:.1f} Pay)</i>\n"
+            yanit += f"• {m_simge} {emoji} <b>{ad}:</b> <code>{paraFormatla(hacim)}</code> <i>(%{pay:.1f} Pay)</i>\n"
         yanit += "\n"
         
     gunluk_ort = toplam_haftalik_hacim / len(secilen_gunler) if secilen_gunler else 0.0
     yanit += (
         f"💡 <b>YÖNETİCİ ÖZETİ:</b>\n"
-        f"└ 📅 Günlük Ortalama Hacim: <b>{paraFormatla(gunluk_ort)}</b>\n"
+        f"• 📅 Günlük Ortalama Hacim: <b>{paraFormatla(gunluk_ort)}</b>\n"
     )
     return yanit
 
@@ -2309,9 +2235,9 @@ def kur_fark_makas_raporu_uret(simulasyon_tutar_str: str = "100000") -> str:
         
         yanit += (
             f"{m_icon} {item['emoji']} <b>{item['ad']}</b>\n"
-            f"├ 💵 USDT/TRY: <code>{f_tl(item['fiyat'])}</code>\n"
-            f"├ {yon_emoji} Makas Farkı: <b>{isaret}{item['fark_tl']:.2f} ₺</b> <i>(%{item['fark_yuzde']:+.2f})</i>\n"
-            f"└ 💰 {tutar:,.0f}$ Kar/Fark: <b>{isaret}{paraFormatla(item['kar_tl'])}</b>\n\n"
+            f"• 💵 USDT/TRY: <code>{f_tl(item['fiyat'])}</code>\n"
+            f"• {yon_emoji} Makas Farkı: <b>{isaret}{item['fark_tl']:.2f} ₺</b> <i>(%{item['fark_yuzde']:+.2f})</i>\n"
+            f"• 💰 {tutar:,.0f}$ Kar/Fark: <b>{isaret}{paraFormatla(item['kar_tl'])}</b>\n\n"
         )
         
     if makas_listesi:
@@ -2862,11 +2788,12 @@ def iban_sablon_bul(veriler: List[List[str]], aranan_kod: str):
 
     return None
 
-def iban_sablon_getir_impl(komut_metni: str, chat_id: int = 0) -> str:
+def iban_sablon_getir_impl(komut_metni: str, chat_id: int = 0):
     """
     Kullanıcı /HSY EMLAK 3 veya /sablon HSY EMLAK 3 yazdığında
     Excel'deki ilgili satırdan hazır ödeme şablonunu çeker ve doğrudan Telegram'a gönderir.
-    Eğer komut bağlı bir Telegram grubundan çağrılmışsa, hesabı otomatik olarak o gruba tahsis edip Excel'e işler.
+    Eğer komut bağlı bir Telegram grubundan çağrılmışsa, hesabı otomatik olarak o gruba tahsis edip Excel'e işler
+    ve altına anında boşa çıkarma / iptal etme butonu ekler.
     """
     temiz_komut = komut_metni.strip()
     if temiz_komut.startswith("/sablon") or temiz_komut.startswith("/şablon") or temiz_komut.startswith("/hesapbilgi"):
@@ -2901,6 +2828,8 @@ def iban_sablon_getir_impl(komut_metni: str, chat_id: int = 0) -> str:
         return f"⚠️ <b>'{hesap_adi}'</b> için Excel tablosunda henüz bir şablon metni girilmemiş."
 
     tahsis_bilgisi = ""
+    klavye = None
+
     # Eğer bu komut bağlı bir Telegram grubundan çağrıldıysa otomatik olarak o gruba tahsis et
     if chat_id and chat_id < 0:
         grup_baglantilarini_guncelle()
@@ -2925,6 +2854,14 @@ def iban_sablon_getir_impl(komut_metni: str, chat_id: int = 0) -> str:
                 else:
                     tahsis_bilgisi = f"\n\n📌 <i>Bu hesap zaten <b>{hedef_cari}</b> grubuna tahsisli.</i>"
 
+                klavye = {
+                    "inline_keyboard": [
+                        [{"text": f"🔓 {h_ad} Boşa Çıkar / İptal Et", "callback_data": f"ibanbosta_{h_ad}"}]
+                    ]
+                }
+
+    if klavye:
+        return sablon_metni + tahsis_bilgisi, klavye
     return sablon_metni + tahsis_bilgisi
 
 def iban_hesap_bul(veriler: List[List[str]], aranan_kod: str):
@@ -2975,6 +2912,31 @@ def iban_hesap_bul(veriler: List[List[str]], aranan_kod: str):
                     return idx, 18, h_ad, mevcut_cari
 
     return None
+
+def iban_bosalt_direct(hesap_kodu: str) -> Tuple[bool, str, str, str]:
+    """
+    Doğrudan hesap kodunu alıp Excel tablosundaki tahsisini boşa çıkarır (Müsait yapar).
+    Döner: (basarili_mi, hesap_adi, eski_cari, sayfa_basligi)
+    """
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    veriler = get_sheet_values_fast(sayfa)
+    
+    bulunan = iban_hesap_bul(veriler, hesap_kodu)
+    if not bulunan:
+        return False, f"Hesap '{hesap_kodu}' bulunamadı", "", sayfa.title
+        
+    satir_idx, col_idx, hesap_adi, eski_cari = bulunan
+    
+    update_sheet_matrix_memory(sayfa.title, satir_idx, col_idx, "")
+    sayfa.update_cell(satir_idx, col_idx, "")
+    
+    app_state["SON_ISLEM"] = {
+        "sayfa": sayfa.title, "satir": satir_idx, "sutun": col_idx,
+        "eskiDeger": eski_cari, "grupAdi": hesap_adi, "islemTuru": "İBAN Boşaltma"
+    }
+    sistemeLogYaz("İBAN Boşaltma", f"{hesap_adi} | Eski: {eski_cari} ➔ Boş")
+    return True, hesap_adi, eski_cari, sayfa.title
 
 def iban_tahsis_impl(komut_metni: str) -> str:
     parcalar = komut_metni.strip().split()[1:]
@@ -3049,24 +3011,9 @@ def iban_bosalt_impl(komut_metni: str) -> str:
         )
         
     hesap_kodu = " ".join(parcalar).strip()
-    sh = get_spreadsheet()
-    sayfa = get_active_daily_sheet(sh)
-    veriler = get_sheet_values_fast(sayfa)
-    
-    bulunan = iban_hesap_bul(veriler, hesap_kodu)
-    if not bulunan:
+    ok, hesap_adi, eski_cari, sayfa_basligi = iban_bosalt_direct(hesap_kodu)
+    if not ok:
         return f"⚠️ <b>Hesap Bulunamadı!</b>\nExcel tablosunda '<b>{hesap_kodu}</b>' adlı bir İBAN/hesap bulunamadı."
-        
-    satir_idx, col_idx, hesap_adi, eski_cari = bulunan
-    
-    update_sheet_matrix_memory(sayfa.title, satir_idx, col_idx, "")
-    sayfa.update_cell(satir_idx, col_idx, "")
-    
-    app_state["SON_ISLEM"] = {
-        "sayfa": sayfa.title, "satir": satir_idx, "sutun": col_idx,
-        "eskiDeger": eski_cari, "grupAdi": hesap_adi, "islemTuru": "İBAN Boşaltma"
-    }
-    sistemeLogYaz("İBAN Boşaltma", f"{hesap_adi} | Eski: {eski_cari} ➔ Boş")
     
     eski_str = f"<s>{eski_cari}</s>" if eski_cari else "<i>(Zaten boştu)</i>"
     return (
@@ -3078,6 +3025,121 @@ def iban_bosalt_impl(komut_metni: str) -> str:
         f"━━━━━━━━━━\n"
         f"💡 <i>Hesap havuza geri döndü, başka bir cariye verilebilir.</i>"
     )
+
+def grup_aktif_ibanlar_raporu_uret(grup_adi: str = "", chat_id: int = 0) -> Tuple[str, dict]:
+    """
+    Belirtilen veya içinde bulunulan gruba bağlı olan TÜM aktif İBAN'ları Excel'den çeker,
+    veri analizi olarak listeler ve her birini tek tıkla boşa çıkarmak/silmek için butonlar sunar.
+    """
+    hedef_cari = grup_adi.strip().upper() if grup_adi else ""
+    if not hedef_cari and chat_id and chat_id < 0:
+        grup_baglantilarini_guncelle()
+        bagli = app_state.get("GRUP_BAGLANTILARI", {}).get(chat_id)
+        if bagli and bagli.get("grup"):
+            hedef_cari = bagli.get("grup").strip().upper()
+
+    if not hedef_cari:
+        return (
+            "⚠️ <b>Grup Belirlenemedi!</b>\n"
+            "Lütfen sorgulamak istediğiniz cariyi belirtin veya bu komutu bağlı bir Telegram grubunda yazın.\n\n"
+            "📌 <b>Örnek:</b> <code>/hesaplar SACİD</code> veya <code>/grupiban TİGER</code>",
+            None
+        )
+
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    veriler = get_sheet_values_fast(sayfa)
+
+    hedef_norm = normalize_text(hedef_cari)
+    tahsisli_hesaplar = []
+
+    for idx, row in enumerate(veriler[1:], start=2):
+        # 1. Sol Blok: Col 11: Hesap, Col 12: Şablon, Col 13: Banka, Col 14: Cari (0-indexed)
+        if len(row) > 14 and row[14].strip():
+            c1 = row[14].strip()
+            if normalize_text(c1) == hedef_norm:
+                h_ad = row[11].strip() if len(row) > 11 else ""
+                h_sablon = row[12].strip() if len(row) > 12 else ""
+                h_banka = row[13].strip() if len(row) > 13 else ""
+                m_iban = re.search(r'TR\d{2}\s?(?:\d{4}\s?){5}\d{2}', h_sablon.upper())
+                iban_str = m_iban.group(0).replace(" ", "") if m_iban else ""
+                tahsisli_hesaplar.append({
+                    "hesap": h_ad,
+                    "banka": h_banka,
+                    "iban": iban_str,
+                    "satir": idx,
+                    "col": 15
+                })
+
+        # 2. Sağ Blok: Col 15: Hesap, Col 16: Şablon, Col 17: Cari (0-indexed)
+        if len(row) > 17 and row[17].strip():
+            c2 = row[17].strip()
+            if normalize_text(c2) == hedef_norm:
+                h_ad = row[15].strip() if len(row) > 15 else ""
+                h_sablon = row[16].strip() if len(row) > 16 else ""
+                m_iban = re.search(r'TR\d{2}\s?(?:\d{4}\s?){5}\d{2}', h_sablon.upper())
+                iban_str = m_iban.group(0).replace(" ", "") if m_iban else ""
+                tahsisli_hesaplar.append({
+                    "hesap": h_ad,
+                    "banka": "",
+                    "iban": iban_str,
+                    "satir": idx,
+                    "col": 18
+                })
+
+    tarih_str = suankiZamaniAl().strftime("%d.%m.%Y")
+    saat_str = suankiZamaniAl().strftime("%H:%M")
+    emoji = grupEmojisiBul(hedef_cari)
+
+    if not tahsisli_hesaplar:
+        metin = (
+            f"🏦 <b>{hedef_cari} GRUBU İBAN ANALİZ RAPORU</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📅 Tarih: <b>{tarih_str}</b> | ⏰ Saat: <code>{saat_str}</code>\n"
+            f"👤 Bağlı Cari: {emoji} <b>{hedef_cari}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🟢 <b>Bu gruba şu anda tahsis edilmiş aktif bir İBAN bulunmuyor.</b>\n\n"
+            f"💡 <i>İhtiyacınız olduğunda <code>/HSY EMLAK 2</code> veya <code>/sablon [Hesap]</code> yazarak yeni bir hesap alabilirsiniz.</i>"
+        )
+        klavye = {
+            "inline_keyboard": [
+                [{"text": "🔄 Listeyi Yenile", "callback_data": f"grup_iban_yenile_{hedef_cari}"}]
+            ]
+        }
+        return metin, klavye
+
+    metin = (
+        f"🏦 <b>{hedef_cari} GRUBU AKTİF İBAN VERİ ANALİZİ</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📅 Tarih: <b>{tarih_str}</b> | ⏰ Saat: <code>{saat_str}</code>\n"
+        f"👤 Bağlı Cari: {emoji} <b>{hedef_cari}</b>\n"
+        f"📊 Toplam Tahsisli Hesap: <b>{len(tahsisli_hesaplar)} Adet</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"📋 <b>GÜNCEL AKTİF HESAPLAR:</b>\n\n"
+    )
+
+    buttons = []
+    madalyalar = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+
+    for i, h in enumerate(tahsisli_hesaplar):
+        num = madalyalar[i] if i < len(madalyalar) else f"{i+1}️⃣"
+        iban_display = f"<code>{h['iban']}</code>" if h['iban'] else "<i>(Şablonda kayıtlı)</i>"
+        banka_display = f" | 🏢 <b>{h['banka']}</b>" if h['banka'] else ""
+        metin += (
+            f"{num} 🏛️ <b>{h['hesap']}</b>{banka_display}\n"
+            f"   • 💳 İBAN: {iban_display}\n"
+            f"   • 📌 Durum: 🔴 <b>{hedef_cari} Grubuna Tahsisli</b>\n\n"
+        )
+        buttons.append([{"text": f"🔓 {h['hesap']} Hesabını Boşa Çıkar", "callback_data": f"grup_iban_sil_{h['hesap']}_{hedef_cari}"}])
+
+    buttons.append([{"text": "🔄 Listeyi Yenile", "callback_data": f"grup_iban_yenile_{hedef_cari}"}])
+
+    metin += (
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 <i>Boşa çıkarmak istediğiniz hesabın butonuna basarak Excel'deki tahsisini anında kaldırabilirsiniz.</i>"
+    )
+
+    return metin, {"inline_keyboard": buttons}
 
 def cari_ekstre_impl(komut_metni: str) -> str:
     parcalar = komut_metni.strip().split()[1:]
@@ -3239,7 +3301,7 @@ def toplu_islem_impl(komut_metni: str) -> str:
             continue
         p = satir.strip().split()
         if len(p) < 2:
-            islem_sonuclari.append(f"├ ⚠️ <code>{satir}</code> <i>(Eksik parametre)</i>")
+            islem_sonuclari.append(f"• ⚠️ <code>{satir}</code> <i>(Eksik parametre)</i>")
             continue
             
         sembol = p[0].upper()
@@ -3251,9 +3313,9 @@ def toplu_islem_impl(komut_metni: str) -> str:
                 grup, tutar = parse_grup_ve_tutar(kalan_p)
                 res = hucreyeVeriYaz_impl(f"/kasa {grup} {tutar}", 4, "Kasa Ekleme", 1)
                 etkilenen_gruplar.add(grup)
-                islem_sonuclari.append(f"├ 💰 <b>{grup.upper()}:</b> +{paraFormatla(tutar)} <i>(Kasa Girişi)</i>")
+                islem_sonuclari.append(f"• 💰 <b>{grup.upper()}:</b> +{paraFormatla(tutar)} <i>(Kasa Girişi)</i>")
             except Exception as e:
-                islem_sonuclari.append(f"├ ⚠️ <b>{satir}:</b> {e}")
+                islem_sonuclari.append(f"• ⚠️ <b>{satir}:</b> {e}")
                 
         # 2. Kasa Silme (-)
         elif sembol in ["-", "KASASIL", "-KASA"]:
@@ -3261,9 +3323,9 @@ def toplu_islem_impl(komut_metni: str) -> str:
                 grup, tutar = parse_grup_ve_tutar(kalan_p)
                 res = hucreyeVeriYaz_impl(f"/kasasil {grup} {tutar}", 4, "Kasa Silme", -1)
                 etkilenen_gruplar.add(grup)
-                islem_sonuclari.append(f"├ 💸 <b>{grup.upper()}:</b> -{paraFormatla(tutar)} <i>(Kasa Çıkışı)</i>")
+                islem_sonuclari.append(f"• 💸 <b>{grup.upper()}:</b> -{paraFormatla(tutar)} <i>(Kasa Çıkışı)</i>")
             except Exception as e:
-                islem_sonuclari.append(f"├ ⚠️ <b>{satir}:</b> {e}")
+                islem_sonuclari.append(f"• ⚠️ <b>{satir}:</b> {e}")
                 
         # 3. Ödeme Ekleme (Ö veya O)
         elif sembol in ["Ö", "O", "ODEME", "ÖDEME", "+ODEME", "+ÖDEME"]:
@@ -3271,9 +3333,9 @@ def toplu_islem_impl(komut_metni: str) -> str:
                 grup, tutar = parse_grup_ve_tutar(kalan_p)
                 res = hucreyeVeriYaz_impl(f"/odeme {grup} {tutar}", 5, "Ödenen Ekleme", 1)
                 etkilenen_gruplar.add(grup)
-                islem_sonuclari.append(f"├ 💸 <b>{grup.upper()}:</b> {paraFormatla(tutar)} <i>(Ödeme Yapıldı)</i>")
+                islem_sonuclari.append(f"• 💸 <b>{grup.upper()}:</b> {paraFormatla(tutar)} <i>(Ödeme Yapıldı)</i>")
             except Exception as e:
-                islem_sonuclari.append(f"├ ⚠️ <b>{satir}:</b> {e}")
+                islem_sonuclari.append(f"• ⚠️ <b>{satir}:</b> {e}")
                 
         # 4. Devir Ekleme (D)
         elif sembol in ["D", "DEVİR", "DEVIR", "+DEVIR"]:
@@ -3281,35 +3343,30 @@ def toplu_islem_impl(komut_metni: str) -> str:
                 grup, tutar = parse_grup_ve_tutar(kalan_p)
                 res = hucreyeVeriYaz_impl(f"/devir {grup} {tutar}", 3, "Devir Ekleme", 1)
                 etkilenen_gruplar.add(grup)
-                islem_sonuclari.append(f"├ 🔄 <b>{grup.upper()}:</b> +{paraFormatla(tutar)} <i>(Devir)</i>")
+                islem_sonuclari.append(f"• 🔄 <b>{grup.upper()}:</b> +{paraFormatla(tutar)} <i>(Devir)</i>")
             except Exception as e:
-                islem_sonuclari.append(f"├ ⚠️ <b>{satir}:</b> {e}")
+                islem_sonuclari.append(f"• ⚠️ <b>{satir}:</b> {e}")
                 
         # 5. Masraf Ekleme (M veya G)
         elif sembol in ["M", "G", "MASRAF", "GİDER", "GIDER", "+MASRAF"]:
             try:
                 masraf_adi, tutar = parse_grup_ve_tutar(kalan_p)
                 res = masrafVerisiYaz_impl(f"/masrafekle {masraf_adi} {tutar}", "Masraf Ekleme", 1)
-                islem_sonuclari.append(f"├ 📉 <b>Masraf ({masraf_adi}):</b> {paraFormatla(tutar)}")
+                islem_sonuclari.append(f"• 📉 <b>Masraf ({masraf_adi}):</b> {paraFormatla(tutar)}")
             except Exception as e:
-                islem_sonuclari.append(f"├ ⚠️ <b>{satir}:</b> {e}")
+                islem_sonuclari.append(f"• ⚠️ <b>{satir}:</b> {e}")
         else:
             try:
                 grup, tutar = parse_grup_ve_tutar(p)
                 res = hucreyeVeriYaz_impl(f"/kasa {grup} {tutar}", 4, "Kasa Ekleme", 1)
                 etkilenen_gruplar.add(grup)
-                islem_sonuclari.append(f"├ 💰 <b>{grup.upper()}:</b> +{paraFormatla(tutar)} <i>(Kasa Girişi)</i>")
+                islem_sonuclari.append(f"• 💰 <b>{grup.upper()}:</b> +{paraFormatla(tutar)} <i>(Kasa Girişi)</i>")
             except Exception as e:
-                islem_sonuclari.append(f"├ ❓ <code>{satir}</code> <i>(Tanınmayan format)</i>")
+                islem_sonuclari.append(f"• ❓ <code>{satir}</code> <i>(Tanınmayan format)</i>")
 
     if not islem_sonuclari:
         return "⚠️ İşlenecek geçerli bir işlem satırı bulunamadı."
         
-    if islem_sonuclari:
-        son = islem_sonuclari[-1]
-        if son.startswith("├ "):
-            islem_sonuclari[-1] = "└ " + son[2:]
-            
     guncel_veriler = get_sheet_values_fast(sayfa)
     kalanlar_listesi = []
     
@@ -3431,24 +3488,20 @@ def gecmis_gun_sorgula_impl(komut_metni: str) -> str:
         f"📁 Durum: 🔒 <b>Arşivlenmiş Gün</b>\n"
         f"🏢 İşlem Gören Aktif Cari: <b>{len(finans['aktif_gruplar'])} Adet</b>\n\n"
         f"📊 <b>GENEL BİLANÇO:</b>\n"
-        f"├ 🔄 Toplam Devir: {paraFormatla(finans['devir'])}\n"
-        f"├ 💰 Toplam Kasa: {paraFormatla(finans['kasa'])}\n"
-        f"├ 💸 Toplam Ödeme: {paraFormatla(finans['odenen'])}\n"
-        f"├ ✂️ Toplam Komisyon: {paraFormatla(finans['komisyon'])}\n"
-        f"└ 🏦 <b>NET KALAN KASA: {paraFormatla(finans['kalan'])}</b>\n\n"
+        f"• 🔄 Toplam Devir: {paraFormatla(finans['devir'])}\n"
+        f"• 💰 Toplam Kasa: {paraFormatla(finans['kasa'])}\n"
+        f"• 💸 Toplam Ödeme: {paraFormatla(finans['odenen'])}\n"
+        f"• ✂️ Toplam Komisyon: {paraFormatla(finans['komisyon'])}\n"
+        f"• 🏦 <b>NET KALAN KASA: {paraFormatla(finans['kalan'])}</b>\n\n"
     )
     if masraf_sayisi > 0:
-        mesaj += f"📉 <b>GÜNLÜK GİDERLER:</b>\n└ {masraf_sayisi} Kalem Masraf: <b>{paraFormatla(toplam_masraf)}</b>\n\n"
+        mesaj += f"📉 <b>GÜNLÜK GİDERLER:</b>\n• {masraf_sayisi} Kalem Masraf: <b>{paraFormatla(toplam_masraf)}</b>\n\n"
         
     if sirali_cariler:
         mesaj += f"━━━━━━━━━━━\n🏆 <b>EN YÜKSEK İŞLEM GÖREN CARİLER:</b>\n"
         for idx, g in enumerate(sirali_cariler, 1):
             emoji = grupEmojisiBul(g["ad"])
-            mesaj += f"├ {idx}. {emoji} <b>{g['ad'].upper()}:</b> 🏦 {paraFormatla(g['kalan'])}\n"
-        lines = mesaj.rstrip().splitlines()
-        if lines and lines[-1].startswith("├ "):
-            lines[-1] = "└ " + lines[-1][2:]
-        mesaj = "\n".join(lines) + "\n"
+            mesaj += f"• {idx}. {emoji} <b>{g['ad'].upper()}:</b> 🏦 {paraFormatla(g['kalan'])}\n"
 
     mesaj += (
         f"━━━━━━━━━━━━━━━━━━━━\n"
@@ -3730,14 +3783,14 @@ def debug_sistem_impl() -> str:
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"🚀 <b>Durum:</b> RAM Ayna Önbelleği Devrede!\n\n"
         f"📊 <b>GECİKME VE PING TESTİ:</b>\n"
-        f"├ ✈️ Telegram Bot API: {tg_ping_str}\n"
-        f"├ 🌐 Google Sheets API (Doğrudan): {gs_ping_str}\n"
-        f"└ ⚡ RAM Ayna Okuma Hızı: {ram_hiz_str}\n\n"
+        f"• ✈️ Telegram Bot API: {tg_ping_str}\n"
+        f"• 🌐 Google Sheets API (Doğrudan): {gs_ping_str}\n"
+        f"• ⚡ RAM Ayna Okuma Hızı: {ram_hiz_str}\n\n"
         f"🧠 <b>BELLEK VE ÇALIŞMA ALANI:</b>\n"
-        f"├ 📅 Aktif Gün Sayfası: <b>{aktif_sayfa_str}</b>\n"
-        f"├ 📑 Toplam Çalışma Sayfası: <code>{toplam_sayfa_sayisi} Adet</code>\n"
-        f"├ 🧵 Aktif Thread Havuzu: <code>{aktif_thread_sayisi} İş Parçacığı</code>\n"
-        f"└ ⚡ Toplam İşlem Süresi: <code>{toplam_sure_ms:.0f} ms</code>\n"
+        f"• 📅 Aktif Gün Sayfası: <b>{aktif_sayfa_str}</b>\n"
+        f"• 📑 Toplam Çalışma Sayfası: <code>{toplam_sayfa_sayisi} Adet</code>\n"
+        f"• 🧵 Aktif Thread Havuzu: <code>{aktif_thread_sayisi} İş Parçacığı</code>\n"
+        f"• ⚡ Toplam İşlem Süresi: <code>{toplam_sure_ms:.0f} ms</code>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"💡 <i>Tüm /kasa ve /rapor sorguları artık 0 ms RAM ayna hızında çalışıyor.</i>"
     )
@@ -3803,7 +3856,7 @@ def yukleme_metni_uret(islem_tipi: str = "") -> str:
 
 def islemi_analiz_bildirimiyle_yap(chat_id: int, islem_fn, *args, goster_bildirim: bool = False, islem_tipi: str = ""):
     # 1. Non-blocking typing bildirimi
-    _log_executor.submit(telegramChatAction, chat_id, "typing")
+    telegramChatAction(chat_id, "typing")
     
     fn_name = islem_tipi or getattr(islem_fn, "__name__", "")
     for a in args:
@@ -3925,6 +3978,32 @@ def process_telegram_update(update: dict):
         elif data.startswith("rapor_"):
             grup = data.replace("rapor_", "")
             islemi_analiz_bildirimiyle_yap(chat_id, grup_kasa_analiz_fisi_uret, grup)
+        elif data.startswith("ibanbosta_"):
+            hesap_adi = data.replace("ibanbosta_", "").strip()
+            ok, h_ad, eski_c, s_title = iban_bosalt_direct(hesap_adi)
+            msg_id = cq.get("message", {}).get("message_id")
+            orig_text = cq.get("message", {}).get("text", "")
+            if ok:
+                yeni_metin = orig_text + f"\n\n🟢 <b>{h_ad} hesabı boşa çıkarıldı (Excel güncellendi - Müsait).</b>"
+                if msg_id:
+                    telegramMesajDuzenle(chat_id, msg_id, yeni_metin, None)
+            else:
+                telegramMesajGonder(chat_id, f"⚠️ {h_ad}")
+        elif data.startswith("grup_iban_sil_"):
+            parcalar = data.replace("grup_iban_sil_", "").rsplit("_", 1)
+            hesap_adi = parcalar[0].strip()
+            hedef_cari = parcalar[1].strip() if len(parcalar) > 1 else ""
+            ok, h_ad, eski_c, s_title = iban_bosalt_direct(hesap_adi)
+            metin, klavye = grup_aktif_ibanlar_raporu_uret(hedef_cari, chat_id)
+            msg_id = cq.get("message", {}).get("message_id")
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+        elif data.startswith("grup_iban_yenile_"):
+            hedef_cari = data.replace("grup_iban_yenile_", "").strip()
+            metin, klavye = grup_aktif_ibanlar_raporu_uret(hedef_cari, chat_id)
+            msg_id = cq.get("message", {}).get("message_id")
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
         elif data in ["mesaj_kapat", "panel_kapat", "kapat"]:
             msg_id = cq.get("message", {}).get("message_id")
             if msg_id:
@@ -4144,6 +4223,10 @@ def process_telegram_update(update: dict):
                 islemi_analiz_bildirimiyle_yap(chat_id, ibanCozumle_impl, text)
         elif ana_komut in ["/sablon", "/şablon", "/hesapbilgi"]:
             islemi_analiz_bildirimiyle_yap(chat_id, iban_sablon_getir_impl, text, chat_id)
+        elif ana_komut in ["/hesaplar", "/grupiban", "/aktifiban", "/ibanlarim", "/hesaplarim"]:
+            p_args = text.split()[1:]
+            grup_arg = " ".join(p_args).strip() if p_args else ""
+            islemi_analiz_bildirimiyle_yap(chat_id, grup_aktif_ibanlar_raporu_uret, grup_arg, chat_id)
         elif ana_komut in ["/ibantahsis", "/tahsis"]:
             islemi_analiz_bildirimiyle_yap(chat_id, iban_tahsis_impl, text)
         elif ana_komut in ["/ibanbosalt", "/bosalt", "/ibansil"]:
