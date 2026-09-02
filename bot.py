@@ -511,6 +511,25 @@ def yetkili_mi(user_id: int) -> bool:
     admin_listesini_guncelle()
     return user_id in app_state["EK_ADMINLER"]
 
+_yetkisiz_uyarilanlar = set()
+
+def yetkisiz_uyari_gonder(chat_id: int, user_id: int, mesaj: str, klavye: dict = None, tek_seferlik: bool = True) -> bool:
+    """
+    Yetkisiz kullanıcıya uyarı mesajı gönderir.
+    tek_seferlik=True ise aynı kullanıcıya aynı sohbette sadece 1 defa uyarı gönderir,
+    sonraki tekrarlarda grubu veya sohbeti spam yapmamak için sessizce yoksayar.
+    """
+    anahtar = (user_id, chat_id)
+    if tek_seferlik:
+        if anahtar in _yetkisiz_uyarilanlar:
+            return False
+        _yetkisiz_uyarilanlar.add(anahtar)
+        if len(_yetkisiz_uyarilanlar) > 10000:
+            _yetkisiz_uyarilanlar.clear()
+            _yetkisiz_uyarilanlar.add(anahtar)
+    telegramMesajGonder(chat_id, mesaj, klavye)
+    return True
+
 # --- TELEGRAM GRUP BAĞLANTILARI & DİNAMİK KASA FİŞİ ---
 def grup_baglantilarini_guncelle():
     now = time.time()
@@ -3693,6 +3712,9 @@ def admin_ekle_impl(komut_metni: str, ekleyen_id: int) -> str:
             
     adminSayfasi.append_row([str(yeni_id), isim, "KURUCU", bugununTarihiniAl()])
     app_state["EK_ADMINLER"].add(yeni_id)
+    for k in list(_yetkisiz_uyarilanlar):
+        if k[0] == yeni_id:
+            _yetkisiz_uyarilanlar.discard(k)
     sistemeLogYaz("Yönetici Eklendi", f"{isim} (ID: {yeni_id})")
     return f"✅ <b>Yönetici Eklendi!</b>\n👤 <b>İsim:</b> {isim}\n🆔 <b>Telegram ID:</b> <code>{yeni_id}</code>\n\nArtık botu kullanabilir."
 
@@ -3924,14 +3946,14 @@ def process_telegram_update(update: dict):
         
         if data.startswith("t_yenile_"):
             if user_id != KURUCU_ID:
-                telegramMesajGonder(chat_id, "⛔ <b>Yetkisiz İşlem:</b> Şirket cüzdan ve rezerv raporunu sorgulama yetkisi sadece <b>Şirket Kurucusuna</b> aittir.")
+                yetkisiz_uyari_gonder(chat_id, user_id, "⛔ <b>Yetkisiz İşlem:</b> Şirket cüzdan ve rezerv raporunu sorgulama yetkisi sadece <b>Şirket Kurucusuna</b> aittir.")
                 return
             cuzdan = data.replace("t_yenile_", "").strip()
             islemi_analiz_bildirimiyle_yap(chat_id, trc20_varlik_raporu_uret, cuzdan)
             return
 
         if not yetkili_mi(user_id):
-            telegramMesajGonder(chat_id, "⛔ <b>Erişim Reddedildi!</b>\nBu işlem için yetkiniz bulunmamaktadır.")
+            yetkisiz_uyari_gonder(chat_id, user_id, "⛔ <b>Erişim Reddedildi!</b>\nBu işlem için yetkiniz bulunmamaktadır.")
             return
             
         if data in ["rehber", "rehber_ana"]:
@@ -4040,8 +4062,9 @@ def process_telegram_update(update: dict):
         # /t veya /rezerv veya /varlik (TRC-20 Canlı Rezerv & Varlık Raporu)
         if ana_komut in ["/t", "/rezerv", "/varlik"]:
             if user_id != KURUCU_ID:
-                telegramMesajGonder(
+                yetkisiz_uyari_gonder(
                     chat_id,
+                    user_id,
                     "⛔ <b>Yetkisiz İşlem:</b> Şirket cüzdan ve rezerv raporunu sorgulama yetkisi sadece <b>Şirket Kurucusuna</b> aittir."
                 )
                 return
@@ -4052,7 +4075,7 @@ def process_telegram_update(update: dict):
         # /grupbagla veya /bagla
         if ana_komut in ["/grupbagla", "/bagla"]:
             if not yetkili_mi(user_id):
-                telegramMesajGonder(chat_id, f"⛔ <b>Yetkisiz İşlem:</b> Telegram grubunu Excel'e bağlama yetkisi sadece şirket yöneticilerine aittir.\nKullanıcı ID: <code>{user_id}</code>")
+                yetkisiz_uyari_gonder(chat_id, user_id, f"⛔ <b>Yetkisiz İşlem:</b> Telegram grubunu Excel'e bağlama yetkisi sadece şirket yöneticilerine aittir.\nKullanıcı ID: <code>{user_id}</code>")
                 return
             islemi_analiz_bildirimiyle_yap(chat_id, grup_bagla_impl, chat_id, user_id, text, chat_title)
             return
@@ -4060,7 +4083,7 @@ def process_telegram_update(update: dict):
         # /grupkopar veya /baglantikes
         if ana_komut in ["/grupkopar", "/baglantikes", "/grupbaglasil"]:
             if not yetkili_mi(user_id):
-                telegramMesajGonder(chat_id, f"⛔ <b>Yetkisiz İşlem:</b> Grup bağlantısını kaldırma yetkisi sadece şirket yöneticilerine aittir.\nKullanıcı ID: <code>{user_id}</code>")
+                yetkisiz_uyari_gonder(chat_id, user_id, f"⛔ <b>Yetkisiz İşlem:</b> Grup bağlantısını kaldırma yetkisi sadece şirket yöneticilerine aittir.\nKullanıcı ID: <code>{user_id}</code>")
                 return
             islemi_analiz_bildirimiyle_yap(chat_id, grup_kopar_impl, chat_id, user_id)
             return
@@ -4068,7 +4091,7 @@ def process_telegram_update(update: dict):
         # /grupbaglantilari veya /gruplar
         if ana_komut in ["/grupbaglantilari", "/gruplar", "/baglantilar"]:
             if not yetkili_mi(user_id):
-                telegramMesajGonder(chat_id, f"⛔ <b>Yetkisiz İşlem:</b> Bu listeyi sadece şirket yöneticileri görebilir.")
+                yetkisiz_uyari_gonder(chat_id, user_id, f"⛔ <b>Yetkisiz İşlem:</b> Bu listeyi sadece şirket yöneticileri görebilir.")
                 return
             islemi_analiz_bildirimiyle_yap(chat_id, grup_baglantilari_listesi_impl)
             return
@@ -4094,7 +4117,7 @@ def process_telegram_update(update: dict):
                         return
                     else:
                         if not yetkili_mi(user_id):
-                            telegramMesajGonder(chat_id, f"⛔ <b>Erişim Reddedildi!</b>\nKullanıcı ID'niz: <code>{user_id}</code>")
+                            yetkisiz_uyari_gonder(chat_id, user_id, f"⛔ <b>Erişim Reddedildi!</b>\nKullanıcı ID'niz: <code>{user_id}</code>")
                             return
                         telegramMesajGonder(
                             chat_id,
@@ -4123,7 +4146,7 @@ def process_telegram_update(update: dict):
                 else:
                     # Sayı girilmiş -> Bağlı grupta ise o grubun kasasına ekle
                     if not yetkili_mi(user_id):
-                        telegramMesajGonder(chat_id, f"⛔ <b>Yetkisiz İşlem:</b> Kasaya para ekleme işlemi sadece yöneticilere açıktır.")
+                        yetkisiz_uyari_gonder(chat_id, user_id, f"⛔ <b>Yetkisiz İşlem:</b> Kasaya para ekleme işlemi sadece yöneticilere açıktır.")
                         return
                     if chat_id in baglantilar:
                         grup_adi = baglantilar[chat_id]["grup"]
@@ -4136,15 +4159,16 @@ def process_telegram_update(update: dict):
             # 3. İki veya daha fazla parametre girildiğinde (/kasa SACİD 1500)
             else:
                 if not yetkili_mi(user_id):
-                    telegramMesajGonder(chat_id, f"⛔ <b>Yetkisiz İşlem:</b> Kasaya para ekleme işlemi sadece yöneticilere açıktır.")
+                    yetkisiz_uyari_gonder(chat_id, user_id, f"⛔ <b>Yetkisiz İşlem:</b> Kasaya para ekleme işlemi sadece yöneticilere açıktır.")
                     return
                 islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 4, "Kasa Ekleme", 1)
                 return
 
         # Diğer tüm komutlar için yönetici yetkisi zorunludur
         if not yetkili_mi(user_id):
-            telegramMesajGonder(
+            yetkisiz_uyari_gonder(
                 chat_id,
+                user_id,
                 f"⛔ <b>Erişim Reddedildi!</b>\n"
                 f"Bu işlem sadece yetkili şirket yöneticilerine özeldir.\n"
                 f"Kullanıcı ID'niz: <code>{user_id}</code>"
@@ -4176,7 +4200,7 @@ def process_telegram_update(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, cfo_dashboard_raporu_uret, goster_bildirim=True, islem_tipi="kasa")
         elif ana_komut in ["/panellink", "/panelurl", "/panellinki"]:
             if user_id != KURUCU_ID:
-                telegramMesajGonder(chat_id, "⛔ <b>Yetkisiz İşlem:</b> Panel linkini güncelleme yetkisi sadece Şirket Kurucusuna aittir.")
+                yetkisiz_uyari_gonder(chat_id, user_id, "⛔ <b>Yetkisiz İşlem:</b> Panel linkini güncelleme yetkisi sadece Şirket Kurucusuna aittir.")
                 return
             p_args = text.split()[1:]
             if not p_args:
@@ -4239,7 +4263,7 @@ def process_telegram_update(update: dict):
             p_args = text.split()[1:]
             yeni_hedef = p_args[0].strip() if p_args else None
             if yeni_hedef and not yetkili_mi(user_id):
-                telegramMesajGonder(chat_id, "⛔ <b>Yetkisiz İşlem:</b> Ciro hedefini güncelleme yetkisi sadece şirket yöneticilerine aittir.")
+                yetkisiz_uyari_gonder(chat_id, user_id, "⛔ <b>Yetkisiz İşlem:</b> Ciro hedefini güncelleme yetkisi sadece şirket yöneticilerine aittir.")
             else:
                 islemi_analiz_bildirimiyle_yap(chat_id, hedef_kpi_raporu_uret, yeni_hedef, goster_bildirim=True)
         elif ana_komut in ["/trend", "/haftalik", "/haftalık", "/performans"]:
@@ -4290,12 +4314,12 @@ def process_telegram_update(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, debug_sistem_impl, goster_bildirim=True)
         elif ana_komut in ["/kapanis", "/gunsonu"]:
             if user_id != KURUCU_ID:
-                telegramMesajGonder(chat_id, "⛔ <b>Yetkisiz İşlem:</b> Gün sonu kapanış raporunu alma yetkisi sadece Şirket Kurucusuna aittir.")
+                yetkisiz_uyari_gonder(chat_id, user_id, "⛔ <b>Yetkisiz İşlem:</b> Gün sonu kapanış raporunu alma yetkisi sadece Şirket Kurucusuna aittir.")
                 return
             islemi_analiz_bildirimiyle_yap(chat_id, gun_sonu_kapanis_raporu_uret, goster_bildirim=True)
         elif ana_komut in ["/kapanissaati", "/saatayar"]:
             if user_id != KURUCU_ID:
-                telegramMesajGonder(chat_id, "⛔ <b>Yetkisiz İşlem:</b> Bu ayar sadece Şirket Kurucusuna aittir.")
+                yetkisiz_uyari_gonder(chat_id, user_id, "⛔ <b>Yetkisiz İşlem:</b> Bu ayar sadece Şirket Kurucusuna aittir.")
                 return
             p_args = text.split()[1:]
             if not p_args:
