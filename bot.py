@@ -857,7 +857,7 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/iban</code>\n"
             "  └ <i>Kullanımdaki ve boşta olan şirket İBAN'larını listeler.</i>\n\n"
             "• <code>/sablon [Hesap]</code> (veya <code>/[Hesap Adı]</code>)\n"
-            "  └ <i>📋 Excel'deki resmi ödeme/İBAN şablonunu anında çeker (Örn: /HSY EMLAK 3).</i>\n\n"
+            "  └ <i>📋 Excel resmi ödeme şablonunu çeker ve grupta otomatik tahsis eder (Örn: /HSY EMLAK 3).</i>\n\n"
             "• <code>/ibantahsis [Hesap] [Cari]</code>\n"
             "  └ <i>İBAN'ı cariye tahsis edip 'Kullanımda' yapar (Örn: /ibantahsis CYL1 SACİD).</i>\n\n"
             "• <code>/ibanbosalt [Hesap]</code>\n"
@@ -940,7 +940,7 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/portfoy</code> : Şirket konsolide hazine ve portföy bilançosu.\n"
             "• <code>/hesap [Grup] [Kom%] [Kur]</code> : Tether hesap makinesi.\n"
             "• <code>/iban</code> : Şirket İBAN listesi.\n"
-            "• <code>/sablon [Hesap]</code> : Excel ödeme şablonunu çeker (Örn: /HSY EMLAK 3).\n"
+            "• <code>/sablon [Hesap]</code> : Excel ödeme şablonunu çeker ve grupta otomatik tahsis eder.\n"
             "• <code>/ibantahsis [Hesap] [Cari]</code> : İBAN'ı cariye tahsis eder.\n"
             "• <code>/ibanbosalt [Hesap]</code> : İBAN'ı boşa çıkarır.\n"
             "• <code>/ibancoz [İBAN]</code> : İBAN doğrulama ve banka tespiti.\n"
@@ -2862,10 +2862,11 @@ def iban_sablon_bul(veriler: List[List[str]], aranan_kod: str):
 
     return None
 
-def iban_sablon_getir_impl(komut_metni: str) -> str:
+def iban_sablon_getir_impl(komut_metni: str, chat_id: int = 0) -> str:
     """
     Kullanıcı /HSY EMLAK 3 veya /sablon HSY EMLAK 3 yazdığında
     Excel'deki ilgili satırdan hazır ödeme şablonunu çeker ve doğrudan Telegram'a gönderir.
+    Eğer komut bağlı bir Telegram grubundan çağrılmışsa, hesabı otomatik olarak o gruba tahsis edip Excel'e işler.
     """
     temiz_komut = komut_metni.strip()
     if temiz_komut.startswith("/sablon") or temiz_komut.startswith("/şablon") or temiz_komut.startswith("/hesapbilgi"):
@@ -2899,7 +2900,32 @@ def iban_sablon_getir_impl(komut_metni: str) -> str:
     if not sablon_metni:
         return f"⚠️ <b>'{hesap_adi}'</b> için Excel tablosunda henüz bir şablon metni girilmemiş."
 
-    return sablon_metni
+    tahsis_bilgisi = ""
+    # Eğer bu komut bağlı bir Telegram grubundan çağrıldıysa otomatik olarak o gruba tahsis et
+    if chat_id and chat_id < 0:
+        grup_baglantilarini_guncelle()
+        bagli = app_state.get("GRUP_BAGLANTILARI", {}).get(chat_id)
+        if bagli and bagli.get("grup"):
+            hedef_cari = bagli.get("grup").strip().upper()
+            h_res = iban_hesap_bul(veriler, aranan) or iban_hesap_bul(veriler, hesap_adi)
+            if h_res:
+                h_satir, h_col, h_ad, eski_cari = h_res
+                if eski_cari.strip().upper() != hedef_cari:
+                    try:
+                        update_sheet_matrix_memory(sayfa.title, h_satir, h_col, hedef_cari)
+                        sayfa.update_cell(h_satir, h_col, hedef_cari)
+                        app_state["SON_ISLEM"] = {
+                            "sayfa": sayfa.title, "satir": h_satir, "sutun": h_col,
+                            "eskiDeger": eski_cari, "grupAdi": h_ad, "islemTuru": "İBAN Otomatik Tahsis"
+                        }
+                        sistemeLogYaz("İBAN Otomatik Tahsis", f"Gruptan ({chat_id}) {h_ad} ➔ {hedef_cari}")
+                        tahsis_bilgisi = f"\n\n📌 <i>Bu hesap otomatik olarak <b>{hedef_cari}</b> grubuna tahsis edildi (Excel güncellendi).</i>"
+                    except Exception as e:
+                        print(f"Otomatik İBAN tahsis hatası: {e}")
+                else:
+                    tahsis_bilgisi = f"\n\n📌 <i>Bu hesap zaten <b>{hedef_cari}</b> grubuna tahsisli.</i>"
+
+    return sablon_metni + tahsis_bilgisi
 
 def iban_hesap_bul(veriler: List[List[str]], aranan_kod: str):
     """
@@ -2926,7 +2952,28 @@ def iban_hesap_bul(veriler: List[List[str]], aranan_kod: str):
             if aranan_norm == h_norm or (len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm)):
                 mevcut_cari = row[17].strip() if len(row) > 17 else ""
                 return idx, 18, h_ad, mevcut_cari
-                
+
+    # 2. Aşama: Esnek token eşleşmesi (Örn: 'ARS 3' -> 'ARS EMLAK 3' veya 'HSY 2' -> 'HSY 2 / 29')
+    match_digits = re.findall(r'\d+', aranan_norm)
+    match_letters = re.findall(r'[A-Z]+', aranan_norm)
+    if match_digits and match_letters:
+        num = match_digits[-1]
+        letters = "".join(match_letters)
+        for idx, row in enumerate(veriler[1:], start=2):
+            if len(row) > 11 and row[11].strip():
+                h_ad = row[11].strip()
+                h_norm = normalize_hesap_kodu(h_ad)
+                if letters in h_norm and h_norm.endswith(num):
+                    mevcut_cari = row[14].strip() if len(row) > 14 else ""
+                    return idx, 15, h_ad, mevcut_cari
+
+            if len(row) > 15 and row[15].strip():
+                h_ad = row[15].strip()
+                h_norm = normalize_hesap_kodu(h_ad)
+                if letters in h_norm and h_norm.endswith(num):
+                    mevcut_cari = row[17].strip() if len(row) > 17 else ""
+                    return idx, 18, h_ad, mevcut_cari
+
     return None
 
 def iban_tahsis_impl(komut_metni: str) -> str:
@@ -4096,7 +4143,7 @@ def process_telegram_update(update: dict):
             else:
                 islemi_analiz_bildirimiyle_yap(chat_id, ibanCozumle_impl, text)
         elif ana_komut in ["/sablon", "/şablon", "/hesapbilgi"]:
-            islemi_analiz_bildirimiyle_yap(chat_id, iban_sablon_getir_impl, text)
+            islemi_analiz_bildirimiyle_yap(chat_id, iban_sablon_getir_impl, text, chat_id)
         elif ana_komut in ["/ibantahsis", "/tahsis"]:
             islemi_analiz_bildirimiyle_yap(chat_id, iban_tahsis_impl, text)
         elif ana_komut in ["/ibanbosalt", "/bosalt", "/ibansil"]:
@@ -4242,7 +4289,7 @@ def process_telegram_update(update: dict):
                     sayfa_temp = get_active_daily_sheet(sh_temp)
                     veriler_temp = get_sheet_values_fast(sayfa_temp)
                     if iban_sablon_bul(veriler_temp, aranan_aday):
-                        islemi_analiz_bildirimiyle_yap(chat_id, iban_sablon_getir_impl, text)
+                        islemi_analiz_bildirimiyle_yap(chat_id, iban_sablon_getir_impl, text, chat_id)
                         return
                 except Exception:
                     pass
