@@ -739,31 +739,42 @@ def toplu_duyuru_hazirla_paneli(komut_metni: str, gonderen_id: int) -> Tuple[str
         "tum_idler": list(baglantilar.keys())
     }
     
-    ibanli_adlar = ", ".join(sorted(list(set(item[1] for item in bagli_ibanli_gruplar)))) if bagli_ibanli_gruplar else "Yok"
-    ibansiz_adlar = ", ".join(sorted(list(set(item[1] for item in bagli_ibansiz_gruplar)))) if bagli_ibansiz_gruplar else "Yok"
+    def _format_cari_listesi(isimler: List[str], max_adet: int = 12) -> str:
+        if not isimler:
+            return "<i>Yok</i>"
+        if len(isimler) <= max_adet:
+            return ", ".join(isimler)
+        gosterilen = ", ".join(isimler[:max_adet])
+        kalan = len(isimler) - max_adet
+        return f"{gosterilen} <i>(+{kalan} cari daha)</i>"
+
+    ibanli_adlar = _format_cari_listesi(sorted(list(set(item[1] for item in bagli_ibanli_gruplar))), 12)
+    ibansiz_adlar = _format_cari_listesi(sorted(list(set(item[1] for item in bagli_ibansiz_gruplar))), 8)
     
     metin = (
-        f"📢 <b>TOPLU DUYURU HEDEF SEÇİM PANELİ</b>\n"
+        f"📢 <b>TOPLU DUYURU KONTROL PANELİ</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📝 <b>Duyuru Metni:</b>\n"
-        f"<i>\"{duyuru_icerik}\"</i>\n"
+        f"📝 <b>İletilecek Mesaj:</b>\n"
+        f"<i>« {duyuru_icerik} »</i>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"📊 <b>HEDEF KİTLE ANALİZİ:</b>\n"
-        f"• 💳 <b>İBAN'ı Aktif Cariler ({len(bagli_ibanli_gruplar)}):</b> <code>{ibanli_adlar}</code>\n"
-        f"• ⚪ <b>İBAN'ı Olmayan Cariler ({len(bagli_ibansiz_gruplar)}):</b> <code>{ibansiz_adlar}</code>\n"
-        f"• 👥 <b>Toplam Bağlı Grup:</b> <code>{len(baglantilar)} Adet</code>\n"
+        f"📊 <b>HEDEF KİTLE ANALİZİ:</b>\n\n"
+        f"🟢 <b>İBAN'ı Aktif Cariler ({len(bagli_ibanli_gruplar)} Adet):</b>\n"
+        f"<i>{ibanli_adlar}</i>\n\n"
+        f"⚪ <b>İBAN'ı Olmayan Cariler ({len(bagli_ibansiz_gruplar)} Adet):</b>\n"
+        f"<i>{ibansiz_adlar}</i>\n\n"
+        f"👥 <b>Toplam Bağlı Grup:</b> <b>{len(baglantilar)} Grup</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"👇 <i>Duyurunun hangi gruplara gönderileceğini seçiniz:</i>"
+        f"👇 <i>Lütfen duyurunun iletileceği hedef kitleyi seçiniz:</i>"
     )
     
     butonlar = []
     if bagli_ibanli_gruplar:
-        butonlar.append([{"text": f"💳 Sadece İBAN'ı Aktif Gruplara ({len(bagli_ibanli_gruplar)} Grup)", "callback_data": f"duyuru_gonder_iban_{draft_id}"}])
+        butonlar.append([{"text": f"🟢 Sadece İBAN'ı Aktif Gruplara Gönder ({len(bagli_ibanli_gruplar)} Grup)", "callback_data": f"duyuru_gonder_iban_{draft_id}"}])
     else:
-        butonlar.append([{"text": "💳 Sadece İBAN'ı Aktif Gruplara (0 Grup)", "callback_data": f"duyuru_bos_uyari_{draft_id}"}])
+        butonlar.append([{"text": "⚪ Sadece İBAN'ı Aktif Gruplara (0 Grup)", "callback_data": f"duyuru_bos_uyari_{draft_id}"}])
         
-    butonlar.append([{"text": f"🌐 Tüm Bağlı Gruplara ({len(baglantilar)} Grup)", "callback_data": f"duyuru_gonder_tumu_{draft_id}"}])
-    butonlar.append([{"text": "❌ İptal Et", "callback_data": f"duyuru_iptal_{draft_id}"}])
+    butonlar.append([{"text": f"🌐 Tüm Bağlı Gruplara Gönder ({len(baglantilar)} Grup)", "callback_data": f"duyuru_gonder_tumu_{draft_id}"}])
+    butonlar.append([{"text": "❌ Gönderimi İptal Et", "callback_data": f"duyuru_iptal_{draft_id}"}])
     
     return metin, {"inline_keyboard": butonlar}
 
@@ -793,7 +804,7 @@ def toplu_duyuru_yayinla_callback(draft_id: str, hedef_filtre: str, gonderen_id:
     hedef_aciklama = ""
     
     if hedef_filtre == "iban_aktif":
-        hedef_aciklama = "💳 Sadece İBAN'ı Aktif Gruplar"
+        hedef_aciklama = "🟢 Sadece İBAN'ı Aktif Gruplar"
         for c_id, info in baglantilar.items():
             grup_adi = info.get("grup", "")
             if normalize_text(grup_adi) in aktif_iban_carileri:
@@ -815,7 +826,7 @@ def toplu_duyuru_yayinla_callback(draft_id: str, hedef_filtre: str, gonderen_id:
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"{duyuru_icerik}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"⏰ <i>{saat_tarih}</i>"
+        f"⏰ <i>{saat_tarih}</i>  •  🏛️ <b>CFO Yönetim</b>"
     )
     
     basarili_gruplar = []
@@ -837,14 +848,16 @@ def toplu_duyuru_yayinla_callback(draft_id: str, hedef_filtre: str, gonderen_id:
         f"Gönderen: {gonderen_id} | Filtre: {hedef_filtre} | Başarılı: {len(basarili_gruplar)}/{len(hedef_chat_idler)}"
     )
     
+    iletilen_cari_str = ", ".join(sorted(list(set(basarili_gruplar)))) if basarili_gruplar else "Yok"
+    
     rapor = (
         f"📢 <b>TOPLU DUYURU RAPORU</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"🎯 <b>Hedef Kitle:</b> <b>{hedef_aciklama}</b>\n"
-        f"✅ <b>Başarılı Gönderim:</b> <code>{len(basarili_gruplar)} Grup</code>\n"
+        f"✅ <b>Başarılı Gönderim:</b> <b>{len(basarili_gruplar)} Grup</b>\n"
     )
     if basarili_gruplar:
-        rapor += f"🏢 <b>İletilen Cariler:</b> <i>{', '.join(sorted(list(set(basarili_gruplar))))}</i>\n"
+        rapor += f"🏢 <b>İletilen Cariler:</b>\n<i>{iletilen_cari_str}</i>\n"
         
     if basarisiz_gruplar:
         rapor += (
