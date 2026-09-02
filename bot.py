@@ -241,35 +241,17 @@ _cached_active_sheet_time = 0
 _cached_active_sheet_lock = threading.Lock()
 
 def get_active_daily_sheet(sh, force_refresh=False) -> gspread.Worksheet:
-    """Excel tablosundaki en son tarihli aktif çalışma sayfasını bulur ve önbelleğe alır."""
+    """
+    Excel tablosundaki EN SON GÜNCEL TARİHLİ aktif çalışma sayfasını bulur ve önbelleğe alır.
+    Sistem saati ne olursa olsun (yeni gün erken açılmış olsa veya gece yarısı öncesi/sonrası fark etmeksizin),
+    Google Sheets'teki en ileri/en son tarihli sayfayı baz alır ve işlemleri doğrudan oraya işler.
+    """
     global _cached_active_sheet, _cached_active_sheet_time
     now = time.time()
     with _cached_active_sheet_lock:
-        if not force_refresh and _cached_active_sheet is not None and (now - _cached_active_sheet_time < 300):
+        if not force_refresh and _cached_active_sheet is not None and (now - _cached_active_sheet_time < 60):
             return _cached_active_sheet
             
-        # 1. HIZLI YOL: Doğrudan bugünün veya dünün tarihli sayfasını çek (33 sayfa üstverisi indirmeden ~150ms)
-        today_str = suankiZamaniAl().strftime("%d.%m.%Y")
-        try:
-            ws = sh.worksheet(today_str)
-            if is_valid_daily_sheet(ws):
-                _cached_active_sheet = ws
-                _cached_active_sheet_time = now
-                return ws
-        except Exception:
-            pass
-
-        yesterday_str = (suankiZamaniAl() - datetime.timedelta(days=1)).strftime("%d.%m.%Y")
-        try:
-            ws = sh.worksheet(yesterday_str)
-            if is_valid_daily_sheet(ws):
-                _cached_active_sheet = ws
-                _cached_active_sheet_time = now
-                return ws
-        except Exception:
-            pass
-
-        # 2. YEDEK YOL: Tüm sayfaları tara
         tum_ws = sh.worksheets()
         tarih_sayfalari = []
         
@@ -278,9 +260,11 @@ def get_active_daily_sheet(sh, force_refresh=False) -> gspread.Worksheet:
                 try:
                     t_obj = datetime.datetime.strptime(ws.title, "%d.%m.%Y")
                     tarih_sayfalari.append((t_obj, ws))
-                except: pass
+                except Exception:
+                    pass
                 
         if tarih_sayfalari:
+            # Tarihe göre büyükten küçüğe sırala (en güncel/en son açılan tarih en başta)
             tarih_sayfalari.sort(key=lambda x: x[0], reverse=True)
             _cached_active_sheet = tarih_sayfalari[0][1]
             _cached_active_sheet_time = now
@@ -668,7 +652,9 @@ def grup_senkronize_impl() -> str:
     Telegram grupları arasındaki tüm bağlantıları, cari isimlerini ve grup başlıklarını
     canlı olarak sorgular, senkronize eder ve tüm sistem önbelleklerini anında günceller.
     """
-    global _cached_sheet_matrix, _cached_sheet_matrix_time, _cached_spreadsheet, _cached_sh_time
+    global _cached_active_sheet, _cached_active_sheet_time, _cached_sheet_matrix, _cached_sheet_matrix_time, _cached_spreadsheet, _cached_sh_time
+    _cached_active_sheet = None
+    _cached_active_sheet_time = 0
     _cached_sheet_matrix = None
     _cached_sheet_matrix_time = 0
     _cached_spreadsheet = None
@@ -676,7 +662,7 @@ def grup_senkronize_impl() -> str:
     app_state["BAGLANTI_CACHE_TIME"] = 0
     
     sh = get_spreadsheet()
-    sayfa = get_active_daily_sheet(sh)
+    sayfa = get_active_daily_sheet(sh, force_refresh=True)
     gunluk_veriler = get_sheet_values_fast(sayfa)
     
     gunluk_cariler = set()
@@ -4192,6 +4178,14 @@ def yenigun_gerceklestir_impl(masraflari_sil: bool) -> str:
         except Exception:
             pass
             
+    # Yeni açılan güncel sayfayı hemen aktif sayfa olarak hafızaya al ve önbelleği güncelle
+    global _cached_active_sheet, _cached_active_sheet_time, _cached_sheet_matrix, _cached_sheet_matrix_title, _cached_sheet_matrix_time
+    _cached_active_sheet = yeni_sayfa
+    _cached_active_sheet_time = time.time()
+    _cached_sheet_matrix = None
+    _cached_sheet_matrix_title = ""
+    _cached_sheet_matrix_time = 0
+
     sistemeLogYaz("Yeni Gün Geçişi", f"Yeni gün ({hedef_yeni_tarih}) açıldı. Kaynak: {kaynak_sayfa.title} | Devir: {paraFormatla(toplam_devir)} | G45: {yeni_g45_formulu}")
     
     return (
