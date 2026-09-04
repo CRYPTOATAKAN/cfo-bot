@@ -2073,6 +2073,19 @@ def fetch_all_market_rates_parallel(force_refresh: bool = False, max_age: float 
             except Exception:
                 return 0.0
 
+        gold_data = {"gram": 7350.0, "ons": 2850.0, "gumus": 85.20}
+        try:
+            d_gold = http_get_json("https://finans.truncgil.com/v3/today.json")
+            if isinstance(d_gold, dict):
+                g_a = _parse_kur((d_gold.get("gram-altin") or {}).get("Selling"))
+                o_a = _parse_kur((d_gold.get("ons") or {}).get("Selling"))
+                g_g = _parse_kur((d_gold.get("gumus") or {}).get("Selling"))
+                if g_a > 0: gold_data["gram"] = g_a
+                if o_a > 0: gold_data["ons"] = o_a
+                if g_g > 0: gold_data["gumus"] = g_g
+        except Exception:
+            pass
+
         # 1. Öncelikli Gerçek Kaynak: https://kur.doviz.com/harem/amerikan-dolari (Harem Altın Kapalıçarşı Canlı Tahtası)
         try:
             html = http_get_text("https://kur.doviz.com/harem/amerikan-dolari")
@@ -2093,7 +2106,8 @@ def fetch_all_market_rates_parallel(force_refresh: bool = False, max_age: float 
             if u_alis > 0 and u_satis > 0:
                 return {
                     "usd": (u_alis, u_satis),
-                    "eur": (e_alis, e_satis) if (e_alis > 0 and e_satis > 0) else (55.60, 55.85)
+                    "eur": (e_alis, e_satis) if (e_alis > 0 and e_satis > 0) else (55.60, 55.85),
+                    "gold": gold_data
                 }
         except Exception as e:
             pass
@@ -2109,10 +2123,11 @@ def fetch_all_market_rates_parallel(force_refresh: bool = False, max_age: float 
             e_satis = _parse_kur(e.get("Selling"))
             return {
                 "usd": (u_alis, u_satis) if u_alis > 0 and u_satis > 0 else (48.08, 48.17),
-                "eur": (e_alis, e_satis) if e_alis > 0 and e_satis > 0 else (55.60, 55.85)
+                "eur": (e_alis, e_satis) if e_alis > 0 and e_satis > 0 else (55.60, 55.85),
+                "gold": gold_data
             }
         except Exception:
-            return {"usd": (48.08, 48.17), "eur": (55.60, 55.85)}
+            return {"usd": (48.08, 48.17), "eur": (55.60, 55.85), "gold": gold_data}
 
     def fetch_fiat():
         try:
@@ -2127,7 +2142,8 @@ def fetch_all_market_rates_parallel(force_refresh: bool = False, max_age: float 
             return {
                 "last": float(r.get("lastPrice", 0)),
                 "high": float(r.get("highPrice", 0)),
-                "low": float(r.get("lowPrice", 0))
+                "low": float(r.get("lowPrice", 0)),
+                "change": float(r.get("priceChangePercent", 0))
             }
         except Exception:
             return None
@@ -2258,44 +2274,110 @@ def kurRaporuUret_impl() -> str:
         
     return yanit.strip()
 
-def canliKurSorgula_impl() -> str:
+def fetch_binance_crypto_tickers(symbols: list) -> dict:
+    """Binance REST API üzerinden 24 saatlik fiyat ve % değişim verilerini çeker."""
+    result = {}
     try:
-        rates = fetch_all_market_rates_parallel()
-        b_usdt_val = (rates.get("binance") or {}).get("last", 48.20)
+        data = http_get_json("https://data-api.binance.vision/api/v3/ticker/24hr")
+        if isinstance(data, list):
+            for item in data:
+                sym = item.get("symbol")
+                if sym in symbols:
+                    result[sym] = {
+                        "price": float(item.get("lastPrice", 0)),
+                        "change": float(item.get("priceChangePercent", 0))
+                    }
+    except Exception:
+        pass
+
+    for sym in symbols:
+        if sym not in result:
+            try:
+                item = http_get_json(f"https://data-api.binance.vision/api/v3/ticker/24hr?symbol={sym}")
+                if isinstance(item, dict) and "lastPrice" in item:
+                    result[sym] = {
+                        "price": float(item.get("lastPrice", 0)),
+                        "change": float(item.get("priceChangePercent", 0))
+                    }
+            except Exception:
+                pass
+    return result
+
+def canliKurSorgula_impl(force_refresh: bool = False):
+    try:
+        rates = fetch_all_market_rates_parallel(force_refresh=force_refresh)
+        b_usdt_val = float((rates.get("binance") or {}).get("last", 48.20))
         fiat = rates.get("fiat") or {}
         try_rate = float(fiat.get("TRY", 48.09))
-        
-        # Ek kurlar
-        b_btc = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=BTCUSDT")
-        b_eth = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=ETHUSDT")
-        b_bnb = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=BNBUSDT")
-        b_sol = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=SOLUSDT")
-        b_xrp = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=XRPUSDT")
 
-        btc_p = float(b_btc['price']) if (b_btc and 'price' in b_btc) else 0.0
-        eth_p = float(b_eth['price']) if (b_eth and 'price' in b_eth) else 0.0
-        bnb_p = float(b_bnb['price']) if (b_bnb and 'price' in b_bnb) else 0.0
-        sol_p = float(b_sol['price']) if (b_sol and 'price' in b_sol) else 0.0
-        xrp_p = float(b_xrp['price']) if (b_xrp and 'price' in b_xrp) else 0.0
+        harem = rates.get("harem") or {}
+        h_usd_alis, h_usd_satis = harem.get("usd", (48.08, 48.17))
+        h_eur_alis, h_eur_satis = harem.get("eur", (55.60, 55.85))
 
-        kripto_metin = f"🇹🇷 USDT / TRY: <code>{float(b_usdt_val):.2f} ₺</code>\n"
-        if btc_p > 0:
-            kripto_metin += f"🔶 BTC / USDT: <code>{btc_p:,.0f} $</code>\n"
-        if eth_p > 0:
-            kripto_metin += f"🔷 ETH / USDT: <code>{eth_p:.2f} $</code>\n"
-        if bnb_p > 0:
-            kripto_metin += f"🟡 BNB / USDT: <code>{bnb_p:.2f} $</code>\n"
-        if sol_p > 0:
-            kripto_metin += f"🟣 SOL / USDT: <code>{sol_p:.2f} $</code>\n"
-        if xrp_p > 0:
-            xrp_fmt = f"{xrp_p:.4f}" if xrp_p < 10 else f"{xrp_p:.2f}"
-            kripto_metin += f"🌐 XRP / USDT: <code>{xrp_fmt} $</code>\n"
+        gold_info = harem.get("gold") or {"gram": 7350.0, "ons": 2850.0, "gumus": 85.20}
+        gram_altin = float(gold_info.get("gram", 7350.0))
+        ons_altin = float(gold_info.get("ons", 2850.0))
+        gram_gumus = float(gold_info.get("gumus", 85.20))
 
-        return (
-            "🌍 <b>CANLI PİYASA & DÜNYA KURLARI</b>\n\n"
-            "🪙 <b>Kripto Paralar (Binance)</b>\n"
-            f"{kripto_metin}\n"
-            "💵 <b>Dünya Para Birimleri</b>\n"
+        # Kripto kurları (24s Değişim ve Fiyatlar)
+        symbols = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT", "TRXUSDT", "AVAXUSDT", "DOGEUSDT"]
+        crypto_data = fetch_binance_crypto_tickers(symbols)
+
+        # 1. Kripto Paralar
+        crypto_lines = []
+        usdt_chg = float((rates.get("binance") or {}).get("change", 0.0))
+        usdt_chg_str = f" 🟢 +{usdt_chg:.2f}%" if usdt_chg > 0 else (f" 🔴 {usdt_chg:.2f}%" if usdt_chg < 0 else "")
+        crypto_lines.append(f"🇹🇷 USDT / TRY: <code>{b_usdt_val:.2f} ₺</code>{usdt_chg_str}")
+
+        labels_map = [
+            ("BTCUSDT", "🔶 BTC / USDT", "{val:,.0f} $"),
+            ("ETHUSDT", "🔷 ETH / USDT", "{val:.2f} $"),
+            ("BNBUSDT", "🟡 BNB / USDT", "{val:.2f} $"),
+            ("SOLUSDT", "🟣 SOL / USDT", "{val:.2f} $"),
+            ("XRPUSDT", "🌐 XRP / USDT", "{val:.4f} $"),
+            ("TRXUSDT", "🔴 TRX / USDT", "{val:.4f} $"),
+            ("AVAXUSDT", "🔺 AVAX / USDT", "{val:.2f} $"),
+            ("DOGEUSDT", "🐕 DOGE / USDT", "{val:.4f} $"),
+        ]
+
+        for sym, label, fmt in labels_map:
+            c_info = crypto_data.get(sym, {})
+            val = c_info.get("price", 0.0)
+            chg = c_info.get("change", 0.0)
+            if val > 0:
+                chg_str = f" 🟢 +{chg:.2f}%" if chg >= 0 else f" 🔴 {chg:.2f}%"
+                if sym in ["XRPUSDT", "TRXUSDT", "DOGEUSDT"] and val >= 10:
+                    val_str = f"{val:.2f} $"
+                else:
+                    val_str = fmt.format(val=val)
+                crypto_lines.append(f"{label}: <code>{val_str}</code>{chg_str}")
+
+        kripto_metin = "\n".join(crypto_lines)
+
+        # 2. Altın & Kıymetli Madenler
+        altin_metin = (
+            f"👑 ONS Altın: <code>{ons_altin:,.2f} $</code>\n"
+            f"🟡 Gram Altın: <code>{gram_altin:,.2f} ₺</code>\n"
+            f"🥈 Gram Gümüş: <code>{gram_gumus:,.2f} ₺</code>"
+        )
+
+        # 3. Kapalıçarşı & Arbitraj Makası
+        if h_usd_satis > 0:
+            makas_pct = ((b_usdt_val - h_usd_satis) / h_usd_satis) * 100
+            if makas_pct >= 0:
+                makas_str = f"+%{makas_pct:.2f} (USDT Primi)"
+            else:
+                makas_str = f"-%{abs(makas_pct):.2f} (Nakit Primi)"
+        else:
+            makas_str = "%0.00"
+
+        kapalicarsi_metin = (
+            f"🏬 Nakit USD (Alış/Satış): <code>{h_usd_alis:.2f} ₺ / {h_usd_satis:.2f} ₺</code>\n"
+            f"⚡ USDT vs Nakit Makası: <code>{makas_str}</code>"
+        )
+
+        # 4. Dünya Para Birimleri
+        dunya_metin = (
             f"🇺🇸 Dolar (USD): <code>{try_rate:.2f} ₺</code>\n"
             f"🇪🇺 Euro (EUR): <code>{(try_rate / fiat.get('EUR', 1)):.2f} ₺</code>\n"
             f"🇬🇧 Sterlin (GBP): <code>{(try_rate / fiat.get('GBP', 1)):.2f} ₺</code>\n"
@@ -2304,11 +2386,30 @@ def canliKurSorgula_impl() -> str:
             f"🇦🇺 Avustralya Dol. (AUD): <code>{(try_rate / fiat.get('AUD', 1)):.2f} ₺</code>\n"
             f"🇯🇵 Japon Yeni (JPY): <code>{(try_rate / fiat.get('JPY', 1)):.2f} ₺</code>\n"
             f"🇸🇦 Suudi Riyali (SAR): <code>{(try_rate / fiat.get('SAR', 1)):.2f} ₺</code>\n"
-            f"🇷🇺 Rus Rublesi (RUB): <code>{(try_rate / fiat.get('RUB', 1)):.2f} ₺</code>\n\n"
+            f"🇷🇺 Rus Rublesi (RUB): <code>{(try_rate / fiat.get('RUB', 1)):.2f} ₺</code>"
+        )
+
+        metin = (
+            "🌍 <b>CANLI PİYASA & DÜNYA KURLARI</b>\n\n"
+            "🪙 <b>Kripto Paralar (Binance)</b>\n"
+            f"{kripto_metin}\n\n"
+            "🏆 <b>Altın & Kıymetli Madenler (Kapalıçarşı)</b>\n"
+            f"{altin_metin}\n\n"
+            "🏦 <b>Kapalıçarşı Nakit & Arbitraj Makası</b>\n"
+            f"{kapalicarsi_metin}\n\n"
+            "💵 <b>Dünya Para Birimleri</b>\n"
+            f"{dunya_metin}\n\n"
             f"<i>⏱ Son Güncelleme: {suankiZamaniAl().strftime('%H:%M:%S')}</i>"
         )
+
+        klavye = {
+            "inline_keyboard": [
+                [{"text": "🔄 Canlı Kurları Yenile", "callback_data": "canli_kur_yenile"}]
+            ]
+        }
+        return metin, klavye
     except Exception as e:
-        return f"❌ <b>API Hatası:</b> {e}"
+        return f"❌ <b>API Hatası:</b> {e}", None
 
 def arbitraj_raporu_uret_impl(komut_metni: str = "") -> str:
     """
@@ -4575,6 +4676,17 @@ def process_telegram_update(update: dict):
                 telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
             else:
                 telegramMesajGonder(chat_id, metin, klavye)
+        elif data == "canli_kur_yenile":
+            msg_id = cq.get("message", {}).get("message_id")
+            metin, klavye = canliKurSorgula_impl(force_refresh=True)
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+            else:
+                telegramMesajGonder(chat_id, metin, klavye)
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq["id"], "text": "🔄 Canlı kurlar güncellendi!"})
+            except Exception:
+                pass
         elif data == "menu_yenigun":
             metin, klavye = yenigun_baslat_mesaji()
             telegramMesajGonder(chat_id, metin, klavye)
