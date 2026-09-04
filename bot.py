@@ -4532,6 +4532,63 @@ def process_telegram_update(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, yenigun_gerceklestir_impl, False)
         elif data == "yenigun_iptal":
             telegramMesajGonder(chat_id, "❌ Yeni gün devir işlemi iptal edildi.")
+        elif data.startswith("rapor_ilet_"):
+            draft_id = data.replace("rapor_ilet_", "").strip()
+            item = app_state.get("RAPOR_TASLAKLARI", {}).get(draft_id)
+            if not item:
+                telegram_api("answerCallbackQuery", {
+                    "callback_query_id": cq["id"],
+                    "text": "⚠️ Rapor taslağı bulunamadı veya süresi dolmuş.",
+                    "show_alert": True
+                })
+                return
+            
+            grup_adi = item["grup"]
+            grup_metni = item["metin"]
+            
+            grup_baglantilarini_guncelle()
+            baglantilar = app_state.get("GRUP_BAGLANTILARI", {})
+            hedef_chat_id = None
+            hedef_title = grup_adi
+            g_norm = normalize_text(grup_adi)
+            
+            for c_id, info in baglantilar.items():
+                if normalize_text(info.get("grup", "")) == g_norm:
+                    hedef_chat_id = c_id
+                    hedef_title = info.get("title") or info.get("grup") or grup_adi
+                    break
+            
+            if hedef_chat_id:
+                res = telegramMesajGonder(hedef_chat_id, grup_metni)
+                if res.get("ok"):
+                    telegram_api("answerCallbackQuery", {
+                        "callback_query_id": cq["id"],
+                        "text": f"✅ Rapor '{hedef_title}' Telegram grubuna başarıyla iletildi!",
+                        "show_alert": False
+                    })
+                    msg_id = cq.get("message", {}).get("message_id")
+                    guncel_metin = grup_metni + f"\n\n🟢 <b>İletildi:</b> <i>{hedef_title} Telegram Grubu</i>"
+                    yeni_klavye = {
+                        "inline_keyboard": [
+                            [{"text": f"✅ {hedef_title} Grubuna İletildi", "callback_data": "duyuru_bos_uyari_"}],
+                            [{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]
+                        ]
+                    }
+                    if msg_id:
+                        telegramMesajDuzenle(chat_id, msg_id, guncel_metin, yeni_klavye)
+                else:
+                    err_desc = res.get("description", "API Hatası")
+                    telegram_api("answerCallbackQuery", {
+                        "callback_query_id": cq["id"],
+                        "text": f"❌ Mesaj iletilemedi: {err_desc}",
+                        "show_alert": True
+                    })
+            else:
+                telegram_api("answerCallbackQuery", {
+                    "callback_query_id": cq["id"],
+                    "text": f"⚠️ '{grup_adi}' adında bağlı bir Telegram grubu bulunamadı!\n\nLütfen o grupta '/grupbagla {grup_adi}' yazarak grubu bağlayınız.",
+                    "show_alert": True
+                })
         elif data.startswith("rapor_"):
             grup = data.replace("rapor_", "")
             islemi_analiz_bildirimiyle_yap(chat_id, grup_kasa_analiz_fisi_uret, grup)
@@ -4621,64 +4678,6 @@ def process_telegram_update(update: dict):
                 "text": "⚠️ Şu anda İBAN'ı aktif olarak atanmış bir grup bulunmuyor.",
                 "show_alert": True
             })
-        elif data.startswith("rapor_ilet_"):
-            draft_id = data.replace("rapor_ilet_", "").strip()
-            item = app_state.get("RAPOR_TASLAKLARI", {}).get(draft_id)
-            if not item:
-                telegram_api("answerCallbackQuery", {
-                    "callback_query_id": cq["id"],
-                    "text": "⚠️ Rapor taslağı bulunamadı veya süresi dolmuş.",
-                    "show_alert": True
-                })
-                return
-            
-            grup_adi = item["grup"]
-            grup_metni = item["metin"]
-            
-            grup_baglantilarini_guncelle()
-            baglantilar = app_state.get("GRUP_BAGLANTILARI", {})
-            hedef_chat_id = None
-            hedef_title = grup_adi
-            g_norm = normalize_text(grup_adi)
-            
-            for c_id, info in baglantilar.items():
-                if normalize_text(info.get("grup", "")) == g_norm:
-                    hedef_chat_id = c_id
-                    hedef_title = info.get("title") or info.get("grup") or grup_adi
-                    break
-            
-            if hedef_chat_id:
-                res = telegramMesajGonder(hedef_chat_id, grup_metni)
-                if res.get("ok"):
-                    telegram_api("answerCallbackQuery", {
-                        "callback_query_id": cq["id"],
-                        "text": f"✅ Rapor '{hedef_title}' Telegram grubuna başarıyla iletildi!",
-                        "show_alert": False
-                    })
-                    msg_id = cq.get("message", {}).get("message_id")
-                    guncel_metin = grup_metni + f"\n\n🟢 <b>İletildi:</b> <i>{hedef_title} Telegram Grubu</i>"
-                    yeni_klavye = {
-                        "inline_keyboard": [
-                            [{"text": f"✅ {hedef_title} Grubuna İletildi", "callback_data": "duyuru_bos_uyari_"}],
-                            [{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]
-                        ]
-                    }
-                    if msg_id:
-                        telegramMesajDuzenle(chat_id, msg_id, guncel_metin, yeni_klavye)
-                else:
-                    err_desc = res.get("description", "API Hatası")
-                    telegram_api("answerCallbackQuery", {
-                        "callback_query_id": cq["id"],
-                        "text": f"❌ Mesaj iletilemedi: {err_desc}",
-                        "show_alert": True
-                    })
-            else:
-                telegram_api("answerCallbackQuery", {
-                    "callback_query_id": cq["id"],
-                    "text": f"⚠️ '{grup_adi}' adında bağlı bir Telegram grubu bulunamadı!\n\nLütfen o grupta '/grupbagla {grup_adi}' yazarak grubu bağlayınız.",
-                    "show_alert": True
-                })
-
         elif data in ["mesaj_kapat", "panel_kapat", "kapat"]:
             msg_id = cq.get("message", {}).get("message_id")
             if msg_id:
