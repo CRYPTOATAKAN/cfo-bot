@@ -3036,20 +3036,20 @@ def hesapMakinesi_impl(orijinalMetin: str) -> str:
     islemZamani = suankiZamaniAl().strftime("%d.%m.%Y | %H:%M")
     mesaj = (
         f"👑 <b>HESAP KESİMİ & BAKİYE RAPORU</b>\n\n"
-        f"🏛️ <b>Cari Hesap:</b> <b>{gercekGrupAdi.upper()}</b>\n"
+        f"🏛️ <b>Cari Hesap:</b> {gercekGrupAdi.upper()}\n"
         f"⏰ <b>Rapor Zamanı:</b> {islemZamani}\n\n"
     )
     if devirBorc != 0:
         mesaj += (
             f"⚠️ <b>GEÇMİŞTEN KALAN BORÇ HATIRLATMASI</b>\n"
-            f"🔻 Devir/Borç Bakiyesi: <code>{paraFormatla(devirBorc)}</code>\n\n"
+            f"🔻 Devir/Borç Bakiyesi: {paraFormatla(devirBorc)}\n\n"
         )
     mesaj += (
-        f"💰 <b>Mevcut Kasa:</b> <code>{paraFormatla(guncelKasa)}</code>\n"
-        f"✂️ <b>Hizmet Bedeli (%{komisyonOrani}):</b> <code>{paraFormatla(komisyonKesintisi)}</code>\n"
-        f"💎 <b>Net Hak Edilen (TL):</b> <code>{paraFormatla(netKasaTl)}</code>\n\n"
-        f"📊 <b>Uygulanan Kur:</b> <code>{kur}</code>\n"
-        f"🌐 <b>ÖDENECEK TETHER (USDT):</b> <b><code>{rakamFormatla(duzUsdt)} USDT</code></b>"
+        f"💰 <b>Mevcut Kasa:</b> {paraFormatla(guncelKasa)}\n"
+        f"✂️ <b>Hizmet Bedeli (%{komisyonOrani}):</b> {paraFormatla(komisyonKesintisi)}\n"
+        f"💎 <b>Net Hak Edilen (TL):</b> {paraFormatla(netKasaTl)}\n\n"
+        f"📊 <b>Uygulanan Kur:</b> {kur}\n"
+        f"🌐 <b>ÖDENECEK TETHER (USDT):</b> <b>{rakamFormatla(duzUsdt)} USDT</b>"
     )
 
     draft_id = f"r_{int(time.time())}_{random.randint(100, 999)}"
