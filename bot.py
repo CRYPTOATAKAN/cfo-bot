@@ -2086,31 +2086,42 @@ def fetch_all_market_rates_parallel(force_refresh: bool = False, max_age: float 
         except Exception:
             pass
 
-        # 1. Öncelikli Gerçek Kaynak: https://kur.doviz.com/harem/amerikan-dolari (Harem Altın Kapalıçarşı Canlı Tahtası)
-        try:
-            html = http_get_text("https://kur.doviz.com/harem/amerikan-dolari")
-            u_alis, u_satis = 0.0, 0.0
-            m_u_bid = re.search(r'data-socket-key="23-USD"[^>]*data-socket-attr="bid"[^>]*>([\d,\.\s]+)<', html)
-            m_u_ask = re.search(r'data-socket-key="23-USD"[^>]*data-socket-attr="ask"[^>]*>([\d,\.\s]+)<', html)
-            if m_u_bid and m_u_ask:
-                u_alis = _parse_kur(m_u_bid.group(1))
-                u_satis = _parse_kur(m_u_ask.group(1))
+        # 1. Canlı Kaynak: doviz.com Kapalıçarşı (20-USD) & Harem (23-USD)
+        for url in ["https://kur.doviz.com/kapalicarsi/amerikan-dolari", "https://kur.doviz.com/harem/amerikan-dolari"]:
+            try:
+                html = http_get_text(url)
+                u_alis, u_satis = 0.0, 0.0
+                
+                # Öncelik 1: 20-USD (Kapalıçarşı Serbest Piyasa)
+                m_20_bid = re.search(r'data-socket-key="20-USD"[^>]*data-socket-attr="bid"[^>]*>([\s\S]*?)<', html)
+                m_20_ask = re.search(r'data-socket-key="20-USD"[^>]*data-socket-attr="(?:ask|s)"[^>]*>([\s\S]*?)<', html)
+                if m_20_bid and m_20_ask:
+                    u_alis = _parse_kur(m_20_bid.group(1))
+                    u_satis = _parse_kur(m_20_ask.group(1))
 
-            e_alis, e_satis = 0.0, 0.0
-            m_e_bid = re.search(r'data-socket-key="23-EUR"[^>]*data-socket-attr="bid"[^>]*>([\d,\.\s]+)<', html)
-            m_e_ask = re.search(r'data-socket-key="23-EUR"[^>]*data-socket-attr="ask"[^>]*>([\d,\.\s]+)<', html)
-            if m_e_bid and m_e_ask:
-                e_alis = _parse_kur(m_e_bid.group(1))
-                e_satis = _parse_kur(m_e_ask.group(1))
+                # Öncelik 2: 23-USD (Harem Altın Tahtası)
+                if u_alis == 0 or u_satis == 0:
+                    m_23_bid = re.search(r'data-socket-key="23-USD"[^>]*data-socket-attr="bid"[^>]*>([\s\S]*?)<', html)
+                    m_23_ask = re.search(r'data-socket-key="23-USD"[^>]*data-socket-attr="(?:ask|s)"[^>]*>([\s\S]*?)<', html)
+                    if m_23_bid and m_23_ask:
+                        u_alis = _parse_kur(m_23_bid.group(1))
+                        u_satis = _parse_kur(m_23_ask.group(1))
 
-            if u_alis > 0 and u_satis > 0:
-                return {
-                    "usd": (u_alis, u_satis),
-                    "eur": (e_alis, e_satis) if (e_alis > 0 and e_satis > 0) else (55.60, 55.85),
-                    "gold": gold_data
-                }
-        except Exception as e:
-            pass
+                e_alis, e_satis = 0.0, 0.0
+                m_e_bid = re.search(r'data-socket-key="(?:20-EUR|23-EUR)"[^>]*data-socket-attr="bid"[^>]*>([\s\S]*?)<', html)
+                m_e_ask = re.search(r'data-socket-key="(?:20-EUR|23-EUR)"[^>]*data-socket-attr="(?:ask|s)"[^>]*>([\s\S]*?)<', html)
+                if m_e_bid and m_e_ask:
+                    e_alis = _parse_kur(m_e_bid.group(1))
+                    e_satis = _parse_kur(m_e_ask.group(1))
+
+                if u_alis > 0 and u_satis > 0:
+                    return {
+                        "usd": (u_alis, u_satis),
+                        "eur": (e_alis, e_satis) if (e_alis > 0 and e_satis > 0) else (55.60, 55.85),
+                        "gold": gold_data
+                    }
+            except Exception:
+                pass
 
         # 2. İkincil Yedek Kaynak: Truncgil
         try:
@@ -2122,12 +2133,12 @@ def fetch_all_market_rates_parallel(force_refresh: bool = False, max_age: float 
             e_alis = _parse_kur(e.get("Buying"))
             e_satis = _parse_kur(e.get("Selling"))
             return {
-                "usd": (u_alis, u_satis) if u_alis > 0 and u_satis > 0 else (48.08, 48.17),
+                "usd": (u_alis, u_satis) if u_alis > 0 and u_satis > 0 else (48.25, 48.26),
                 "eur": (e_alis, e_satis) if e_alis > 0 and e_satis > 0 else (55.60, 55.85),
                 "gold": gold_data
             }
         except Exception:
-            return {"usd": (48.08, 48.17), "eur": (55.60, 55.85), "gold": gold_data}
+            return {"usd": (48.25, 48.26), "eur": (55.60, 55.85), "gold": gold_data}
 
     def fetch_fiat():
         try:
