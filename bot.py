@@ -2205,9 +2205,10 @@ def fetch_all_market_rates_parallel(force_refresh: bool = False, max_age: float 
     results = {}
     for k, fut in futures.items():
         try:
-            results[k] = fut.result(timeout=3.5)
+            res = fut.result(timeout=3.5)
+            results[k] = res if res is not None else {}
         except Exception:
-            results[k] = None
+            results[k] = {}
 
     with _rates_lock:
         _rates_cache = dict(results)
@@ -2236,7 +2237,7 @@ def get_harem_euro_kuru() -> Tuple[float, float]:
 
 def kurRaporuUret_impl() -> str:
     rates = fetch_all_market_rates_parallel()
-    h_usd = rates.get("harem", {}).get("usd", (48.20, 48.25))
+    h_usd = (rates.get("harem") or {}).get("usd", (48.20, 48.25))
     
     yanit = "📊 <b>GÜNCEL DÖVİZ & USDT KURLARI</b>\n━━━━━━━━━━━━\n\n"
     yanit += (
@@ -2424,7 +2425,7 @@ def arbitraj_raporu_uret_impl(komut_metni: str = "") -> str:
                 hacim = val
 
     rates = fetch_all_market_rates_parallel()
-    h_alis, h_satis = rates.get("harem", {}).get("usd", (48.20, 48.25))
+    h_alis, h_satis = (rates.get("harem") or {}).get("usd", (48.20, 48.25))
     
     borsa_fiyatlari = {}
     if rates.get("binance") and rates["binance"].get("last"):
@@ -2839,7 +2840,7 @@ def kur_fark_makas_raporu_uret(simulasyon_tutar_str: str = "100000") -> str:
         tutar = 100000.0
         
     rates = fetch_all_market_rates_parallel()
-    h_usd_alis, h_usd_satis = rates.get("harem", {}).get("usd", (48.08, 48.17))
+    h_usd_alis, h_usd_satis = (rates.get("harem") or {}).get("usd", (48.08, 48.17))
     
     # 5 Büyük Kripto Borsası
     borsalar = [
@@ -2966,7 +2967,7 @@ def get_tron_balances(address: str) -> Tuple[float, float, float]:
 
 def get_borsa_kurlari_listesi() -> Tuple[str, float]:
     rates = fetch_all_market_rates_parallel()
-    default_rate = rates.get("fiat", {}).get("TRY", 48.09)
+    default_rate = (rates.get("fiat") or {}).get("TRY", 48.09)
     
     def format_sayi_yerel(val):
         return f"{val:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
