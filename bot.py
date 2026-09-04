@@ -3531,7 +3531,7 @@ def iban_sablon_getir_impl(komut_metni: str, chat_id: int = 0):
                             "eskiDeger": eski_cari, "grupAdi": h_ad, "islemTuru": "İBAN Otomatik Tahsis"
                         }
                         sistemeLogYaz("İBAN Otomatik Tahsis", f"Gruptan ({chat_id}) {h_ad} ➔ {hedef_cari}")
-                        tahsis_bilgisi = f"\n\n📌 <i>Bu hesap otomatik olarak <b>{hedef_cari}</b> grubuna tahsis edildi (Excel güncellendi).</i>"
+                        tahsis_bilgisi = f"\n\n📌 <i>Bu hesap otomatik olarak <b>{hedef_cari}</b> grubuna tahsis edildi.</i>"
                     except Exception as e:
                         print(f"Otomatik İBAN tahsis hatası: {e}")
                 else:
@@ -4762,7 +4762,7 @@ def process_telegram_update(update: dict):
             msg_id = cq.get("message", {}).get("message_id")
             orig_text = cq.get("message", {}).get("text", "")
             if ok:
-                yeni_metin = orig_text + f"\n\n🟢 <b>{h_ad} hesabı boşa çıkarıldı (Excel güncellendi - Müsait).</b>"
+                yeni_metin = orig_text + f"\n\n🟢 <b>{h_ad} hesabı boşa çıkarıldı (Müsait).</b>"
                 if msg_id:
                     telegramMesajDuzenle(chat_id, msg_id, yeni_metin, None)
             else:
