@@ -4,6 +4,7 @@ import io
 import json
 import time
 import uuid
+import random
 import datetime
 import threading
 import unicodedata
@@ -233,7 +234,7 @@ def is_valid_daily_sheet(ws) -> bool:
         if ws.col_count < 8 or ws.row_count < 30:
             return False
         return True
-    except:
+    except Exception:
         return False
 
 _cached_active_sheet = None
@@ -327,7 +328,7 @@ def bugununTarihiniAl() -> str:
         sh = get_spreadsheet()
         ws = get_active_daily_sheet(sh)
         return ws.title
-    except:
+    except Exception:
         return suankiZamaniAl().strftime("%d.%m.%Y")
 
 def normalize_text(text: str) -> str:
@@ -398,7 +399,7 @@ def rakamFormatla(sayi) -> str:
         is_neg = val < 0
         val_str = f"{abs(val):,}".replace(",", ".")
         return f"-{val_str}" if is_neg else val_str
-    except:
+    except Exception:
         return str(sayi)
 
 def guvenliSayi(deger) -> float:
@@ -432,7 +433,7 @@ def guvenliSayi(deger) -> float:
     try:
         sayi = float(temiz)
         return -sayi if eksi_mi else sayi
-    except:
+    except Exception:
         return 0.0
 
 def paraFormatla(deger) -> str:
@@ -444,7 +445,7 @@ def paraFormatla(deger) -> str:
         is_negative = val < 0
         formatted = f"{abs(val):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
         return f"-{formatted} ₺" if is_negative else f"{formatted} ₺"
-    except:
+    except Exception:
         return "0,00 ₺"
 
 def _sistemeLogYaz_worker(islemAdi: str, detay: str):
@@ -1158,7 +1159,7 @@ def toplu_duyuru_yayinla_callback(draft_id: str, hedef_filtre: str, gonderen_id:
     }
     return rapor, klavye
 
-def grup_kasa_analiz_fisi_uret(grup_ham: str) -> str:
+def grup_kasa_analiz_fisi_uret(grup_ham: str) -> Tuple[str, Optional[dict]]:
     hedef_norm = normalize_text(grup_ham)
     if not hedef_norm:
         raise ValueError("Grup adı boş olamaz.")
@@ -1187,7 +1188,7 @@ def grup_kasa_analiz_fisi_uret(grup_ham: str) -> str:
     tarih_str = sayfa.title
     saat_str = suankiZamaniAl().strftime("%H:%M")
 
-    return (
+    mesaj = (
         f"📊 <b>[ {gercek_grup_adi.upper()} ] GÜNCEL KASA ANALİZİ</b>\n"
         f"━━━━━━━━━━━━━━━\n"
         f"📅 Tarih: {tarih_str} | ⏰ Saat: {saat_str}\n"
@@ -1200,6 +1201,20 @@ def grup_kasa_analiz_fisi_uret(grup_ham: str) -> str:
         f"🏦 <b>NET KALAN TL: {paraFormatla(kalan)}</b>\n"
         f"━━━━━━━━━━━━━━━"
     )
+
+    draft_id = f"r_{int(time.time())}_{random.randint(100, 999)}"
+    app_state.setdefault("RAPOR_TASLAKLARI", {})[draft_id] = {
+        "grup": gercek_grup_adi,
+        "metin": mesaj
+    }
+
+    klavye = {
+        "inline_keyboard": [
+            [{"text": f"📤 {gercek_grup_adi.upper()} Grubuna İlet", "callback_data": f"rapor_ilet_{draft_id}"}],
+            [{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]
+        ]
+    }
+    return mesaj, klavye
 
 def menuKlavyesiOlustur(isGroup: bool):
     keyboard = [
@@ -1224,7 +1239,7 @@ def menuKlavyesiOlustur(isGroup: bool):
                         eklenen.add(uAd)
                         emoji = grupEmojisiBul(gAd)
                         keyboard.append([{"text": f"{emoji} {gAd}", "callback_data": f"rapor_{gAd}"}])
-    except:
+    except Exception:
         pass
     keyboard.append([{"text": "🛠️ Komut Rehberi", "callback_data": "rehber"}])
     return {"inline_keyboard": keyboard}
@@ -1980,7 +1995,7 @@ def gun_sonu_kapanis_raporu_uret() -> str:
     try:
         b_usdt = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=USDTTRY")
         anlik_kur_str = f"🟡 <b>Binance USDT/TRY:</b> <code>{float(b_usdt['price']):.2f} ₺</code>\n"
-    except:
+    except Exception:
         pass
 
     tarih = sayfa.title
@@ -2188,7 +2203,7 @@ def f_tl(val) -> str:
     try:
         s = f"{float(val):.2f}"
         return s.replace(".", ",") + " ₺"
-    except:
+    except Exception:
         return "- ₺"
 
 def get_harem_dolar_kuru() -> Tuple[float, float]:
@@ -3020,27 +3035,36 @@ def hesapMakinesi_impl(orijinalMetin: str) -> str:
     
     islemZamani = suankiZamaniAl().strftime("%d.%m.%Y | %H:%M")
     mesaj = (
-        f"🧮 <b>HESAP KESİM RAPORU</b>\n"
-        f"━━━━━━━━━━━\n"
-        f"🏢 Grup: <b>{gercekGrupAdi.upper()}</b>\n"
-        f"🕒 Zaman: {islemZamani}\n\n"
+        f"👑 <b>HESAP KESİMİ & BAKİYE RAPORU</b>\n\n"
+        f"🏛️ <b>Cari Hesap:</b> <b>{gercekGrupAdi.upper()}</b>\n"
+        f"⏰ <b>Rapor Zamanı:</b> {islemZamani}\n\n"
     )
     if devirBorc != 0:
         mesaj += (
-            f"⚠️ <b>DEVİR / BORÇ HATIRLATMASI</b> ⚠️\n"
-            f"Geçmişten Kalan: <b>{paraFormatla(devirBorc)}</b>\n"
-            f"━━━━━━━━━━━\n\n"
+            f"⚠️ <b>GEÇMİŞTEN KALAN BORÇ HATIRLATMASI</b>\n"
+            f"🔻 Devir/Borç Bakiyesi: <code>{paraFormatla(devirBorc)}</code>\n\n"
         )
     mesaj += (
-        f"💵 Güncel Kasa: {paraFormatla(guncelKasa)}\n"
-        f"📉 Komisyon (% {komisyonOrani}): {paraFormatla(komisyonKesintisi)}\n"
-        f"✅ Net Bakiye (TL): {paraFormatla(netKasaTl)}\n"
-        f"💱 İşlem Kuru: {kur}\n"
-        f"━━━━━━━━━━\n"
-        f"🪙 <b>Tether Karşılığı: {rakamFormatla(duzUsdt)} USDT</b>\n"
-        f"━━━━━━━━━━"
+        f"💰 <b>Mevcut Kasa:</b> <code>{paraFormatla(guncelKasa)}</code>\n"
+        f"✂️ <b>Hizmet Bedeli (%{komisyonOrani}):</b> <code>{paraFormatla(komisyonKesintisi)}</code>\n"
+        f"💎 <b>Net Hak Edilen (TL):</b> <code>{paraFormatla(netKasaTl)}</code>\n\n"
+        f"📊 <b>Uygulanan Kur:</b> <code>{kur}</code>\n"
+        f"🌐 <b>ÖDENECEK TETHER (USDT):</b> <b><code>{rakamFormatla(duzUsdt)} USDT</code></b>"
     )
-    return mesaj
+
+    draft_id = f"r_{int(time.time())}_{random.randint(100, 999)}"
+    app_state.setdefault("RAPOR_TASLAKLARI", {})[draft_id] = {
+        "grup": gercekGrupAdi,
+        "metin": mesaj
+    }
+
+    klavye = {
+        "inline_keyboard": [
+            [{"text": f"📤 {gercekGrupAdi.upper()} Grubuna İlet", "callback_data": f"rapor_ilet_{draft_id}"}],
+            [{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]
+        ]
+    }
+    return mesaj, klavye
 
 # --- TÜRKİYE BANKA KODLARI LİSTESİ (TCMB) ---
 BANKA_KODLARI = {
@@ -4062,7 +4086,7 @@ def yenigun_baslat_mesaji():
         try:
             d_obj = datetime.datetime.strptime(kaynak_sayfa.title, "%d.%m.%Y")
             hedef_tarih = (d_obj + datetime.timedelta(days=1)).strftime("%d.%m.%Y")
-        except: pass
+        except Exception: pass
 
     klavye = {
         "inline_keyboard": [
@@ -4092,7 +4116,7 @@ def yenigun_gerceklestir_impl(masraflari_sil: bool) -> str:
         try:
             d_obj = datetime.datetime.strptime(kaynak_sayfa.title, "%d.%m.%Y")
             hedef_yeni_tarih = (d_obj + datetime.timedelta(days=1)).strftime("%d.%m.%Y")
-        except: pass
+        except Exception: pass
         
     # 2. Eğer hedef sayfa adı önceden bozuk/yarım açılmışsa temizle
     try:
@@ -4212,7 +4236,7 @@ def admin_ekle_impl(komut_metni: str, ekleyen_id: int) -> str:
     
     sh = get_spreadsheet()
     try: adminSayfasi = sh.worksheet(ADMIN_SAYFASI)
-    except:
+    except Exception:
         adminSayfasi = sh.add_worksheet(title=ADMIN_SAYFASI, rows=100, cols=4)
         adminSayfasi.append_row(["Telegram ID", "Yönetici Adı", "Ekleyen", "Tarih"])
         
@@ -4597,6 +4621,64 @@ def process_telegram_update(update: dict):
                 "text": "⚠️ Şu anda İBAN'ı aktif olarak atanmış bir grup bulunmuyor.",
                 "show_alert": True
             })
+        elif data.startswith("rapor_ilet_"):
+            draft_id = data.replace("rapor_ilet_", "").strip()
+            item = app_state.get("RAPOR_TASLAKLARI", {}).get(draft_id)
+            if not item:
+                telegram_api("answerCallbackQuery", {
+                    "callback_query_id": cq["id"],
+                    "text": "⚠️ Rapor taslağı bulunamadı veya süresi dolmuş.",
+                    "show_alert": True
+                })
+                return
+            
+            grup_adi = item["grup"]
+            grup_metni = item["metin"]
+            
+            grup_baglantilarini_guncelle()
+            baglantilar = app_state.get("GRUP_BAGLANTILARI", {})
+            hedef_chat_id = None
+            hedef_title = grup_adi
+            g_norm = normalize_text(grup_adi)
+            
+            for c_id, info in baglantilar.items():
+                if normalize_text(info.get("grup", "")) == g_norm:
+                    hedef_chat_id = c_id
+                    hedef_title = info.get("title") or info.get("grup") or grup_adi
+                    break
+            
+            if hedef_chat_id:
+                res = telegramMesajGonder(hedef_chat_id, grup_metni)
+                if res.get("ok"):
+                    telegram_api("answerCallbackQuery", {
+                        "callback_query_id": cq["id"],
+                        "text": f"✅ Rapor '{hedef_title}' Telegram grubuna başarıyla iletildi!",
+                        "show_alert": False
+                    })
+                    msg_id = cq.get("message", {}).get("message_id")
+                    guncel_metin = grup_metni + f"\n\n🟢 <b>İletildi:</b> <i>{hedef_title} Telegram Grubu</i>"
+                    yeni_klavye = {
+                        "inline_keyboard": [
+                            [{"text": f"✅ {hedef_title} Grubuna İletildi", "callback_data": "duyuru_bos_uyari_"}],
+                            [{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]
+                        ]
+                    }
+                    if msg_id:
+                        telegramMesajDuzenle(chat_id, msg_id, guncel_metin, yeni_klavye)
+                else:
+                    err_desc = res.get("description", "API Hatası")
+                    telegram_api("answerCallbackQuery", {
+                        "callback_query_id": cq["id"],
+                        "text": f"❌ Mesaj iletilemedi: {err_desc}",
+                        "show_alert": True
+                    })
+            else:
+                telegram_api("answerCallbackQuery", {
+                    "callback_query_id": cq["id"],
+                    "text": f"⚠️ '{grup_adi}' adında bağlı bir Telegram grubu bulunamadı!\n\nLütfen o grupta '/grupbagla {grup_adi}' yazarak grubu bağlayınız.",
+                    "show_alert": True
+                })
+
         elif data in ["mesaj_kapat", "panel_kapat", "kapat"]:
             msg_id = cq.get("message", {}).get("message_id")
             if msg_id:
@@ -4836,7 +4918,7 @@ def process_telegram_update(update: dict):
             gun = 7
             if p_args:
                 try: gun = int(p_args[0].strip())
-                except: gun = 7
+                except Exception: gun = 7
             islemi_analiz_bildirimiyle_yap(chat_id, haftalik_trend_raporu_uret, gun, goster_bildirim=True)
         elif ana_komut in ["/kurfark", "/makas", "/spread", "/firsat"]:
             p_args = text.split()[1:]
