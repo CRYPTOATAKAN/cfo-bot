@@ -2268,15 +2268,33 @@ def canliKurSorgula_impl() -> str:
         # Ek kurlar
         b_btc = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=BTCUSDT")
         b_eth = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=ETHUSDT")
-        
+        b_bnb = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=BNBUSDT")
+        b_sol = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=SOLUSDT")
+        b_xrp = http_get_json("https://data-api.binance.vision/api/v3/ticker/price?symbol=XRPUSDT")
+
+        btc_p = float(b_btc['price']) if (b_btc and 'price' in b_btc) else 0.0
+        eth_p = float(b_eth['price']) if (b_eth and 'price' in b_eth) else 0.0
+        bnb_p = float(b_bnb['price']) if (b_bnb and 'price' in b_bnb) else 0.0
+        sol_p = float(b_sol['price']) if (b_sol and 'price' in b_sol) else 0.0
+        xrp_p = float(b_xrp['price']) if (b_xrp and 'price' in b_xrp) else 0.0
+
+        kripto_metin = f"🇹🇷 USDT / TRY: <code>{float(b_usdt_val):.2f} ₺</code>\n"
+        if btc_p > 0:
+            kripto_metin += f"🔶 BTC / USDT: <code>{btc_p:,.0f} $</code>\n"
+        if eth_p > 0:
+            kripto_metin += f"🔷 ETH / USDT: <code>{eth_p:.2f} $</code>\n"
+        if bnb_p > 0:
+            kripto_metin += f"🟡 BNB / USDT: <code>{bnb_p:.2f} $</code>\n"
+        if sol_p > 0:
+            kripto_metin += f"🟣 SOL / USDT: <code>{sol_p:.2f} $</code>\n"
+        if xrp_p > 0:
+            xrp_fmt = f"{xrp_p:.4f}" if xrp_p < 10 else f"{xrp_p:.2f}"
+            kripto_metin += f"🌐 XRP / USDT: <code>{xrp_fmt} $</code>\n"
+
         return (
-            "🌍 <b>CANLI PİYASA & DÜNYA KURLARI</b>\n"
-            "━━━━━━━━━━━━\n\n"
+            "🌍 <b>CANLI PİYASA & DÜNYA KURLARI</b>\n\n"
             "🪙 <b>Kripto Paralar (Binance)</b>\n"
-            f"🇹🇷 USDT / TRY: <code>{float(b_usdt_val):.2f} ₺</code>\n"
-            f"🔶 BTC / USDT: <code>{float(b_btc['price']):,.0f} $</code>\n"
-            f"🔷 ETH / USDT: <code>{float(b_eth['price']):.2f} $</code>\n\n"
-            "━━━━━━━━━━━━\n\n"
+            f"{kripto_metin}\n"
             "💵 <b>Dünya Para Birimleri</b>\n"
             f"🇺🇸 Dolar (USD): <code>{try_rate:.2f} ₺</code>\n"
             f"🇪🇺 Euro (EUR): <code>{(try_rate / fiat.get('EUR', 1)):.2f} ₺</code>\n"
@@ -3291,12 +3309,12 @@ def iban_sablon_bul(veriler: List[List[str]], aranan_kod: str):
     if not aranan_norm:
         return None
 
-    # 1. Aşama: Tam veya doğrudan başlangıç/içerme eşleşmesi
+    # 1. Aşama: BİREBİR TAM EŞLEŞME (Örn: 'CYL 1' için tam 'CYL 1' satırını bulur, 'CYL 10'a atlamaz)
     for idx, row in enumerate(veriler[1:], start=2):
         if len(row) > 11 and row[11].strip():
             h_ad = row[11].strip()
             h_norm = normalize_hesap_kodu(h_ad)
-            if h_norm == aranan_norm or (len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm)):
+            if h_norm == aranan_norm:
                 sablon = row[12].strip() if len(row) > 12 else ""
                 cari = row[14].strip() if len(row) > 14 else ""
                 return idx, h_ad, sablon, cari
@@ -3304,12 +3322,30 @@ def iban_sablon_bul(veriler: List[List[str]], aranan_kod: str):
         if len(row) > 15 and row[15].strip():
             h_ad = row[15].strip()
             h_norm = normalize_hesap_kodu(h_ad)
-            if h_norm == aranan_norm or (len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm)):
+            if h_norm == aranan_norm:
                 sablon = row[16].strip() if len(row) > 16 else ""
                 cari = row[17].strip() if len(row) > 17 else ""
                 return idx, h_ad, sablon, cari
 
-    # 2. Aşama: Esnek token eşleşmesi (Örn: 'ARS 3' -> 'ARS EMLAK 3' veya 'HSY 2' -> 'HSY 2 / 29')
+    # 2. Aşama: Başlangıç/içerme eşleşmesi (Sadece tam eşleşme yoksa)
+    for idx, row in enumerate(veriler[1:], start=2):
+        if len(row) > 11 and row[11].strip():
+            h_ad = row[11].strip()
+            h_norm = normalize_hesap_kodu(h_ad)
+            if len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm):
+                sablon = row[12].strip() if len(row) > 12 else ""
+                cari = row[14].strip() if len(row) > 14 else ""
+                return idx, h_ad, sablon, cari
+
+        if len(row) > 15 and row[15].strip():
+            h_ad = row[15].strip()
+            h_norm = normalize_hesap_kodu(h_ad)
+            if len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm):
+                sablon = row[16].strip() if len(row) > 16 else ""
+                cari = row[17].strip() if len(row) > 17 else ""
+                return idx, h_ad, sablon, cari
+
+    # 3. Aşama: Esnek token eşleşmesi (Örn: 'ARS 3' -> 'ARS EMLAK 3' veya 'HSY 2' -> 'HSY 2 / 29')
     match_digits = re.findall(r'\d+', aranan_norm)
     match_letters = re.findall(r'[A-Z]+', aranan_norm)
     if match_digits and match_letters:
@@ -3319,7 +3355,7 @@ def iban_sablon_bul(veriler: List[List[str]], aranan_kod: str):
             if len(row) > 11 and row[11].strip():
                 h_ad = row[11].strip()
                 h_norm = normalize_hesap_kodu(h_ad)
-                if letters in h_norm and h_norm.endswith(num):
+                if letters in h_norm and (h_norm.endswith(num) or re.search(rf'{num}(?!\d)', h_norm)):
                     sablon = row[12].strip() if len(row) > 12 else ""
                     cari = row[14].strip() if len(row) > 14 else ""
                     return idx, h_ad, sablon, cari
@@ -3327,7 +3363,7 @@ def iban_sablon_bul(veriler: List[List[str]], aranan_kod: str):
             if len(row) > 15 and row[15].strip():
                 h_ad = row[15].strip()
                 h_norm = normalize_hesap_kodu(h_ad)
-                if letters in h_norm and h_norm.endswith(num):
+                if letters in h_norm and (h_norm.endswith(num) or re.search(rf'{num}(?!\d)', h_norm)):
                     sablon = row[16].strip() if len(row) > 16 else ""
                     cari = row[17].strip() if len(row) > 17 else ""
                     return idx, h_ad, sablon, cari
@@ -3415,28 +3451,44 @@ def iban_hesap_bul(veriler: List[List[str]], aranan_kod: str):
     Excel tablosundaki L (12. sütun) ve P (16. sütun) hesap bloklarında arama yapar.
     Döner: (satir_no_1based, hedef_cari_sutun_1based, hesap_adi, mevcut_cari)
     """
-    aranan_norm = normalize_hesap_kodu(aranan_kod)
+    aranan_temiz = aranan_kod.strip()
+    aranan_norm = normalize_hesap_kodu(aranan_temiz)
     if not aranan_norm:
         return None
-        
+
+    # 1. Aşama: BİREBİR TAM EŞLEŞME (Örn: 'CYL 1' için tam 'CYL 1' satırını bulur, 'CYL 10'a atlamaz)
     for idx, row in enumerate(veriler[1:], start=2):
-        # 1. Sol Blok: Sütun L (Col 12), Cari Sütun O (Col 15)
         if len(row) > 11 and row[11].strip():
             h_ad = row[11].strip()
             h_norm = normalize_hesap_kodu(h_ad)
-            if aranan_norm == h_norm or (len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm)):
+            if h_norm == aranan_norm:
                 mevcut_cari = row[14].strip() if len(row) > 14 else ""
                 return idx, 15, h_ad, mevcut_cari
-                
-        # 2. Sağ Blok: Sütun P (Col 16), Cari Sütun R (Col 18)
+
         if len(row) > 15 and row[15].strip():
             h_ad = row[15].strip()
             h_norm = normalize_hesap_kodu(h_ad)
-            if aranan_norm == h_norm or (len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm)):
+            if h_norm == aranan_norm:
                 mevcut_cari = row[17].strip() if len(row) > 17 else ""
                 return idx, 18, h_ad, mevcut_cari
 
-    # 2. Aşama: Esnek token eşleşmesi (Örn: 'ARS 3' -> 'ARS EMLAK 3' veya 'HSY 2' -> 'HSY 2 / 29')
+    # 2. Aşama: Başlangıç/içerme eşleşmesi (Sadece tam eşleşme yoksa)
+    for idx, row in enumerate(veriler[1:], start=2):
+        if len(row) > 11 and row[11].strip():
+            h_ad = row[11].strip()
+            h_norm = normalize_hesap_kodu(h_ad)
+            if len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm):
+                mevcut_cari = row[14].strip() if len(row) > 14 else ""
+                return idx, 15, h_ad, mevcut_cari
+
+        if len(row) > 15 and row[15].strip():
+            h_ad = row[15].strip()
+            h_norm = normalize_hesap_kodu(h_ad)
+            if len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm):
+                mevcut_cari = row[17].strip() if len(row) > 17 else ""
+                return idx, 18, h_ad, mevcut_cari
+
+    # 3. Aşama: Esnek token eşleşmesi (Örn: 'ARS 3' -> 'ARS EMLAK 3' veya 'HSY 2' -> 'HSY 2 / 29')
     match_digits = re.findall(r'\d+', aranan_norm)
     match_letters = re.findall(r'[A-Z]+', aranan_norm)
     if match_digits and match_letters:
@@ -3446,14 +3498,14 @@ def iban_hesap_bul(veriler: List[List[str]], aranan_kod: str):
             if len(row) > 11 and row[11].strip():
                 h_ad = row[11].strip()
                 h_norm = normalize_hesap_kodu(h_ad)
-                if letters in h_norm and h_norm.endswith(num):
+                if letters in h_norm and (h_norm.endswith(num) or re.search(rf'{num}(?!\d)', h_norm)):
                     mevcut_cari = row[14].strip() if len(row) > 14 else ""
                     return idx, 15, h_ad, mevcut_cari
 
             if len(row) > 15 and row[15].strip():
                 h_ad = row[15].strip()
                 h_norm = normalize_hesap_kodu(h_ad)
-                if letters in h_norm and h_norm.endswith(num):
+                if letters in h_norm and (h_norm.endswith(num) or re.search(rf'{num}(?!\d)', h_norm)):
                     mevcut_cari = row[17].strip() if len(row) > 17 else ""
                     return idx, 18, h_ad, mevcut_cari
 
