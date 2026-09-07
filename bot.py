@@ -42,7 +42,12 @@ KISITLI_YETKILILER = {
     8401305264: {
         "username": "@sacidc",
         "name": "Sacid C",
-        "allowed_commands": {"/kasa", "/durum", "/hesaplar", "/grupiban", "/aktifiban", "/ibanlarim", "/hesaplarim"},
+        "allowed_commands": {
+            "/kasa", "/durum",
+            "/hesaplar", "/grupiban", "/aktifiban", "/ibanlarim", "/hesaplarim",
+            "/kur", "/canlikur",
+            "/cevir", "/çevir", "/doviz", "/döviz", "/kurcevir", "/donustur"
+        },
         "allow_write": False
     }
 }
@@ -4738,12 +4743,12 @@ def process_telegram_update(update: dict):
             return
 
         if kullanici_kisitli_mi(user_id):
-            if data.startswith("grup_iban_yenile_"):
+            if data.startswith("grup_iban_yenile_") or data == "canli_kur_yenile" or data.startswith("cevir_"):
                 pass
             else:
                 telegram_api("answerCallbackQuery", {
                     "callback_query_id": cq["id"],
-                    "text": "⛔ Yetkisiz İşlem: Hesabınız kısıtlı yetkiye sahiptir. Sadece /kasa ve /hesaplar verilerini görüntüleyebilirsiniz.",
+                    "text": "⛔ Yetkisiz İşlem: Hesabınız kısıtlı yetkiye sahiptir.",
                     "show_alert": True
                 })
                 return
@@ -4999,7 +5004,7 @@ def process_telegram_update(update: dict):
                     user_id,
                     f"⛔ <b>Yetkisiz İşlem:</b>\n"
                     f"Sayın <b>{uname}</b>, hesabınız kısıtlı yetkiye sahiptir.\n"
-                    f"Sadece <code>/kasa</code> ve <code>/hesaplar</code> komutlarını kullanabilirsiniz."
+                    f"Sadece size tanımlanan izinli komutları (<code>/kasa</code>, <code>/hesaplar</code>, <code>/kur</code>, <code>/canlikur</code>, <code>/cevir</code>) kullanabilirsiniz."
                 )
                 return
 
