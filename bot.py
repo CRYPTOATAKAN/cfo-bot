@@ -37,9 +37,20 @@ VARSAYILAN_TRC20_ADRES = os.environ.get("TRC20_WALLET_ADDRESS", "TQHuwJh5c4ygbKh
 _update_executor = concurrent.futures.ThreadPoolExecutor(max_workers=16, thread_name_prefix="UpdateWorker")
 _log_executor = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="LogWorker")
 
+# --- KISITLI YETKİLİ KULLANICILAR (Sadece Belirli Komutları Görebilen Rol Yönetimi) ---
+KISITLI_YETKILILER = {
+    8401305264: {
+        "username": "@sacidc",
+        "name": "Sacid C",
+        "allowed_commands": {"/kasa", "/durum", "/hesaplar", "/grupiban", "/aktifiban", "/ibanlarim", "/hesaplarim"},
+        "allow_write": False
+    }
+}
+
 app_state = {
     "WEB_APP_URL": WEB_APP_URL,
     "EK_ADMINLER": set(),
+    "KISITLI_YETKILILER": KISITLI_YETKILILER,
     "GRUP_BAGLANTILARI": {},
     "BAGLANTI_CACHE_TIME": 0,
     "SISTEM_KILIDI": "PASIF",
@@ -496,6 +507,10 @@ def yetkili_mi(user_id: int) -> bool:
         return True
     admin_listesini_guncelle()
     return user_id in app_state["EK_ADMINLER"]
+
+def kullanici_kisitli_mi(user_id: int) -> bool:
+    """Kullanıcının kısıtlı yetkili listesinde olup olmadığını kontrol eder."""
+    return user_id in app_state.get("KISITLI_YETKILILER", {})
 
 _yetkisiz_uyarilanlar = set()
 
@@ -3483,49 +3498,57 @@ def iban_sablon_bul(veriler: List[List[str]], aranan_kod: str):
 
     return None
 
-def iban_sablon_getir_impl(komut_metni: str, chat_id: int = 0):
+def sablon_kodlarini_coz(aranan_metin: str) -> List[str]:
     """
-    Kullanıcı /HSY EMLAK 3 veya /sablon HSY EMLAK 3 yazdığında
-    Excel'deki ilgili satırdan hazır ödeme şablonunu çeker ve doğrudan Telegram'a gönderir.
-    Eğer komut bağlı bir Telegram grubundan çağrılmışsa, hesabı otomatik olarak o gruba tahsis edip Excel'e işler
-    ve altına anında boşa çıkarma / iptal etme butonu ekler.
+    Aranan metni virgül (,) ve tire (-) aralıklarına göre çözümler.
+    Örnek:
+      'ARS 1-5' -> ['ARS 1', 'ARS 2', 'ARS 3', 'ARS 4', 'ARS 5']
+      'HSY EMLAK 3-6' -> ['HSY EMLAK 3', 'HSY EMLAK 4', 'HSY EMLAK 5', 'HSY EMLAK 6']
+      'CYL 1, HSY 3, ARS 2' -> ['CYL 1', 'HSY 3', 'ARS 2']
     """
-    temiz_komut = komut_metni.strip()
-    if temiz_komut.startswith("/sablon") or temiz_komut.startswith("/şablon") or temiz_komut.startswith("/hesapbilgi"):
-        p = temiz_komut.split()[1:]
-        aranan = " ".join(p).strip()
-    else:
-        aranan = temiz_komut.lstrip("/").strip()
+    if not aranan_metin:
+        return []
 
-    if not aranan:
-        return (
-            "📋 <b>ŞİRKET ÖDEME ŞABLONU ÇEKİCİ</b>\n"
-            "━━━━━━━━━━━\n"
-            "Kullanım: <code>/sablon [Hesap Adı]</code> veya doğrudan <code>/[Hesap Adı]</code>\n\n"
-            "📌 <b>Örnekler:</b>\n"
-            "• <code>/HSY EMLAK 3</code>\n"
-            "• <code>/CYL 1</code>\n"
-            "• <code>/ARS EMLAK 2</code>\n"
-            "• <code>/SRGL 1</code>"
-        )
+    ham_parcalar = [p.strip() for p in aranan_metin.split(",") if p.strip()]
+    sonuc = []
 
-    sh = get_spreadsheet()
-    sayfa = get_active_daily_sheet(sh)
-    veriler = get_sheet_values_fast(sayfa)
+    for item in ham_parcalar:
+        m = re.match(r'^(.*?)\s*(\d+)\s*-\s*(\d+)$', item, re.IGNORECASE)
+        if m:
+            prefix = m.group(1).strip()
+            start = int(m.group(2))
+            end = int(m.group(3))
 
+            if start <= end and (end - start) <= 25:
+                for i in range(start, end + 1):
+                    kod = f"{prefix} {i}".strip() if prefix else str(i)
+                    if kod not in sonuc:
+                        sonuc.append(kod)
+                continue
+            elif start > end and (start - end) <= 25:
+                for i in range(start, end - 1, -1):
+                    kod = f"{prefix} {i}".strip() if prefix else str(i)
+                    if kod not in sonuc:
+                        sonuc.append(kod)
+                continue
+
+        if item not in sonuc:
+            sonuc.append(item)
+
+    return sonuc[:25]
+
+def tek_sablon_getir_impl(aranan: str, sayfa, veriler: List[List[str]], chat_id: int = 0):
     res = iban_sablon_bul(veriler, aranan)
     if not res:
-        return f"⚠️ <b>Şablon Bulunamadı!</b>\nExcel tablosunda '<b>{aranan}</b>' hesabına ait bir ödeme şablonu bulunamadı.\n\n💡 <i>Mevcut hesaplar: CYL 1-5, HSY 1-10, HSY EMLAK 1-16, ARS EMLAK 1-17, SRGL 1-10</i>"
+        return None
 
     satir_idx, hesap_adi, sablon_metni, cari_adi = res
-
     if not sablon_metni:
-        return f"⚠️ <b>'{hesap_adi}'</b> için Excel tablosunda henüz bir şablon metni girilmemiş."
+        return None
 
     tahsis_bilgisi = ""
     klavye = None
 
-    # Eğer bu komut bağlı bir Telegram grubundan çağrıldıysa otomatik olarak o gruba tahsis et
     if chat_id and chat_id < 0:
         grup_baglantilarini_guncelle()
         bagli = app_state.get("GRUP_BAGLANTILARI", {}).get(chat_id)
@@ -3558,6 +3581,68 @@ def iban_sablon_getir_impl(komut_metni: str, chat_id: int = 0):
     if klavye:
         return sablon_metni + tahsis_bilgisi, klavye
     return sablon_metni + tahsis_bilgisi
+
+def iban_sablon_getir_impl(komut_metni: str, chat_id: int = 0):
+    """
+    Kullanıcı /HSY EMLAK 3, /sablon ARS 1-5 veya /sablon CYL 1, HSY 3 yazdığında
+    Excel'deki şablonları çeker ve her bir şablonu ayrı ayrı mesajlar halinde Telegram'a gönderir.
+    """
+    temiz_komut = komut_metni.strip()
+    if temiz_komut.startswith("/sablon") or temiz_komut.startswith("/şablon") or temiz_komut.startswith("/hesapbilgi"):
+        p = temiz_komut.split()[1:]
+        aranan = " ".join(p).strip()
+    else:
+        aranan = temiz_komut.lstrip("/").strip()
+
+    if not aranan:
+        return (
+            "📋 <b>ŞİRKET ÖDEME ŞABLONU ÇEKİCİ</b>\n"
+            "━━━━━━━━━━━\n"
+            "Kullanım: <code>/sablon [Hesap Adı]</code> veya <code>/sablon ARS 1-5</code>\n\n"
+            "📌 <b>Örnekler:</b>\n"
+            "• Tekli: <code>/HSY EMLAK 3</code> veya <code>/CYL 1</code>\n"
+            "• Toplu Aralık: <code>/sablon ARS 1-5</code> veya <code>/ARS 1-5</code>\n"
+            "• Toplu Liste: <code>/sablon CYL 1, HSY 3, ARS 2</code>"
+        )
+
+    kodlar = sablon_kodlarini_coz(aranan)
+    if not kodlar:
+        kodlar = [aranan]
+
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    veriler = get_sheet_values_fast(sayfa)
+
+    # 1. TEKLİ SORGULAMA
+    if len(kodlar) == 1:
+        res = tek_sablon_getir_impl(kodlar[0], sayfa, veriler, chat_id)
+        if not res:
+            return f"⚠️ <b>Şablon Bulunamadı!</b>\nExcel tablosunda '<b>{kodlar[0]}</b>' hesabına ait bir ödeme şablonu bulunamadı.\n\n💡 <i>Mevcut hesaplar: CYL 1-5, HSY 1-10, HSY EMLAK 1-16, ARS EMLAK 1-17, SRGL 1-10</i>"
+        return res
+
+    # 2. TOPLU SORGULAMA (Ayrı ayrı mesajlar olarak iletilir)
+    gonderilenler = []
+    bulunamayanlar = []
+
+    for kod in kodlar:
+        res = tek_sablon_getir_impl(kod, sayfa, veriler, chat_id)
+        if res:
+            gonderilenler.append((kod, res))
+            if chat_id:
+                if isinstance(res, tuple):
+                    metin, klavye = res
+                    telegramMesajGonder(chat_id, metin, klavye)
+                else:
+                    telegramMesajGonder(chat_id, str(res))
+                time.sleep(0.15)
+        else:
+            bulunamayanlar.append(kod)
+
+    if not gonderilenler:
+        return f"⚠️ <b>Hiçbir Şablon Bulunamadı!</b>\nBelirtilen aralık veya listedeki hesaplar Excel tablosunda bulunamadı."
+
+    bulunmayan_metin = f"\n⚠️ Bulunamayanlar: {', '.join(bulunamayanlar)}" if bulunamayanlar else ""
+    return f"✅ <b>Toplu Şablon İletimi Tamamlandı!</b>\nToplam <b>{len(gonderilenler)} adet</b> ödeme şablonu gruba ayrı mesajlar halinde iletildi.{bulunmayan_metin}"
 
 def iban_hesap_bul(veriler: List[List[str]], aranan_kod: str):
     """
@@ -4652,7 +4737,17 @@ def process_telegram_update(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, trc20_varlik_raporu_uret, cuzdan)
             return
 
-        if not yetkili_mi(user_id):
+        if kullanici_kisitli_mi(user_id):
+            if data.startswith("grup_iban_yenile_"):
+                pass
+            else:
+                telegram_api("answerCallbackQuery", {
+                    "callback_query_id": cq["id"],
+                    "text": "⛔ Yetkisiz İşlem: Hesabınız kısıtlı yetkiye sahiptir. Sadece /kasa ve /hesaplar verilerini görüntüleyebilirsiniz.",
+                    "show_alert": True
+                })
+                return
+        elif not yetkili_mi(user_id):
             yetkisiz_uyari_gonder(chat_id, user_id, "⛔ <b>Erişim Reddedildi!</b>\nBu işlem için yetkiniz bulunmamaktadır.")
             return
             
@@ -4893,7 +4988,40 @@ def process_telegram_update(update: dict):
         # Yetkisiz kullanıcıya İLK denemesinde TEK SEFERLİK uyarı verilir;
         # sonraki tüm mesajlarında bot SESSİZ MODA geçer ve kullanıcıyı tamamen yok sayar.
         # =========================================================================
-        if not yetkili_mi(user_id):
+        if kullanici_kisitli_mi(user_id):
+            u_info = app_state.get("KISITLI_YETKILILER", {}).get(user_id, {})
+            izinli_komutlar = u_info.get("allowed_commands", set())
+            uname = u_info.get("username", f"<code>{user_id}</code>")
+            
+            if ana_komut not in izinli_komutlar:
+                yetkisiz_uyari_gonder(
+                    chat_id,
+                    user_id,
+                    f"⛔ <b>Yetkisiz İşlem:</b>\n"
+                    f"Sayın <b>{uname}</b>, hesabınız kısıtlı yetkiye sahiptir.\n"
+                    f"Sadece <code>/kasa</code> ve <code>/hesaplar</code> komutlarını kullanabilirsiniz."
+                )
+                return
+
+            if ana_komut in ["/kasa", "/durum"]:
+                args = komut_parcalari[1:]
+                yazma_denemesi = False
+                if len(args) >= 2:
+                    yazma_denemesi = True
+                elif len(args) == 1:
+                    try:
+                        _ = float(args[0].replace(".", "").replace(",", "."))
+                        yazma_denemesi = True
+                    except ValueError:
+                        yazma_denemesi = False
+                if yazma_denemesi:
+                    yetkisiz_uyari_gonder(
+                        chat_id,
+                        user_id,
+                        "⛔ <b>Yetkisiz İşlem:</b> Kasaya bakiye/veri ekleme yetkiniz bulunmamaktadır. Sadece <code>/kasa</code> fişini görüntüleyebilirsiniz."
+                    )
+                    return
+        elif not yetkili_mi(user_id):
             yetkisiz_uyari_gonder(
                 chat_id,
                 user_id,
@@ -5217,7 +5345,8 @@ def process_telegram_update(update: dict):
                     sh_temp = get_spreadsheet()
                     sayfa_temp = get_active_daily_sheet(sh_temp)
                     veriler_temp = get_sheet_values_fast(sayfa_temp)
-                    if iban_sablon_bul(veriler_temp, aranan_aday):
+                    kodlar_temp = sablon_kodlarini_coz(aranan_aday)
+                    if iban_sablon_bul(veriler_temp, aranan_aday) or (kodlar_temp and any(iban_sablon_bul(veriler_temp, k) for k in kodlar_temp)):
                         islemi_analiz_bildirimiyle_yap(chat_id, iban_sablon_getir_impl, text, chat_id)
                         return
                 except Exception:
