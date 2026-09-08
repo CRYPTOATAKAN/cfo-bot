@@ -1930,8 +1930,8 @@ def cfo_dashboard_raporu_uret() -> Tuple[str, dict]:
     dashboard_metni = (
         f"🖥️ <b>CFO CANLI FİNANS & CARİ DASHBOARD</b>\n"
         f"━━━━━━━━━━\n"
-        f"📅 <b>Tarih:</b> <code>{tarih}</code> | ⏰ <b>Saat:</b> <code>{saat}</code>\n"
-        f"👥 <b>İşlem Gören Cari:</b> <code>{len(aktifler)} Adet</code>\n"
+        f"📅 <b>Tarih:</b> {tarih} | ⏰ <b>Saat:</b> {saat}\n"
+        f"👥 <b>İşlem Gören Cari:</b> {len(aktifler)} Adet\n"
         f"━━━━━━━━━━\n\n"
         f"📋 <b>CARİ BAZLI CANLI HAREKET TABLOSU:</b>\n\n"
     )
@@ -1948,20 +1948,20 @@ def cfo_dashboard_raporu_uret() -> Tuple[str, dict]:
             
         dashboard_metni += (
             f"👤 {emoji} <b>{g['ad'].upper()}</b> ({durum_tag})\n"
-            f"• 🔄 Devir: <code>{paraFormatla(g['devir'])}</code>\n"
-            f"• 💰 Kasa: <code>+{paraFormatla(g['kasa'])}</code>\n"
-            f"• 💸 Ödenen: <code>-{paraFormatla(g['odenen'])}</code>\n"
-            f"• ✂️ Komisyon: <code>{paraFormatla(g['komisyon'])}</code>\n"
-            f"• 🏦 <b>Kalan: <code>{paraFormatla(g['kalan'])}</code></b>\n\n"
+            f"🔄 Devir: {paraFormatla(g['devir'])}\n"
+            f"💰 Kasa: {paraFormatla(g['kasa'])}\n"
+            f"💸 Ödenen: {paraFormatla(g['odenen'])}\n"
+            f"✂️ Komisyon: {paraFormatla(g['komisyon'])}\n"
+            f"🏦 <b>Kalan: {paraFormatla(g['kalan'])}</b>\n\n"
         )
         
     dashboard_metni += (
         f"━━━━━━━━━━━\n"
         f"🏆 <b>KONSOLİDE GENEL TOPLAM BİLANÇO</b>\n"
-        f"• 🔄 <b>Toplam Devir:</b> <code>{paraFormatla(finans['devir'])}</code>\n"
-        f"• 💰 <b>Toplam Eklenen Kasa:</b> <code>+{paraFormatla(finans['kasa'])}</code>\n"
-        f"• 💸 <b>Toplam Yapılan Ödeme:</b> <code>-{paraFormatla(finans['odenen'])}</code>\n"
-        f"• ✂️ <b>Toplam Komisyon:</b> <code>{paraFormatla(finans['komisyon'])}</code>\n"
+        f"🔄 <b>Toplam Devir:</b> {paraFormatla(finans['devir'])}\n"
+        f"💰 <b>Toplam Eklenen Kasa:</b> {paraFormatla(finans['kasa'])}\n"
+        f"💸 <b>Toplam Yapılan Ödeme:</b> {paraFormatla(finans['odenen'])}\n"
+        f"✂️ <b>Toplam Komisyon:</b> {paraFormatla(finans['komisyon'])}\n"
         f"━━━━━━━━━━━\n"
         f"🏦 <b>GÜNCEL NET KALAN KASA: {paraFormatla(finans['kalan'])}</b>\n"
         f"━━━━━━━━━━━"
