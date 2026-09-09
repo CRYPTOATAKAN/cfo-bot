@@ -4516,6 +4516,16 @@ def grup_aktif_ibanlar_raporu_uret(grup_adi: str = "", chat_id: int = 0) -> Tupl
 
     return metin, {"inline_keyboard": buttons}
 
+def is_valid_cari_name(text: str) -> bool:
+    if not text or not text.strip():
+        return False
+    t = text.strip()
+    if len(t) > 50 or '\n' in t:
+        return False
+    if any(k in t.upper() for k in ["ÖDEME BİLGİLERİ", "HESAP SAHİBİ", "EMLAK KATILIM", "KUVEYT TÜRK", "MİNİMUM İŞLEM", "AÇIKLAMA ZORUNLULUĞU", "HESAP KODU"]):
+        return False
+    return True
+
 def tum_tahsisli_ibanlar_raporu_uret() -> Tuple[str, dict]:
     """
     TÜM carilere/gruplara tahsis edilmiş aktif İBAN hesaplarını listeler
@@ -4525,11 +4535,11 @@ def tum_tahsisli_ibanlar_raporu_uret() -> Tuple[str, dict]:
     tahsisli_hesaplar = []
 
     for idx, row in enumerate(veriler, start=1):
-        if idx == 1 or (len(row) > 0 and row[0].strip().upper() == "HESAP KODU") or (len(row) > 5 and row[5].strip().upper() == "HESAP KODU"):
+        if (len(row) > 0 and row[0].strip().upper() == "HESAP KODU") or (len(row) > 5 and row[5].strip().upper() == "HESAP KODU"):
             continue
 
         # 1. Sol Blok on İBANLAR (Col A: 0 Hesap, Col D: 3 Cari)
-        if len(row) > 3 and row[3].strip():
+        if len(row) > 3 and is_valid_cari_name(row[3]):
             cari = row[3].strip()
             h_ad = row[0].strip() if len(row) > 0 else ""
             h_sablon = row[1].strip() if len(row) > 1 else ""
@@ -4542,7 +4552,7 @@ def tum_tahsisli_ibanlar_raporu_uret() -> Tuple[str, dict]:
                 "satir": idx,
                 "col": 4
             })
-        elif len(row) > 2 and row[2].strip() and not (len(row) > 4 and row[4].strip()):
+        elif len(row) > 2 and is_valid_cari_name(row[2]) and not (len(row) > 4 and row[4].strip()):
             cari = row[2].strip()
             h_ad = row[0].strip() if len(row) > 0 else ""
             h_sablon = row[1].strip() if len(row) > 1 else ""
@@ -4557,7 +4567,7 @@ def tum_tahsisli_ibanlar_raporu_uret() -> Tuple[str, dict]:
             })
 
         # 2. Sağ Blok on İBANLAR (Col F: 5 Hesap, Col H: 7 Cari)
-        if len(row) > 7 and row[7].strip():
+        if len(row) > 7 and is_valid_cari_name(row[7]):
             cari = row[7].strip()
             h_ad = row[5].strip() if len(row) > 5 else ""
             h_sablon = row[6].strip() if len(row) > 6 else ""
@@ -4570,7 +4580,7 @@ def tum_tahsisli_ibanlar_raporu_uret() -> Tuple[str, dict]:
                 "satir": idx,
                 "col": 8
             })
-        elif len(row) > 6 and row[6].strip() and not (len(row) > 7 and row[7].strip()):
+        elif len(row) > 6 and is_valid_cari_name(row[6]) and not (len(row) > 7 and row[7].strip()):
             cari = row[6].strip()
             h_ad = row[4].strip() if len(row) > 4 else ""
             h_sablon = row[5].strip() if len(row) > 5 else ""
@@ -4645,25 +4655,25 @@ def tum_tahsisli_ibanlari_temizle_impl() -> str:
         cleared_count = 0
 
         for idx, row in enumerate(iban_vals, start=1):
-            if idx == 1 or (len(row) > 0 and row[0].strip().upper() == "HESAP KODU") or (len(row) > 5 and row[5].strip().upper() == "HESAP KODU"):
+            if (len(row) > 0 and row[0].strip().upper() == "HESAP KODU") or (len(row) > 5 and row[5].strip().upper() == "HESAP KODU"):
                 continue
 
             # Sol Blok (Col D: index 3 / 1-based col 4)
-            if len(row) > 3 and row[3].strip():
+            if len(row) > 3 and is_valid_cari_name(row[3]):
                 update_sheet_matrix_memory(iban_ws.title, idx, 4, "")
                 iban_ws.update_cell(idx, 4, "")
                 cleared_count += 1
-            elif len(row) > 2 and row[2].strip() and not (len(row) > 4 and row[4].strip()):
+            elif len(row) > 2 and is_valid_cari_name(row[2]) and not (len(row) > 4 and row[4].strip()):
                 update_sheet_matrix_memory(iban_ws.title, idx, 3, "")
                 iban_ws.update_cell(idx, 3, "")
                 cleared_count += 1
 
             # Sağ Blok (Col H: index 7 / 1-based col 8)
-            if len(row) > 7 and row[7].strip():
+            if len(row) > 7 and is_valid_cari_name(row[7]):
                 update_sheet_matrix_memory(iban_ws.title, idx, 8, "")
                 iban_ws.update_cell(idx, 8, "")
                 cleared_count += 1
-            elif len(row) > 6 and row[6].strip() and not (len(row) > 7 and row[7].strip()):
+            elif len(row) > 6 and is_valid_cari_name(row[6]) and not (len(row) > 7 and row[7].strip()):
                 update_sheet_matrix_memory(iban_ws.title, idx, 7, "")
                 iban_ws.update_cell(idx, 7, "")
                 cleared_count += 1
