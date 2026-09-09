@@ -4516,6 +4516,171 @@ def grup_aktif_ibanlar_raporu_uret(grup_adi: str = "", chat_id: int = 0) -> Tupl
 
     return metin, {"inline_keyboard": buttons}
 
+def tum_tahsisli_ibanlar_raporu_uret() -> Tuple[str, dict]:
+    """
+    TÜM carilere/gruplara tahsis edilmiş aktif İBAN hesaplarını listeler
+    ve her biri için tek tıkla boşa çıkarma / silme ile toplu temizleme butonları sunar.
+    """
+    veriler = get_iban_values()
+    tahsisli_hesaplar = []
+
+    for idx, row in enumerate(veriler, start=1):
+        if idx == 1 or (len(row) > 0 and row[0].strip().upper() == "HESAP KODU") or (len(row) > 5 and row[5].strip().upper() == "HESAP KODU"):
+            continue
+
+        # 1. Sol Blok on İBANLAR (Col A: 0 Hesap, Col D: 3 Cari)
+        if len(row) > 3 and row[3].strip():
+            cari = row[3].strip()
+            h_ad = row[0].strip() if len(row) > 0 else ""
+            h_sablon = row[1].strip() if len(row) > 1 else ""
+            m_iban = re.search(r'TR\d{2}\s?(?:\d{4}\s?){5}\d{2}', h_sablon.upper())
+            iban_str = m_iban.group(0).replace(" ", "") if m_iban else ""
+            tahsisli_hesaplar.append({
+                "hesap": h_ad,
+                "cari": cari,
+                "iban": iban_str,
+                "satir": idx,
+                "col": 4
+            })
+        elif len(row) > 2 and row[2].strip() and not (len(row) > 4 and row[4].strip()):
+            cari = row[2].strip()
+            h_ad = row[0].strip() if len(row) > 0 else ""
+            h_sablon = row[1].strip() if len(row) > 1 else ""
+            m_iban = re.search(r'TR\d{2}\s?(?:\d{4}\s?){5}\d{2}', h_sablon.upper())
+            iban_str = m_iban.group(0).replace(" ", "") if m_iban else ""
+            tahsisli_hesaplar.append({
+                "hesap": h_ad,
+                "cari": cari,
+                "iban": iban_str,
+                "satir": idx,
+                "col": 3
+            })
+
+        # 2. Sağ Blok on İBANLAR (Col F: 5 Hesap, Col H: 7 Cari)
+        if len(row) > 7 and row[7].strip():
+            cari = row[7].strip()
+            h_ad = row[5].strip() if len(row) > 5 else ""
+            h_sablon = row[6].strip() if len(row) > 6 else ""
+            m_iban = re.search(r'TR\d{2}\s?(?:\d{4}\s?){5}\d{2}', h_sablon.upper())
+            iban_str = m_iban.group(0).replace(" ", "") if m_iban else ""
+            tahsisli_hesaplar.append({
+                "hesap": h_ad,
+                "cari": cari,
+                "iban": iban_str,
+                "satir": idx,
+                "col": 8
+            })
+        elif len(row) > 6 and row[6].strip() and not (len(row) > 7 and row[7].strip()):
+            cari = row[6].strip()
+            h_ad = row[4].strip() if len(row) > 4 else ""
+            h_sablon = row[5].strip() if len(row) > 5 else ""
+            m_iban = re.search(r'TR\d{2}\s?(?:\d{4}\s?){5}\d{2}', h_sablon.upper())
+            iban_str = m_iban.group(0).replace(" ", "") if m_iban else ""
+            tahsisli_hesaplar.append({
+                "hesap": h_ad,
+                "cari": cari,
+                "iban": iban_str,
+                "satir": idx,
+                "col": 7
+            })
+
+    tarih_str = suankiZamaniAl().strftime("%d.%m.%Y")
+    saat_str = suankiZamaniAl().strftime("%H:%M")
+
+    if not tahsisli_hesaplar:
+        metin = (
+            f"🏦 <b>TÜM TAHSİSLİ İBAN'LAR YÖNETİM PANELİ</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📅 Tarih: <b>{tarih_str}</b> | ⏰ Saat: <code>{saat_str}</code>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"🟢 <b>Şu anda sisteme tahsis edilmiş aktif bir İBAN bulunmuyor.</b>\n"
+            f"<i>Tüm şirket İBAN'ları boşta ve kullanıma hazır.</i>"
+        )
+        klavye = {
+            "inline_keyboard": [
+                [{"text": "🔄 Listeyi Yenile", "callback_data": "tahsis_listesi_yenile"}]
+            ]
+        }
+        return metin, klavye
+
+    metin = (
+        f"🏦 <b>TÜM TAHSİSLİ İBAN'LAR YÖNETİM PANELİ</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📅 Tarih: <b>{tarih_str}</b> | ⏰ Saat: <code>{saat_str}</code>\n"
+        f"📊 Toplam Tahsisli Hesap: <b>{len(tahsisli_hesaplar)} Adet</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"📋 <b>AKTİF HESAPLAR & GRUPLARI:</b>\n\n"
+    )
+
+    buttons = []
+    madalyalar = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
+
+    for i, h in enumerate(tahsisli_hesaplar):
+        num = madalyalar[i] if i < len(madalyalar) else f"{i+1}️⃣"
+        iban_display = f"<code>{h['iban']}</code>" if h['iban'] else "<i>(Şablonda kayıtlı)</i>"
+        metin += (
+            f"{num} 🏛️ <b>{h['hesap']}</b> ➔ 👤 <b>{h['cari']}</b>\n"
+            f"   • 💳 İBAN: {iban_display}\n\n"
+        )
+        buttons.append([{"text": f"🔓 {h['hesap']} ({h['cari']}) Boşa Çıkar", "callback_data": f"tum_tahsis_sil_{h['hesap']}"}])
+
+    buttons.append([{"text": "🚨 TÜM TAHSİSLERİ SIFIRLA / TEMİZLE", "callback_data": "tahsis_tumunu_sil_onay"}])
+    buttons.append([{"text": "🔄 Listeyi Yenile", "callback_data": "tahsis_listesi_yenile"}])
+
+    metin += (
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 <i>Boşa çıkarmak istediğiniz hesabın butonuna basarak Excel'deki tahsisini tek tıkla kaldırabilirsiniz.</i>"
+    )
+
+    return metin, {"inline_keyboard": buttons}
+
+def tum_tahsisli_ibanlari_temizle_impl() -> str:
+    """
+    İBANLAR tablosunda tahsis edilmiş TÜM hesapların Cari bilgilerini silerek hepsini Müsait/Boşta yapar.
+    """
+    sh = get_spreadsheet()
+    try:
+        iban_ws = get_iban_sheet(sh)
+        iban_vals = get_sheet_values_fast(iban_ws)
+        cleared_count = 0
+
+        for idx, row in enumerate(iban_vals, start=1):
+            if idx == 1 or (len(row) > 0 and row[0].strip().upper() == "HESAP KODU") or (len(row) > 5 and row[5].strip().upper() == "HESAP KODU"):
+                continue
+
+            # Sol Blok (Col D: index 3 / 1-based col 4)
+            if len(row) > 3 and row[3].strip():
+                update_sheet_matrix_memory(iban_ws.title, idx, 4, "")
+                iban_ws.update_cell(idx, 4, "")
+                cleared_count += 1
+            elif len(row) > 2 and row[2].strip() and not (len(row) > 4 and row[4].strip()):
+                update_sheet_matrix_memory(iban_ws.title, idx, 3, "")
+                iban_ws.update_cell(idx, 3, "")
+                cleared_count += 1
+
+            # Sağ Blok (Col H: index 7 / 1-based col 8)
+            if len(row) > 7 and row[7].strip():
+                update_sheet_matrix_memory(iban_ws.title, idx, 8, "")
+                iban_ws.update_cell(idx, 8, "")
+                cleared_count += 1
+            elif len(row) > 6 and row[6].strip() and not (len(row) > 7 and row[7].strip()):
+                update_sheet_matrix_memory(iban_ws.title, idx, 7, "")
+                iban_ws.update_cell(idx, 7, "")
+                cleared_count += 1
+
+        sistemeLogYaz("Toplu İBAN Temizleme", f"Toplam {cleared_count} adet İBAN tahsisi sıfırlandı.")
+
+        return (
+            f"🟢 <b>TÜM İBAN TAHSİSLERİ BAŞARIYLA TEMİZLENDİ!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"🗑️ <b>Temizlenen Tahsisli Hesap:</b> <code>{cleared_count} Adet</code>\n"
+            f"📊 <b>Durum:</b> Tüm İBAN'lar 🟢 <b>Müsait / Kullanıma Hazır</b> hale getirildi.\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💡 <i>Tüm İBAN havuzu boşa çıkarıldı, yeni gruplara verilebilir.</i>"
+        )
+    except Exception as e:
+        return f"⚠️ <b>Toplu İBAN Temizleme Hatası:</b> {e}"
+
 def cari_ekstre_impl(komut_metni: str) -> str:
     parcalar = komut_metni.strip().split()[1:]
     if len(parcalar) < 1:
@@ -5805,6 +5970,51 @@ def process_telegram_update(update: dict):
                 "text": "⚠️ Şu anda İBAN'ı aktif olarak atanmış bir grup bulunmuyor.",
                 "show_alert": True
             })
+        elif data.startswith("tum_tahsis_sil_"):
+            hesap_adi = data.replace("tum_tahsis_sil_", "").strip()
+            ok, h_ad, eski_c, s_title = iban_bosalt_direct(hesap_adi)
+            metin, klavye = tum_tahsisli_ibanlar_raporu_uret()
+            msg_id = cq.get("message", {}).get("message_id")
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+            else:
+                telegramMesajGonder(chat_id, metin, klavye)
+        elif data == "tahsis_tumunu_sil_onay":
+            msg_id = cq.get("message", {}).get("message_id")
+            metin = (
+                "⚠️ <b>EMİN MİSİNİZ?</b>\n\n"
+                "Sistemde tahsis edilmiş <b>TÜM İBAN'lar boşa çıkarılacak</b> ve carilerin/grupların atamaları temizlenecektir.\n\n"
+                "Bu işlem geri alınamaz!"
+            )
+            klavye = {
+                "inline_keyboard": [
+                    [{"text": "✅ EVET, TÜMÜNÜ SIFIRLA", "callback_data": "tahsis_tumunu_sil_evet"}],
+                    [{"text": "❌ İPTAL", "callback_data": "tahsis_listesi_yenile"}]
+                ]
+            }
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+            else:
+                telegramMesajGonder(chat_id, metin, klavye)
+        elif data == "tahsis_tumunu_sil_evet":
+            msg_id = cq.get("message", {}).get("message_id")
+            sonuc_metni = tum_tahsisli_ibanlari_temizle_impl()
+            klavye = {
+                "inline_keyboard": [
+                    [{"text": "📋 Tahsis Listesine Dön", "callback_data": "tahsis_listesi_yenile"}]
+                ]
+            }
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, sonuc_metni, klavye)
+            else:
+                telegramMesajGonder(chat_id, sonuc_metni, klavye)
+        elif data == "tahsis_listesi_yenile":
+            metin, klavye = tum_tahsisli_ibanlar_raporu_uret()
+            msg_id = cq.get("message", {}).get("message_id")
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+            else:
+                telegramMesajGonder(chat_id, metin, klavye)
         elif data in ["mesaj_kapat", "panel_kapat", "kapat"]:
             msg_id = cq.get("message", {}).get("message_id")
             if msg_id:
@@ -6062,6 +6272,10 @@ def process_telegram_update(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, iban_tahsis_impl, text)
         elif ana_komut in ["/ibanbosalt", "/bosalt", "/ibansil"]:
             islemi_analiz_bildirimiyle_yap(chat_id, iban_bosalt_impl, text)
+        elif ana_komut in ["/tahsisliibanlar", "/tahsisler", "/ibanyonetim"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, tum_tahsisli_ibanlar_raporu_uret)
+        elif ana_komut in ["/ibantemizle", "/topluibanbosalt"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, tum_tahsisli_ibanlari_temizle_impl)
         elif ana_komut in ["/ekstre", "/gecmis", "/hesapdokumu", "/dokum"]:
             islemi_analiz_bildirimiyle_yap(chat_id, cari_ekstre_impl, text, goster_bildirim=True)
         elif ana_komut in ["/duyuru", "/topluduyuru", "/broadcast", "/yayin", "/yayım"]:
