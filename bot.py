@@ -6272,9 +6272,9 @@ def process_telegram_update(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, iban_tahsis_impl, text)
         elif ana_komut in ["/ibanbosalt", "/bosalt", "/ibansil"]:
             islemi_analiz_bildirimiyle_yap(chat_id, iban_bosalt_impl, text)
-        elif ana_komut in ["/tahsisliibanlar", "/tahsisler", "/ibanyonetim"]:
+        elif ana_komut in ["/tahsisliibanlar", "/tahsisliiban", "/tahsisler", "/tahsis", "/ibanyonetim", "/ibanyönetim", "/ibantahsisler", "/tahsisliibanlarim"]:
             islemi_analiz_bildirimiyle_yap(chat_id, tum_tahsisli_ibanlar_raporu_uret)
-        elif ana_komut in ["/ibantemizle", "/topluibanbosalt"]:
+        elif ana_komut in ["/ibantemizle", "/topluibanbosalt", "/topluibantemizle", "/ibantemizligi", "/ibantemizliği"]:
             islemi_analiz_bildirimiyle_yap(chat_id, tum_tahsisli_ibanlari_temizle_impl)
         elif ana_komut in ["/ekstre", "/gecmis", "/hesapdokumu", "/dokum"]:
             islemi_analiz_bildirimiyle_yap(chat_id, cari_ekstre_impl, text, goster_bildirim=True)
