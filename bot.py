@@ -6335,10 +6335,40 @@ def run_kapanis_scheduler():
             print(f"Kapanış scheduler hatası: {e}")
         time.sleep(30)
 
+_last_sheet_fingerprint = None
+
+def run_sheets_autosync_loop():
+    """Google Sheets tablosunu arka planda kesintisiz (3 saniyede bir) takip eder.
+    Excel veya Google Sheets üzerinde herhangi bir kullanıcı bir veri girdiğinde veya değiştirdiğinde,
+    değişikliği anında tespit eder ve web paneline manuel yenileme OLMADAN otomatik canlı yayın yapar."""
+    global _last_sheet_fingerprint
+    import hashlib
+
+    while True:
+        try:
+            sh = get_spreadsheet(force_refresh=True)
+            sayfa = get_active_daily_sheet(sh, force_refresh=True)
+            veriler = sayfa.get_all_values()
+            
+            data_str = json.dumps(veriler, ensure_ascii=False)
+            current_fp = hashlib.md5(data_str.encode('utf-8')).hexdigest()
+
+            if _last_sheet_fingerprint is not None and current_fp != _last_sheet_fingerprint:
+                finans = tablodan_finans_ozeti_hesapla(veriler)
+                updated_groups = [g["ad"] for g in finans.get("aktif_gruplar", [])]
+                broadcast_dashboard_update(updated_groups)
+                print(f"[AutoSync] Google Sheets üzerinde canlı değişiklik tespit edildi ve anında web paneline yayınlandı.")
+
+            _last_sheet_fingerprint = current_fp
+        except Exception:
+            pass
+        time.sleep(3)
+
 # --- MAIN LOOP (LONG POLLING WITH THREAD POOL) ---
 if __name__ == "__main__":
     threading.Thread(target=run_dashboard_server, daemon=True).start()
     threading.Thread(target=run_kapanis_scheduler, daemon=True).start()
+    threading.Thread(target=run_sheets_autosync_loop, daemon=True).start()
     print(f"CFO Bot & Canlı Dashboard Başlatıldı (7/24 Kesintisiz - Otomatik Kapanış Saati: {app_state.get('KAPANIS_SAATI', '23:45')})...")
     
     offset = 0
@@ -6352,4 +6382,5 @@ if __name__ == "__main__":
                     _update_executor.submit(process_telegram_update, upd)
         except Exception as e:
             time.sleep(1)
+
 
