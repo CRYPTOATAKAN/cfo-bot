@@ -347,7 +347,7 @@ def get_iban_values(sh=None, force_refresh=False) -> List[List[str]]:
     try:
         ws = get_iban_sheet(sh=sh, force_refresh=force_refresh)
         vals = get_sheet_values_fast(ws)
-        if vals:
+        if vals and isinstance(vals, list):
             return vals
     except Exception as e:
         print(f"IBAN sayfası verisi okunamadı: {e}")
@@ -4074,6 +4074,15 @@ def iban_sablon_getir_impl(komut_metni: str, chat_id: int = 0):
     sh = get_spreadsheet()
     sayfa = get_active_daily_sheet(sh)
     veriler = get_sheet_values_fast(sayfa)
+    try:
+        iban_ws = get_iban_sheet(sh)
+        iban_data = get_sheet_values_fast(iban_ws)
+        if iban_data and isinstance(iban_data, list) and len(iban_data) > 1:
+            if any(len(r) > 0 and isinstance(r[0], str) and r[0].strip() for r in iban_data):
+                veriler = iban_data
+                sayfa = iban_ws
+    except Exception:
+        pass
 
     # 1. TEKLİ SORGULAMA
     if len(kodlar) == 1:
@@ -6464,8 +6473,7 @@ def process_telegram_update(update: dict):
                 aranan_aday = text.strip().lstrip("/")
                 try:
                     sh_temp = get_spreadsheet()
-                    sayfa_temp = get_active_daily_sheet(sh_temp)
-                    veriler_temp = get_sheet_values_fast(sayfa_temp)
+                    veriler_temp = get_iban_values(sh_temp)
                     kodlar_temp = sablon_kodlarini_coz(aranan_aday)
                     if iban_sablon_bul(veriler_temp, aranan_aday) or (kodlar_temp and any(iban_sablon_bul(veriler_temp, k) for k in kodlar_temp)):
                         islemi_analiz_bildirimiyle_yap(chat_id, iban_sablon_getir_impl, text, chat_id)
