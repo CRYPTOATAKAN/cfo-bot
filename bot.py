@@ -1591,6 +1591,11 @@ def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
         })
         sistemeLogYaz("Masraf Ekleme", f"{masraf_ham.upper()} | {paraFormatla(tutar_yuvarlanmis)}")
         
+        try:
+            _update_executor.submit(broadcast_dashboard_update, [], [{"grup": "MASRAF", "message": f"📌 <b>{masraf_ham.upper()}</b> masraf kalemi ({paraFormatla(tutar_yuvarlanmis)}) eklendi."}])
+        except Exception:
+            pass
+
         return (
             f"✅ <b>Masraf Eklendi!</b>\n━━━━━━━━━━━━━━━\n"
             f"📉 Masraf Kalemi: <b>{masraf_ham.upper()}</b>\n"
@@ -1630,6 +1635,10 @@ def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
                 "islemTuru": "Masraf Silme", "is_masraf_update": True
             })
             sistemeLogYaz("Masraf Silme", f"{col_i} | Tamamı Silindi ({paraFormatla(mevcut)})")
+            try:
+                _update_executor.submit(broadcast_dashboard_update, [], [{"grup": "MASRAF", "message": f"🗑️ <b>{col_i}</b> masraf kalemi silindi."}])
+            except Exception:
+                pass
             return (
                 f"🗑️ <b>Masraf Satırı Silindi!</b>\n━━━━━━━━━━━━━━\n"
                 f"📉 Masraf Kalemi: <b>{col_i}</b>\n"
@@ -1645,6 +1654,10 @@ def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
                 "islemTuru": "Masraf Silme", "is_masraf_update": True
             })
             sistemeLogYaz("Masraf Silme", f"{col_i} | -{paraFormatla(tutar)} (Kalan: {paraFormatla(yeni)})")
+            try:
+                _update_executor.submit(broadcast_dashboard_update, [], [{"grup": "MASRAF", "message": f"📌 <b>{col_i}</b> masrafı {paraFormatla(tutar)} düşüldü."}])
+            except Exception:
+                pass
             return (
                 f"✅ <b>Masraf Tutarı Düşüldü!</b>\n━━━━━━━━━━━━━\n"
                 f"📉 Masraf Kalemi: <b>{col_i}</b>\n"
@@ -6059,7 +6072,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                             <div class="group-header">
                                 <div class="group-name">
                                     <span>🔹</span> ${gNameUpper}
-                                    ${isUpdated ? '<span class="glow-badge" style="font-size:11px; font-weight:800; color:#34d399; background:rgba(52,211,153,0.25); border:1px solid rgba(52,211,153,0.5); padding:2px 8px; border-radius:10px; margin-left:6px; animation:pulse 1s infinite;">🟢 CANLI GÜNCEL</span>' : ''}
                                 </div>
                                 <div class="group-kalan-badge" style="background:${g.kalan < 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)'}; color:${g.kalan < 0 ? '#f87171' : '#34d399'};">${fmt(g.kalan)}</div>
                             </div>
@@ -6103,8 +6115,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                             const cardEl = document.getElementById(safeId);
                             if (cardEl) {
                                 cardEl.classList.remove('glow-updated');
-                                const badgeEl = cardEl.querySelector('.glow-badge');
-                                if (badgeEl) badgeEl.remove();
                             }
                         });
                     }, 5000);
@@ -6372,11 +6382,13 @@ def run_kapanis_scheduler():
 
 _last_sheet_fingerprint = None
 _prev_group_snapshot = {}
+_prev_masraf_snapshot = None
 
 def run_sheets_autosync_loop():
     """Google Sheets tablosunu arka planda kesintisiz (3 saniyede bir) takip eder.
-    Sadece ve sadece bakiyesi veya değerleri değişen SPESİFİK Gruba özel profesyonel bildirim oluşturur."""
-    global _last_sheet_fingerprint, _prev_group_snapshot
+    Sadece ve sadece bakiyesi veya değerleri değişen SPESİFİK Gruba özel profesyonel bildirim oluşturur.
+    Masraf kalemleri veya genel tablo değiştiğinde anında canlı yayın yaparak web panelini günceller."""
+    global _last_sheet_fingerprint, _prev_group_snapshot, _prev_masraf_snapshot
     import hashlib
 
     while True:
@@ -6436,11 +6448,33 @@ def run_sheets_autosync_loop():
                     elif _prev_group_snapshot and g_name not in _prev_group_snapshot:
                         updated_groups.append(g["ad"])
                         group_changes.append({"grup": g_name, "message": f"🔹 <b>{g_name}</b> yeni aktif grup olarak eklendi."})
-                        
+                
+                # Masraf Takibi
+                new_masraf_snapshot = {
+                    m["ad"].strip().upper(): round(float(m.get("fiyat", 0)), 2)
+                    for m in finans.get("masraflar", [])
+                }
+                
+                if _prev_masraf_snapshot is not None and new_masraf_snapshot != _prev_masraf_snapshot:
+                    for m_name, m_val in new_masraf_snapshot.items():
+                        if m_name not in _prev_masraf_snapshot:
+                            group_changes.append({"grup": "MASRAF", "message": f"📌 <b>{m_name}</b> masraf kalemi ({paraFormatla(m_val)}) eklendi."})
+                        elif _prev_masraf_snapshot[m_name] != m_val:
+                            diff = m_val - _prev_masraf_snapshot[m_name]
+                            if diff > 0:
+                                group_changes.append({"grup": "MASRAF", "message": f"📌 <b>{m_name}</b> masrafı {paraFormatla(diff)} artırıldı."})
+                            else:
+                                group_changes.append({"grup": "MASRAF", "message": f"📌 <b>{m_name}</b> masrafı {paraFormatla(abs(diff))} düşürüldü."})
+                    for m_name in _prev_masraf_snapshot:
+                        if m_name not in new_masraf_snapshot:
+                            group_changes.append({"grup": "MASRAF", "message": f"🗑️ <b>{m_name}</b> masraf kalemi silindi."})
+
                 _prev_group_snapshot = new_snapshot
-                if updated_groups:
-                    broadcast_dashboard_update(updated_groups, group_changes)
-                    print(f"[AutoSync] Canlı değişiklik: {updated_groups}")
+                _prev_masraf_snapshot = new_masraf_snapshot
+
+                # Fingerprint değiştiyse istisnasız HER ZAMAN canlı web paneline bildirim ve veri gönder
+                broadcast_dashboard_update(updated_groups, group_changes)
+                print(f"[AutoSync] Canlı değişiklik yayınlandı. Gruplar: {updated_groups}, Masraf Değişimi: {new_masraf_snapshot != _prev_masraf_snapshot}")
             else:
                 finans = tablodan_finans_ozeti_hesapla(veriler)
                 _prev_group_snapshot = {
@@ -6452,6 +6486,10 @@ def run_sheets_autosync_loop():
                         round(float(g.get("kalan", 0)), 2)
                     )
                     for g in finans.get("aktif_gruplar", [])
+                }
+                _prev_masraf_snapshot = {
+                    m["ad"].strip().upper(): round(float(m.get("fiyat", 0)), 2)
+                    for m in finans.get("masraflar", [])
                 }
 
             _last_sheet_fingerprint = current_fp
