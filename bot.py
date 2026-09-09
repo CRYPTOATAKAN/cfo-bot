@@ -250,9 +250,11 @@ def get_spreadsheet(force_refresh=False):
             _cached_sh_time = now
             return _cached_spreadsheet
 
+IBAN_SAYFASI = "IBANLAR"
+
 def is_valid_daily_sheet(ws) -> bool:
     """Bir sayfanın gerçek ana kasa tablosu (en az 8 sütun ve 30 satır) olup olmadığını doğrular."""
-    if ws.title in [LOG_SAYFASI, "NOTLAR", "YEDEK", ADMIN_SAYFASI, BAGLANTI_SAYFASI]:
+    if ws.title in [LOG_SAYFASI, "NOTLAR", "YEDEK", ADMIN_SAYFASI, BAGLANTI_SAYFASI, IBAN_SAYFASI, "İBANLAR", "IBAN", "İBAN", "IBAN LİSTESİ", "İBAN LİSTESİ"]:
         return False
     try:
         if ws.col_count < 8 or ws.row_count < 30:
@@ -260,6 +262,104 @@ def is_valid_daily_sheet(ws) -> bool:
         return True
     except Exception:
         return False
+
+_cached_iban_sheet = None
+_cached_iban_sheet_time = 0
+_cached_iban_sheet_lock = threading.Lock()
+
+def get_iban_sheet(sh=None, force_refresh=False) -> gspread.Worksheet:
+    """
+    Google Spreadsheet içinde sabit 'IBANLAR' sayfasını bulur veya yoksa otomatik oluşturur.
+    Sayfa yeni oluşturulursa, günlük sayfadaki mevcut tüm IBAN kayıtlarını otomatik olarak bu sayfaya aktarır.
+    """
+    global _cached_iban_sheet, _cached_iban_sheet_time
+    now = time.time()
+    with _cached_iban_sheet_lock:
+        if not force_refresh and _cached_iban_sheet is not None and (now - _cached_iban_sheet_time < 300):
+            return _cached_iban_sheet
+
+        sh = sh or get_spreadsheet(force_refresh=force_refresh)
+        target_titles = [IBAN_SAYFASI, "İBANLAR", "IBAN", "İBAN", "IBAN LİSTESİ", "İBAN LİSTESİ"]
+
+        # 1. Mevcut sayfalar arasında IBAN sayfasını kontrol et
+        try:
+            for ws in sh.worksheets():
+                if ws.title.strip().upper() in [t.upper() for t in target_titles]:
+                    _cached_iban_sheet = ws
+                    _cached_iban_sheet_time = now
+                    return ws
+        except Exception as e:
+            print(f"IBAN sayfası arama uyarısı: {e}")
+
+        # 2. Sayfa yoksa yeni 'IBANLAR' sayfasını oluştur
+        try:
+            ws = sh.add_worksheet(title=IBAN_SAYFASI, rows=500, cols=10)
+        except Exception:
+            try:
+                ws = sh.worksheet(IBAN_SAYFASI)
+            except Exception:
+                ws = sh.sheet1
+
+        # Başlık satırını ekle
+        headers = ["HESAP KODU", "ŞABLON METNİ", "BANKA / AÇIKLAMA", "TAHSİS EDİLEN CARİ", "DURUM"]
+        try:
+            ws.update("A1:E1", [headers])
+        except Exception:
+            pass
+
+        # 3. Otomatik Migrasyon: Aktif günlük sayfadan mevcut IBAN'ları çek ve aktar
+        try:
+            daily_ws = get_active_daily_sheet(sh)
+            veriler = daily_ws.get_all_values()
+            migrated_rows = []
+            
+            for row in veriler[1:]:
+                # Sol Blok (Col L: 11, M: 12, N: 13, O: 14)
+                if len(row) > 11 and row[11].strip():
+                    h_kod = row[11].strip()
+                    sablon = row[12].strip() if len(row) > 12 else ""
+                    banka = row[13].strip() if len(row) > 13 else ""
+                    cari = row[14].strip() if len(row) > 14 else ""
+                    durum = f"🔴 Kullanımda ({cari})" if cari else "🟢 Müsait"
+                    migrated_rows.append([h_kod, sablon, banka, cari, durum])
+
+                # Sağ Blok (Col P: 15, Q: 16, R: 17, S: 18)
+                if len(row) > 15 and row[15].strip():
+                    h_kod = row[15].strip()
+                    sablon = row[16].strip() if len(row) > 16 else ""
+                    banka = row[17].strip() if len(row) > 17 else ""
+                    cari = row[18].strip() if len(row) > 18 else ""
+                    durum = f"🔴 Kullanımda ({cari})" if cari else "🟢 Müsait"
+                    migrated_rows.append([h_kod, sablon, banka, cari, durum])
+
+            if migrated_rows:
+                ws.update(f"A2:E{len(migrated_rows)+1}", migrated_rows)
+                print(f"[IBAN Migration] {len(migrated_rows)} adet IBAN kaydı '{IBAN_SAYFASI}' sayfasına taşındı.")
+        except Exception as e:
+            print(f"[IBAN Migration Warning] IBAN taşıma uyarısı: {e}")
+
+        _cached_iban_sheet = ws
+        _cached_iban_sheet_time = now
+        return ws
+
+def get_iban_values(sh=None, force_refresh=False) -> List[List[str]]:
+    """'IBANLAR' sayfasındaki tüm satır ve sütun verilerini hızlıca çeker.
+    Eğer 'IBANLAR' sayfasında henüz veri yoksa veya birim testlerinde günlük sayfa mock'lanmışsa,
+    günlük çalışma sayfasının verisini fallback olarak döner."""
+    try:
+        ws = get_iban_sheet(sh=sh, force_refresh=force_refresh)
+        vals = get_sheet_values_fast(ws)
+        if vals and len(vals) > 1 and any(len(row) > 0 and row[0].strip() and row[0].strip() != "HESAP KODU" for row in vals[1:]):
+            return vals
+    except Exception as e:
+        print(f"IBAN sayfası verisi okunamadı: {e}")
+
+    try:
+        sh = sh or get_spreadsheet(force_refresh=force_refresh)
+        daily_ws = get_active_daily_sheet(sh, force_refresh=force_refresh)
+        return get_sheet_values_fast(daily_ws)
+    except Exception:
+        return []
 
 _cached_active_sheet = None
 _cached_active_sheet_time = 0
@@ -815,26 +915,28 @@ def grup_senkronize_impl() -> str:
 
 def aktif_ibani_olan_carileri_bul(veriler: List[List[str]] = None) -> Set[str]:
     """
-    Excel tablosunda Sol Blok (Col 14: Cari) ve Sağ Blok (Col 17: Cari) üzerinde
+    Sabit 'IBANLAR' sayfasında (Col D: Cari, index 3) ve yedek olarak günlük sayfadaki bloklarda
     şu anda bir İBAN'a tahsis edilmiş (dolu) olan tüm normalize edilmiş cari adlarını döner.
     """
-    if veriler is None:
-        sh = get_spreadsheet()
-        sayfa = get_active_daily_sheet(sh)
-        veriler = get_sheet_values_fast(sayfa)
+    iban_veriler = get_iban_values() if veriler is None else veriler
         
     aktif_cariler = set()
-    for row in veriler[1:]:
-        # Sol Blok Cari (Col O, index 14)
+    for row in iban_veriler[1:]:
+        # IBANLAR Sayfası (Col D: Cari, index 3)
+        if len(row) > 3 and row[3].strip() and row[3].strip() != "TAHSİS EDİLEN CARİ":
+            c = row[3].strip()
+            aktif_cariler.add(normalize_text(c))
+
+        # Legacy Sol Blok Cari (Col O, index 14)
         if len(row) > 14 and row[14].strip():
             c1 = row[14].strip()
             aktif_cariler.add(normalize_text(c1))
-            
-        # Sağ Blok Cari (Col R, index 17)
+
+        # Legacy Sağ Blok Cari (Col R, index 17)
         if len(row) > 17 and row[17].strip():
             c2 = row[17].strip()
             aktif_cariler.add(normalize_text(c2))
-            
+
     return aktif_cariler
 
 def format_satir_satir_cariler(isimler: List[str], chunk_size: int = 3) -> str:
@@ -3413,22 +3515,30 @@ def ibanCozumle_impl(ham_metin: str) -> str:
 
     bosluklu_iban = " ".join([iban_raw[i:i+4] for i in range(0, len(iban_raw), 4)])
     bitisik_iban = iban_raw
-    
     sirket_durumu = "🔹 <i>Harici Cari / Müşteri Hesabı</i>"
     try:
-        sh = get_spreadsheet()
-        sayfa = get_active_daily_sheet(sh)
-        veriler = sayfa.get_all_values()
+        veriler = get_iban_values()
         temiz_hedef = re.sub(r'[^A-Z0-9]', '', iban_raw)
         
         for row in veriler[1:]:
-            if len(row) > 11:
+            # 1. IBANLAR Sayfası (Col 0: Hesap Kodu, Col 1: Şablon, Col 3: Cari)
+            if len(row) > 0 and row[0].strip() and row[0].strip() != "HESAP KODU":
+                h_ad = row[0].strip()
+                sablon = row[1].strip() if len(row) > 1 else ""
+                cari = row[3].strip() if len(row) > 3 else ""
+                ib_clean = re.sub(r'[^A-Z0-9]', '', (h_ad + " " + sablon).upper())
+                if ib_clean and (temiz_hedef in ib_clean or ib_clean.endswith(temiz_hedef) or temiz_hedef.endswith(ib_clean)):
+                    sirket_durumu = f"🏢 <b>ŞİRKET İÇİ HESAP!</b> (Hesap: <code>{h_ad}</code>" + (f" - Cari: <b>{cari}</b>" if cari else " - 🟢 <b>Boşta</b>") + ")"
+                    break
+            # 2. Legacy Sol Blok Fallback
+            if len(row) > 11 and row[11].strip():
                 ib1 = re.sub(r'[^A-Z0-9]', '', row[11].strip().upper())
                 if ib1 and (ib1 == temiz_hedef or temiz_hedef.endswith(ib1) or ib1.endswith(temiz_hedef)):
                     not1 = row[14].strip() if len(row) > 14 else ""
                     sirket_durumu = f"🏢 <b>ŞİRKET İÇİ HESAP!</b> (CYL/HSY: <code>{row[11].strip()}</code>" + (f" - Cari: <b>{not1}</b>" if not1 else " - 🟢 <b>Boşta</b>") + ")"
                     break
-            if len(row) > 15:
+            # 3. Legacy Sağ Blok Fallback
+            if len(row) > 15 and row[15].strip():
                 ib2 = re.sub(r'[^A-Z0-9]', '', row[15].strip().upper())
                 if ib2 and (ib2 == temiz_hedef or temiz_hedef.endswith(ib2) or ib2.endswith(temiz_hedef)):
                     not2 = row[17].strip() if len(row) > 17 else ""
@@ -3464,21 +3574,28 @@ def ibanCozumle_impl(ham_metin: str) -> str:
     return mesaj
 
 def ibanListesiGetir_impl() -> str:
-    sh = get_spreadsheet()
-    sayfa = get_active_daily_sheet(sh)
-    veriler = get_sheet_values_fast(sayfa)
+    veriler = get_iban_values()
     bosta, dolu = [], []
     for row in veriler[1:]:
-        if len(row) > 11 and row[11].strip():
+        # IBANLAR Sayfası (Col 0: Hesap Kodu, Col 3: Cari)
+        if len(row) > 0 and row[0].strip() and row[0].strip() != "HESAP KODU":
+            h_kod = row[0].strip()
+            cari = row[3].strip() if len(row) > 3 else ""
+            if not cari:
+                bosta.append(f"🔹 <code>{h_kod}</code>")
+            else:
+                dolu.append(f"🔹 👤 <b>{cari}:</b> <code>{h_kod}</code>")
+        elif len(row) > 11 and row[11].strip():
             ib1 = row[11].strip()
             not1 = row[14].strip() if len(row) > 14 else ""
             if not not1: bosta.append(f"🔹 <code>{ib1}</code>")
             else: dolu.append(f"🔹 👤 <b>{not1}:</b> <code>{ib1}</code>")
-        if len(row) > 15 and row[15].strip():
+        elif len(row) > 15 and row[15].strip():
             ib2 = row[15].strip()
             not2 = row[17].strip() if len(row) > 17 else ""
             if not not2: bosta.append(f"🔹 <code>{ib2}</code>")
             else: dolu.append(f"🔹 👤 <b>{not2}:</b> <code>{ib2}</code>")
+
     mesaj = "🏦 <b>ŞİRKET İBAN LİSTESİ</b>\n━━━━━━━━━━\n\n"
     mesaj += "🟢 <b>BOŞTAKİ İBANLAR</b> <i>(Kullanıma Hazır)</i>\n" + ("\n".join(bosta) if bosta else "🔹 <i>Boşta İBAN yok.</i>") + "\n\n"
     mesaj += "🔴 <b>KULLANIMDAKİ İBANLAR</b>\n" + ("\n".join(dolu) if dolu else "🔹 <i>Kullanımda İBAN yok.</i>")
@@ -3489,78 +3606,6 @@ def normalize_hesap_kodu(text: str) -> str:
         return ""
     t = normalize_text(text)
     return re.sub(r'[^A-Z0-9]', '', t)
-
-def iban_sablon_bul(veriler: List[List[str]], aranan_kod: str):
-    """
-    Excel tablosundaki Sol Blok (Col L: 12, Col M: 13, Col O: 15) ve 
-    Sağ Blok (Col P: 16, Col Q: 17, Col R: 18) üzerinde şablon arar.
-    Döner: (satir_idx, hesap_adi, sablon_metni, cari_adi) veya None
-    """
-    aranan_temiz = aranan_kod.strip()
-    aranan_norm = normalize_hesap_kodu(aranan_temiz)
-    if not aranan_norm:
-        return None
-
-    # 1. Aşama: BİREBİR TAM EŞLEŞME (Örn: 'CYL 1' için tam 'CYL 1' satırını bulur, 'CYL 10'a atlamaz)
-    for idx, row in enumerate(veriler[1:], start=2):
-        if len(row) > 11 and row[11].strip():
-            h_ad = row[11].strip()
-            h_norm = normalize_hesap_kodu(h_ad)
-            if h_norm == aranan_norm:
-                sablon = row[12].strip() if len(row) > 12 else ""
-                cari = row[14].strip() if len(row) > 14 else ""
-                return idx, h_ad, sablon, cari
-
-        if len(row) > 15 and row[15].strip():
-            h_ad = row[15].strip()
-            h_norm = normalize_hesap_kodu(h_ad)
-            if h_norm == aranan_norm:
-                sablon = row[16].strip() if len(row) > 16 else ""
-                cari = row[17].strip() if len(row) > 17 else ""
-                return idx, h_ad, sablon, cari
-
-    # 2. Aşama: Başlangıç/içerme eşleşmesi (Sadece tam eşleşme yoksa)
-    for idx, row in enumerate(veriler[1:], start=2):
-        if len(row) > 11 and row[11].strip():
-            h_ad = row[11].strip()
-            h_norm = normalize_hesap_kodu(h_ad)
-            if len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm):
-                sablon = row[12].strip() if len(row) > 12 else ""
-                cari = row[14].strip() if len(row) > 14 else ""
-                return idx, h_ad, sablon, cari
-
-        if len(row) > 15 and row[15].strip():
-            h_ad = row[15].strip()
-            h_norm = normalize_hesap_kodu(h_ad)
-            if len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm):
-                sablon = row[16].strip() if len(row) > 16 else ""
-                cari = row[17].strip() if len(row) > 17 else ""
-                return idx, h_ad, sablon, cari
-
-    # 3. Aşama: Esnek token eşleşmesi (Örn: 'ARS 3' -> 'ARS EMLAK 3' veya 'HSY 2' -> 'HSY 2 / 29')
-    match_digits = re.findall(r'\d+', aranan_norm)
-    match_letters = re.findall(r'[A-Z]+', aranan_norm)
-    if match_digits and match_letters:
-        num = match_digits[-1]
-        letters = "".join(match_letters)
-        for idx, row in enumerate(veriler[1:], start=2):
-            if len(row) > 11 and row[11].strip():
-                h_ad = row[11].strip()
-                h_norm = normalize_hesap_kodu(h_ad)
-                if letters in h_norm and (h_norm.endswith(num) or re.search(rf'{num}(?!\d)', h_norm)):
-                    sablon = row[12].strip() if len(row) > 12 else ""
-                    cari = row[14].strip() if len(row) > 14 else ""
-                    return idx, h_ad, sablon, cari
-
-            if len(row) > 15 and row[15].strip():
-                h_ad = row[15].strip()
-                h_norm = normalize_hesap_kodu(h_ad)
-                if letters in h_norm and (h_norm.endswith(num) or re.search(rf'{num}(?!\d)', h_norm)):
-                    sablon = row[16].strip() if len(row) > 16 else ""
-                    cari = row[17].strip() if len(row) > 17 else ""
-                    return idx, h_ad, sablon, cari
-
-    return None
 
 def sablon_kodlarini_coz(aranan_metin: str) -> List[str]:
     """
@@ -3601,8 +3646,129 @@ def sablon_kodlarini_coz(aranan_metin: str) -> List[str]:
 
     return sonuc[:25]
 
+def sync_iban_update(hesap_kodu: str, cari_adi: str = ""):
+    """
+    IBAN tahsis veya boşaltma yapıldığında hem sabit 'IBANLAR' sayfasını hem de (varsa) günlük sayfayı günceller.
+    """
+    sh = get_spreadsheet()
+    cari_temiz = cari_adi.strip().upper() if cari_adi else ""
+    aranan_norm = normalize_hesap_kodu(hesap_kodu)
+
+    # 1. IBANLAR Sayfasını Güncelle
+    try:
+        iban_ws = get_iban_sheet(sh)
+        iban_vals = get_sheet_values_fast(iban_ws)
+        for idx, row in enumerate(iban_vals[1:], start=2):
+            if len(row) > 0 and row[0].strip():
+                h_ad = row[0].strip()
+                if normalize_hesap_kodu(h_ad) == aranan_norm or (len(aranan_norm) >= 3 and (normalize_hesap_kodu(h_ad).startswith(aranan_norm) or aranan_norm in normalize_hesap_kodu(h_ad))):
+                    update_sheet_matrix_memory(iban_ws.title, idx, 4, cari_temiz)
+                    iban_ws.update_cell(idx, 4, cari_temiz)
+                    durum_str = f"🔴 Kullanımda ({cari_temiz})" if cari_temiz else "🟢 Müsait"
+                    update_sheet_matrix_memory(iban_ws.title, idx, 5, durum_str)
+                    iban_ws.update_cell(idx, 5, durum_str)
+                    break
+    except Exception as e:
+        print(f"IBAN sayfa güncelleme uyarısı: {e}")
+
+    # 2. Günlük Sayfayı Güncelle (Varsa)
+    try:
+        daily_ws = get_active_daily_sheet(sh)
+        daily_vals = get_sheet_values_fast(daily_ws)
+        for idx, row in enumerate(daily_vals[1:], start=2):
+            if len(row) > 11 and row[11].strip():
+                h1 = row[11].strip()
+                if normalize_hesap_kodu(h1) == aranan_norm or (len(aranan_norm) >= 3 and (normalize_hesap_kodu(h1).startswith(aranan_norm) or aranan_norm in normalize_hesap_kodu(h1))):
+                    update_sheet_matrix_memory(daily_ws.title, idx, 15, cari_temiz)
+                    daily_ws.update_cell(idx, 15, cari_temiz)
+                    break
+            if len(row) > 15 and row[15].strip():
+                h2 = row[15].strip()
+                if normalize_hesap_kodu(h2) == aranan_norm or (len(aranan_norm) >= 3 and (normalize_hesap_kodu(h2).startswith(aranan_norm) or aranan_norm in normalize_hesap_kodu(h2))):
+                    update_sheet_matrix_memory(daily_ws.title, idx, 18, cari_temiz)
+                    daily_ws.update_cell(idx, 18, cari_temiz)
+                    break
+    except Exception as e:
+        print(f"Günlük sayfa IBAN güncelleme uyarısı: {e}")
+
+def iban_sablon_bul(veriler=None, aranan_kod: str = ""):
+    """
+    Aranan IBAN koduna ait şablon verisini 'IBANLAR' sayfasında ve legacy 2-blokta arar.
+    Döner: (satir_idx, hesap_adi, sablon_metni, cari_adi) veya None
+    """
+    if isinstance(veriler, str):
+        aranan_kod = veriler
+        veriler = None
+    if not aranan_kod:
+        return None
+
+    aranan_temiz = aranan_kod.strip()
+    if aranan_temiz.startswith("/"):
+        aranan_temiz = aranan_temiz[1:].strip()
+    aranan_norm = normalize_hesap_kodu(aranan_temiz)
+    if not aranan_norm:
+        return None
+
+    iban_veriler = veriler or get_iban_values()
+
+    # 1. IBANLAR Sayfası Dikey Liste - BİREBİR EŞLEŞME
+    for idx, row in enumerate(iban_veriler[1:], start=2):
+        if len(row) > 0 and row[0].strip() and row[0].strip() != "HESAP KODU":
+            h_ad = row[0].strip()
+            if normalize_hesap_kodu(h_ad) == aranan_norm:
+                sablon = row[1].strip() if len(row) > 1 else ""
+                cari = row[3].strip() if len(row) > 3 else ""
+                return idx, h_ad, sablon, cari
+
+    # 2. IBANLAR Sayfası - Başlangıç / İçerme
+    for idx, row in enumerate(iban_veriler[1:], start=2):
+        if len(row) > 0 and row[0].strip() and row[0].strip() != "HESAP KODU":
+            h_ad = row[0].strip()
+            h_norm = normalize_hesap_kodu(h_ad)
+            if len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm):
+                sablon = row[1].strip() if len(row) > 1 else ""
+                cari = row[3].strip() if len(row) > 3 else ""
+                return idx, h_ad, sablon, cari
+
+    # 3. IBANLAR Sayfası - Esnek Token
+    match_digits = re.findall(r'\d+', aranan_norm)
+    match_letters = re.findall(r'[A-Z]+', aranan_norm)
+    if match_digits and match_letters:
+        num = match_digits[-1]
+        letters = "".join(match_letters)
+        for idx, row in enumerate(iban_veriler[1:], start=2):
+            if len(row) > 0 and row[0].strip() and row[0].strip() != "HESAP KODU":
+                h_ad = row[0].strip()
+                h_norm = normalize_hesap_kodu(h_ad)
+                if letters in h_norm and (h_norm.endswith(num) or re.search(rf'{num}(?!\d)', h_norm)):
+                    sablon = row[1].strip() if len(row) > 1 else ""
+                    cari = row[3].strip() if len(row) > 3 else ""
+                    return idx, h_ad, sablon, cari
+
+    # 4. Legacy 2-Blok Format Fallback (Günlük Sayfa)
+    for idx, row in enumerate(iban_veriler[1:], start=2):
+        # Sol blok (Col L:11, M:12, O:14)
+        if len(row) > 11 and row[11].strip():
+            h_ad = row[11].strip()
+            h_norm = normalize_hesap_kodu(h_ad)
+            if h_norm == aranan_norm or (len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm)):
+                sablon = row[12].strip() if len(row) > 12 else ""
+                cari = row[14].strip() if len(row) > 14 else ""
+                return idx, h_ad, sablon, cari
+
+        # Sağ blok (Col P:15, Q:16, S:18)
+        if len(row) > 15 and row[15].strip():
+            h_ad = row[15].strip()
+            h_norm = normalize_hesap_kodu(h_ad)
+            if h_norm == aranan_norm or (len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm)):
+                sablon = row[16].strip() if len(row) > 16 else ""
+                cari = row[18].strip() if len(row) > 18 else ""
+                return idx, h_ad, sablon, cari
+
+    return None
+
 def tek_sablon_getir_impl(aranan: str, sayfa, veriler: List[List[str]], chat_id: int = 0):
-    res = iban_sablon_bul(veriler, aranan)
+    res = iban_sablon_bul(veriler=veriler, aranan_kod=aranan)
     if not res:
         return None
 
@@ -3618,15 +3784,14 @@ def tek_sablon_getir_impl(aranan: str, sayfa, veriler: List[List[str]], chat_id:
         bagli = app_state.get("GRUP_BAGLANTILARI", {}).get(chat_id)
         if bagli and bagli.get("grup"):
             hedef_cari = bagli.get("grup").strip().upper()
-            h_res = iban_hesap_bul(veriler, aranan) or iban_hesap_bul(veriler, hesap_adi)
+            h_res = iban_hesap_bul(veriler=veriler, aranan_kod=aranan) or iban_hesap_bul(veriler=veriler, aranan_kod=hesap_adi)
             if h_res:
-                h_satir, h_col, h_ad, eski_cari = h_res
+                h_satir, h_col, h_ad, eski_cari, is_iban_sheet = h_res
                 if eski_cari.strip().upper() != hedef_cari:
                     try:
-                        update_sheet_matrix_memory(sayfa.title, h_satir, h_col, hedef_cari)
-                        sayfa.update_cell(h_satir, h_col, hedef_cari)
+                        sync_iban_update(h_ad, hedef_cari)
                         app_state["SON_ISLEM"] = {
-                            "sayfa": sayfa.title, "satir": h_satir, "sutun": h_col,
+                            "sayfa": IBAN_SAYFASI, "satir": h_satir, "sutun": h_col,
                             "eskiDeger": eski_cari, "grupAdi": h_ad, "islemTuru": "İBAN Otomatik Tahsis"
                         }
                         sistemeLogYaz("İBAN Otomatik Tahsis", f"Gruptan ({chat_id}) {h_ad} ➔ {hedef_cari}")
@@ -3647,10 +3812,6 @@ def tek_sablon_getir_impl(aranan: str, sayfa, veriler: List[List[str]], chat_id:
     return sablon_metni + tahsis_bilgisi
 
 def iban_sablon_getir_impl(komut_metni: str, chat_id: int = 0):
-    """
-    Kullanıcı /HSY EMLAK 3, /sablon ARS 1-5 veya /sablon CYL 1, HSY 3 yazdığında
-    Excel'deki şablonları çeker ve her bir şablonu ayrı ayrı mesajlar halinde Telegram'a gönderir.
-    """
     temiz_komut = komut_metni.strip()
     if temiz_komut.startswith("/sablon") or temiz_komut.startswith("/şablon") or temiz_komut.startswith("/hesapbilgi"):
         p = temiz_komut.split()[1:]
@@ -3708,95 +3869,98 @@ def iban_sablon_getir_impl(komut_metni: str, chat_id: int = 0):
     bulunmayan_metin = f"\n⚠️ Bulunamayanlar: {', '.join(bulunamayanlar)}" if bulunamayanlar else ""
     return f"✅ <b>Toplu Şablon İletimi Tamamlandı!</b>\nToplam <b>{len(gonderilenler)} adet</b> ödeme şablonu gruba ayrı mesajlar halinde iletildi.{bulunmayan_metin}"
 
-def iban_hesap_bul(veriler: List[List[str]], aranan_kod: str):
+def iban_hesap_bul(veriler: List[List[str]] = None, aranan_kod: str = ""):
     """
-    Excel tablosundaki L (12. sütun) ve P (16. sütun) hesap bloklarında arama yapar.
-    Döner: (satir_no_1based, hedef_cari_sutun_1based, hesap_adi, mevcut_cari)
+    'IBANLAR' sayfasında (Col A: 0 Hesap Kodu, Col D: 3 Cari) ve legacy 2-blokta arama yapar.
+    Döner: (satir_idx, cari_sutun_idx, hesap_adi, mevcut_cari, is_iban_sheet)
     """
+    if not aranan_kod:
+        return None
     aranan_temiz = aranan_kod.strip()
     aranan_norm = normalize_hesap_kodu(aranan_temiz)
     if not aranan_norm:
         return None
 
-    # 1. Aşama: BİREBİR TAM EŞLEŞME (Örn: 'CYL 1' için tam 'CYL 1' satırını bulur, 'CYL 10'a atlamaz)
-    for idx, row in enumerate(veriler[1:], start=2):
-        if len(row) > 11 and row[11].strip():
-            h_ad = row[11].strip()
+    iban_veriler = get_iban_values()
+
+    # 1. Aşama: IBANLAR Sayfası Dikey Liste - BİREBİR TAM EŞLEŞME
+    for idx, row in enumerate(iban_veriler[1:], start=2):
+        if len(row) > 0 and row[0].strip() and row[0].strip() != "HESAP KODU":
+            h_ad = row[0].strip()
             h_norm = normalize_hesap_kodu(h_ad)
             if h_norm == aranan_norm:
-                mevcut_cari = row[14].strip() if len(row) > 14 else ""
-                return idx, 15, h_ad, mevcut_cari
+                mevcut_cari = row[3].strip() if len(row) > 3 else ""
+                return idx, 4, h_ad, mevcut_cari, True
 
-        if len(row) > 15 and row[15].strip():
-            h_ad = row[15].strip()
-            h_norm = normalize_hesap_kodu(h_ad)
-            if h_norm == aranan_norm:
-                mevcut_cari = row[17].strip() if len(row) > 17 else ""
-                return idx, 18, h_ad, mevcut_cari
-
-    # 2. Aşama: Başlangıç/içerme eşleşmesi (Sadece tam eşleşme yoksa)
-    for idx, row in enumerate(veriler[1:], start=2):
-        if len(row) > 11 and row[11].strip():
-            h_ad = row[11].strip()
+    # 2. Aşama: IBANLAR Sayfası - Başlangıç/İçerme
+    for idx, row in enumerate(iban_veriler[1:], start=2):
+        if len(row) > 0 and row[0].strip() and row[0].strip() != "HESAP KODU":
+            h_ad = row[0].strip()
             h_norm = normalize_hesap_kodu(h_ad)
             if len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm):
-                mevcut_cari = row[14].strip() if len(row) > 14 else ""
-                return idx, 15, h_ad, mevcut_cari
+                mevcut_cari = row[3].strip() if len(row) > 3 else ""
+                return idx, 4, h_ad, mevcut_cari, True
 
-        if len(row) > 15 and row[15].strip():
-            h_ad = row[15].strip()
-            h_norm = normalize_hesap_kodu(h_ad)
-            if len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm):
-                mevcut_cari = row[17].strip() if len(row) > 17 else ""
-                return idx, 18, h_ad, mevcut_cari
-
-    # 3. Aşama: Esnek token eşleşmesi (Örn: 'ARS 3' -> 'ARS EMLAK 3' veya 'HSY 2' -> 'HSY 2 / 29')
+    # 3. Aşama: IBANLAR Sayfası - Esnek Token
     match_digits = re.findall(r'\d+', aranan_norm)
     match_letters = re.findall(r'[A-Z]+', aranan_norm)
     if match_digits and match_letters:
         num = match_digits[-1]
         letters = "".join(match_letters)
-        for idx, row in enumerate(veriler[1:], start=2):
-            if len(row) > 11 and row[11].strip():
-                h_ad = row[11].strip()
+        for idx, row in enumerate(iban_veriler[1:], start=2):
+            if len(row) > 0 and row[0].strip() and row[0].strip() != "HESAP KODU":
+                h_ad = row[0].strip()
                 h_norm = normalize_hesap_kodu(h_ad)
                 if letters in h_norm and (h_norm.endswith(num) or re.search(rf'{num}(?!\d)', h_norm)):
-                    mevcut_cari = row[14].strip() if len(row) > 14 else ""
-                    return idx, 15, h_ad, mevcut_cari
+                    mevcut_cari = row[3].strip() if len(row) > 3 else ""
+                    return idx, 4, h_ad, mevcut_cari, True
 
-            if len(row) > 15 and row[15].strip():
-                h_ad = row[15].strip()
-                h_norm = normalize_hesap_kodu(h_ad)
-                if letters in h_norm and (h_norm.endswith(num) or re.search(rf'{num}(?!\d)', h_norm)):
-                    mevcut_cari = row[17].strip() if len(row) > 17 else ""
-                    return idx, 18, h_ad, mevcut_cari
+    # 4. Aşama: Legacy 2-Blok Formatı Fallback
+    daily_veriler = veriler
+    if daily_veriler is None:
+        try:
+            sh = get_spreadsheet()
+            daily_ws = get_active_daily_sheet(sh)
+            daily_veriler = get_sheet_values_fast(daily_ws)
+        except Exception:
+            daily_veriler = []
+
+    for idx, row in enumerate(daily_veriler[1:], start=2):
+        if len(row) > 11 and row[11].strip():
+            h_ad = row[11].strip()
+            h_norm = normalize_hesap_kodu(h_ad)
+            if h_norm == aranan_norm or (len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm)):
+                mevcut_cari = row[14].strip() if len(row) > 14 else ""
+                return idx, 15, h_ad, mevcut_cari, False
+
+        if len(row) > 15 and row[15].strip():
+            h_ad = row[15].strip()
+            h_norm = normalize_hesap_kodu(h_ad)
+            if h_norm == aranan_norm or (len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm)):
+                mevcut_cari = row[17].strip() if len(row) > 17 else ""
+                return idx, 18, h_ad, mevcut_cari, False
 
     return None
 
 def iban_bosalt_direct(hesap_kodu: str) -> Tuple[bool, str, str, str]:
     """
-    Doğrudan hesap kodunu alıp Excel tablosundaki tahsisini boşa çıkarır (Müsait yapar).
+    Doğrudan hesap kodunu alıp IBAN tablosundaki tahsisini boşa çıkarır (Müsait yapar).
     Döner: (basarili_mi, hesap_adi, eski_cari, sayfa_basligi)
     """
-    sh = get_spreadsheet()
-    sayfa = get_active_daily_sheet(sh)
-    veriler = get_sheet_values_fast(sayfa)
-    
-    bulunan = iban_hesap_bul(veriler, hesap_kodu)
+    bulunan = iban_hesap_bul(aranan_kod=hesap_kodu)
     if not bulunan:
-        return False, f"Hesap '{hesap_kodu}' bulunamadı", "", sayfa.title
+        return False, f"Hesap '{hesap_kodu}' bulunamadı", "", IBAN_SAYFASI
         
-    satir_idx, col_idx, hesap_adi, eski_cari = bulunan
-    
-    update_sheet_matrix_memory(sayfa.title, satir_idx, col_idx, "")
-    sayfa.update_cell(satir_idx, col_idx, "")
-    
+    satir_idx, col_idx, hesap_adi, eski_cari, is_iban_sheet = bulunan
+
+    sync_iban_update(hesap_adi, "")
+
     app_state["SON_ISLEM"] = {
-        "sayfa": sayfa.title, "satir": satir_idx, "sutun": col_idx,
+        "sayfa": IBAN_SAYFASI, "satir": satir_idx, "sutun": col_idx,
         "eskiDeger": eski_cari, "grupAdi": hesap_adi, "islemTuru": "İBAN Boşaltma"
     }
     sistemeLogYaz("İBAN Boşaltma", f"{hesap_adi} | Eski: {eski_cari} ➔ Boş")
-    return True, hesap_adi, eski_cari, sayfa.title
+    return True, hesap_adi, eski_cari, IBAN_SAYFASI
 
 def iban_tahsis_impl(komut_metni: str) -> str:
     parcalar = komut_metni.strip().split()[1:]
@@ -3810,39 +3974,34 @@ def iban_tahsis_impl(komut_metni: str) -> str:
             "• <code>/ibantahsis ARS3 BSM</code>"
         )
         
-    sh = get_spreadsheet()
-    sayfa = get_active_daily_sheet(sh)
-    veriler = get_sheet_values_fast(sayfa)
-    
     bulunan = None
     cari_adi = ""
     
     for split_idx in range(len(parcalar) - 1, 0, -1):
         hesap_adayi = " ".join(parcalar[:split_idx]).strip()
         cari_adayi = " ".join(parcalar[split_idx:]).strip()
-        res = iban_hesap_bul(veriler, hesap_adayi)
+        res = iban_hesap_bul(aranan_kod=hesap_adayi)
         if res:
             bulunan = res
             cari_adi = cari_adayi
             break
             
     if not bulunan:
-        res = iban_hesap_bul(veriler, parcalar[0])
+        res = iban_hesap_bul(aranan_kod=parcalar[0])
         if res:
             bulunan = res
             cari_adi = " ".join(parcalar[1:]).strip()
             
     if not bulunan:
-        return f"⚠️ <b>Hesap Bulunamadı!</b>\nExcel tablosunda '<b>{' '.join(parcalar[:-1])}</b>' adlı bir İBAN/hesap bulunamadı."
+        return f"⚠️ <b>Hesap Bulunamadı!</b>\nIBAN tablosunda '<b>{' '.join(parcalar[:-1])}</b>' adlı bir İBAN/hesap bulunamadı."
         
-    satir_idx, col_idx, hesap_adi, eski_cari = bulunan
+    satir_idx, col_idx, hesap_adi, eski_cari, is_iban_sheet = bulunan
     cari_temiz = cari_adi.strip().upper()
     
-    update_sheet_matrix_memory(sayfa.title, satir_idx, col_idx, cari_temiz)
-    sayfa.update_cell(satir_idx, col_idx, cari_temiz)
-    
+    sync_iban_update(hesap_adi, cari_temiz)
+
     app_state["SON_ISLEM"] = {
-        "sayfa": sayfa.title, "satir": satir_idx, "sutun": col_idx,
+        "sayfa": IBAN_SAYFASI, "satir": satir_idx, "sutun": col_idx,
         "eskiDeger": eski_cari, "grupAdi": hesap_adi, "islemTuru": "İBAN Tahsis"
     }
     sistemeLogYaz("İBAN Tahsis", f"{hesap_adi} ➔ {cari_temiz}")
@@ -3853,9 +4012,9 @@ def iban_tahsis_impl(komut_metni: str) -> str:
         f"🏦 <b>Hesap:</b> <code>{hesap_adi}</code>\n"
         f"👤 <b>Tahsis Edilen Cari:</b> <b>{cari_temiz}</b>\n"
         f"📊 <b>Durum:</b> 🔴 <b>Kullanımda</b>\n"
-        f"📌 <b>Excel Satırı:</b> Satır {satir_idx}\n"
+        f"📌 <b>Sayfa / Satır:</b> {IBAN_SAYFASI} | Satır {satir_idx}\n"
         f"━━━━━━━━━━━\n"
-        f"💡 <i>İşlem bitince <code>/ibanbosalt {parcalar[0]}</code> yazarak boşa çıkarabilirsiniz.</i>"
+        f"💡 <i>İşlem bitince <code>/ibanbosalt {hesap_adi}</code> yazarak boşa çıkarabilirsiniz.</i>"
     )
 
 def iban_bosalt_impl(komut_metni: str) -> str:
@@ -3873,7 +4032,7 @@ def iban_bosalt_impl(komut_metni: str) -> str:
     hesap_kodu = " ".join(parcalar).strip()
     ok, hesap_adi, eski_cari, sayfa_basligi = iban_bosalt_direct(hesap_kodu)
     if not ok:
-        return f"⚠️ <b>Hesap Bulunamadı!</b>\nExcel tablosunda '<b>{hesap_kodu}</b>' adlı bir İBAN/hesap bulunamadı."
+        return f"⚠️ <b>Hesap Bulunamadı!</b>\nIBAN tablosunda '<b>{hesap_kodu}</b>' adlı bir İBAN/hesap bulunamadı."
     
     eski_str = f"<s>{eski_cari}</s>" if eski_cari else "<i>(Zaten boştu)</i>"
     return (
@@ -3888,7 +4047,7 @@ def iban_bosalt_impl(komut_metni: str) -> str:
 
 def grup_aktif_ibanlar_raporu_uret(grup_adi: str = "", chat_id: int = 0) -> Tuple[str, dict]:
     """
-    Belirtilen veya içinde bulunulan gruba bağlı olan TÜM aktif İBAN'ları Excel'den çeker,
+    Belirtilen veya içinde bulunulan gruba bağlı olan TÜM aktif İBAN'ları IBANLAR sayfasından çeker,
     veri analizi olarak listeler ve her birini tek tıkla boşa çıkarmak/silmek için butonlar sunar.
     """
     hedef_cari = grup_adi.strip().upper() if grup_adi else ""
@@ -3906,35 +4065,62 @@ def grup_aktif_ibanlar_raporu_uret(grup_adi: str = "", chat_id: int = 0) -> Tupl
             None
         )
 
-    sh = get_spreadsheet()
-    sayfa = get_active_daily_sheet(sh)
-    veriler = get_sheet_values_fast(sayfa)
-
+    veriler = get_iban_values()
     hedef_norm = normalize_text(hedef_cari)
     tahsisli_hesaplar = []
 
-    for idx, row in enumerate(veriler[1:], start=2):
-        # 1. Sol Blok: Col 11: Hesap, Col 12: Şablon, Col 13: Banka, Col 14: Cari (0-indexed)
-        if len(row) > 14 and row[14].strip():
-            c1 = row[14].strip()
-            if normalize_text(c1) == hedef_norm:
-                h_ad = row[11].strip() if len(row) > 11 else ""
-                h_sablon = row[12].strip() if len(row) > 12 else ""
-                h_banka = row[13].strip() if len(row) > 13 else ""
-                m_iban = re.search(r'TR\d{2}\s?(?:\d{4}\s?){5}\d{2}', h_sablon.upper())
-                iban_str = m_iban.group(0).replace(" ", "") if m_iban else ""
-                tahsisli_hesaplar.append({
-                    "hesap": h_ad,
-                    "banka": h_banka,
-                    "iban": iban_str,
-                    "satir": idx,
-                    "col": 15
-                })
+    is_iban_sheet_format = False
+    if veriler and len(veriler) > 0 and len(veriler[0]) > 0:
+        first_cell = veriler[0][0].strip().upper()
+        if "HESAP" in first_cell and "KOD" in first_cell:
+            is_iban_sheet_format = True
 
-        # 2. Sağ Blok: Col 15: Hesap, Col 16: Şablon, Col 17: Cari (0-indexed)
-        if len(row) > 17 and row[17].strip():
-            c2 = row[17].strip()
-            if normalize_text(c2) == hedef_norm:
+    if is_iban_sheet_format:
+        for idx, row in enumerate(veriler[1:], start=2):
+            if len(row) > 3 and row[3].strip() and row[0].strip() != "HESAP KODU":
+                c = row[3].strip()
+                if normalize_text(c) == hedef_norm:
+                    h_ad = row[0].strip() if len(row) > 0 else ""
+                    h_sablon = row[1].strip() if len(row) > 1 else ""
+                    h_banka = row[2].strip() if len(row) > 2 else ""
+                    m_iban = re.search(r'TR\d{2}\s?(?:\d{4}\s?){5}\d{2}', h_sablon.upper())
+                    iban_str = m_iban.group(0).replace(" ", "") if m_iban else ""
+                    tahsisli_hesaplar.append({
+                        "hesap": h_ad,
+                        "banka": h_banka,
+                        "iban": iban_str,
+                        "satir": idx,
+                        "col": 4
+                    })
+    else:
+        for idx, row in enumerate(veriler[1:], start=2):
+            # Sol Blok Fallback
+            if len(row) > 14 and row[14].strip():
+                c1 = row[14].strip()
+                if normalize_text(c1) == hedef_norm:
+                    h_ad = row[11].strip() if len(row) > 11 else ""
+                    h_sablon = row[12].strip() if len(row) > 12 else ""
+                    h_banka = row[13].strip() if len(row) > 13 else ""
+                    m_iban = re.search(r'TR\d{2}\s?(?:\d{4}\s?){5}\d{2}', h_sablon.upper())
+                    iban_str = m_iban.group(0).replace(" ", "") if m_iban else ""
+                    tahsisli_hesaplar.append({
+                        "hesap": h_ad,
+                        "banka": h_banka,
+                        "iban": iban_str,
+                        "satir": idx,
+                        "col": 15
+                    })
+            # Sağ Blok Fallback
+            c2 = ""
+            c2_col = 18
+            if len(row) > 18 and row[18].strip():
+                c2 = row[18].strip()
+                c2_col = 18
+            elif len(row) > 17 and row[17].strip():
+                c2 = row[17].strip()
+                c2_col = 18
+
+            if c2 and normalize_text(c2) == hedef_norm:
                 h_ad = row[15].strip() if len(row) > 15 else ""
                 h_sablon = row[16].strip() if len(row) > 16 else ""
                 m_iban = re.search(r'TR\d{2}\s?(?:\d{4}\s?){5}\d{2}', h_sablon.upper())
@@ -3944,7 +4130,7 @@ def grup_aktif_ibanlar_raporu_uret(grup_adi: str = "", chat_id: int = 0) -> Tupl
                     "banka": "",
                     "iban": iban_str,
                     "satir": idx,
-                    "col": 18
+                    "col": c2_col
                 })
 
     tarih_str = suankiZamaniAl().strftime("%d.%m.%Y")
@@ -3953,7 +4139,7 @@ def grup_aktif_ibanlar_raporu_uret(grup_adi: str = "", chat_id: int = 0) -> Tupl
 
     if not tahsisli_hesaplar:
         metin = (
-            f"🏦 <b>{hedef_cari} GRUBU İBAN ANALİZ RAPORU</b>\n"
+            f"🏦 <b>{hedef_cari} GRUBU AKTİF İBAN VERİ ANALİZİ</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"📅 Tarih: <b>{tarih_str}</b> | ⏰ Saat: <code>{saat_str}</code>\n"
             f"👤 Bağlı Cari: {emoji} <b>{hedef_cari}</b>\n"
