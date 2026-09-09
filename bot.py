@@ -5725,7 +5725,7 @@ _sse_clients = set()
 DASHBOARD_AUTH_TOKEN = os.environ.get("DASHBOARD_AUTH_TOKEN", "").strip()
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "").strip()
 
-def broadcast_dashboard_update(updated_groups: Optional[List[str]] = None):
+def broadcast_dashboard_update(updated_groups: Optional[List[str]] = None, group_changes: Optional[List[dict]] = None):
     """Google Sheets veya Telegram Bot değişikliğinde önbelleği yenileyip tüm canlı web istemcilerine SSE duyurusu yapar."""
     try:
         sh = get_spreadsheet(force_refresh=True)
@@ -5750,6 +5750,7 @@ def broadcast_dashboard_update(updated_groups: Optional[List[str]] = None):
             "masraflar": finans.get("masraflar", []),
             "gruplar": finans["aktif_gruplar"],
             "updated_groups": groups_list,
+            "group_changes": group_changes or [],
             "timestamp": time.time()
         }
         msg = f"data: {json.dumps(payload)}\n\n"
@@ -5875,7 +5876,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         .masraf-name { font-weight:700; color:#f472b6; font-size:14px; display:flex; align-items:center; gap:6px; }
         .masraf-tutar { font-weight:800; color:#f87171; font-size:14px; }
         
-        /* IŞIK YANIP SÖNME & PARLAMA ANİMASYONU (Glow Effect) */
+        /* GÜNCELLEME ANİMASYONU */
         @keyframes groupPulseGlow {
             0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.9); border-color: #34d399; transform: scale(1.02); }
             50% { box-shadow: 0 0 40px 14px rgba(96, 165, 250, 0.85); border-color: #60a5fa; transform: scale(1.03); background:rgba(30, 41, 66, 0.95); }
@@ -5964,6 +5965,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <script>
         let prevGroupsState = {};
         let sseSource = null;
+        let isFirstLoad = true;
 
         function fmt(n) {
             const num = Number(n);
@@ -5991,7 +5993,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 border-radius: 14px;
                 padding: 14px 18px;
                 min-width: 290px;
-                max-width: 400px;
+                max-width: 420px;
                 font-size: 13px;
                 display: flex;
                 align-items: center;
@@ -6000,7 +6002,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 transition: all 0.3s ease;
             `;
             toast.innerHTML = `
-                <div style="font-size:24px; filter:drop-shadow(0 0 8px #34d399);">⚡</div>
+                <div style="font-size:24px; filter:drop-shadow(0 0 8px #34d399);">🔔</div>
                 <div>
                     <div style="font-weight:800; font-size:14px; color:${isHighlight ? '#6ee7b7' : '#93c5fd'}; margin-bottom:2px;">${title}</div>
                     <div style="color:#e2e8f0; font-weight:500;">${message}</div>
@@ -6032,26 +6034,32 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             if(!d.gruplar || d.gruplar.length === 0) {
                 gc.innerHTML = '<p style="color:#94a3b8;">Henüz işlem görmüş aktif grup bulunmuyor.</p>';
             } else {
-                const updatedSet = new Set((d.updated_groups || []).map(g => String(g).toUpperCase().trim()));
+                const updatedSet = new Set();
 
+                if (!isFirstLoad && !isManual) {
+                    if (d.updated_groups && Array.isArray(d.updated_groups)) {
+                        d.updated_groups.forEach(g => {
+                            if (g) updatedSet.add(String(g).toUpperCase().trim());
+                        });
+                    }
+                }
+
+                // Mevcut değerleri hafızaya yaz
                 d.gruplar.forEach(g => {
                     const gNameUpper = g.ad.toUpperCase().trim();
-                    const prevKalan = prevGroupsState[gNameUpper];
-                    if (prevKalan !== undefined && prevKalan !== g.kalan) {
-                        updatedSet.add(gNameUpper);
-                    }
-                    prevGroupsState[gNameUpper] = g.kalan;
+                    prevGroupsState[gNameUpper] = `${g.devir}_${g.kasa}_${g.odenen}_${g.komisyon}_${g.kalan}`;
                 });
 
                 gc.innerHTML = d.gruplar.map(g => {
                     const gNameUpper = g.ad.toUpperCase().trim();
                     const isUpdated = updatedSet.has(gNameUpper);
+                    const safeId = 'card-group-' + gNameUpper.replace(/[^A-Z0-9]/gi, '_');
                     return `
-                        <div class="group-card ${isUpdated ? 'glow-updated' : ''}">
+                        <div class="group-card ${isUpdated ? 'glow-updated' : ''}" id="${safeId}">
                             <div class="group-header">
                                 <div class="group-name">
                                     <span>🔹</span> ${gNameUpper}
-                                    ${isUpdated ? '<span style="font-size:11px; font-weight:800; color:#34d399; background:rgba(52,211,153,0.25); border:1px solid #34d399; padding:2px 8px; border-radius:10px; margin-left:6px; animation:pulse 1s infinite;">⚡ IŞIK GÜNCEL</span>' : ''}
+                                    ${isUpdated ? '<span class="glow-badge" style="font-size:11px; font-weight:800; color:#34d399; background:rgba(52,211,153,0.25); border:1px solid rgba(52,211,153,0.5); padding:2px 8px; border-radius:10px; margin-left:6px; animation:pulse 1s infinite;">🟢 CANLI GÜNCEL</span>' : ''}
                                 </div>
                                 <div class="group-kalan-badge" style="background:${g.kalan < 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)'}; color:${g.kalan < 0 ? '#f87171' : '#34d399'};">${fmt(g.kalan)}</div>
                             </div>
@@ -6075,11 +6083,35 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                     `;
                 }).join('');
 
-                if (updatedSet.size > 0 && !isManual) {
-                    const listNames = Array.from(updatedSet).join(', ');
-                    showToast('⚡ Canlı Değişiklik Tespit Edildi!', `<b>${listNames}</b> grubu anlık olarak güncellendi ve ışık yakıldı!`, true);
+                // Profesyonel Bildirim Gösterimi (Tekil İşlem Bazlı)
+                if (!isManual && !isFirstLoad) {
+                    if (d.group_changes && Array.isArray(d.group_changes) && d.group_changes.length > 0) {
+                        d.group_changes.forEach(change => {
+                            if (change && change.message) {
+                                showToast("Finansal İşlem Bildirimi", change.message, true);
+                            }
+                        });
+                    } else if (updatedSet.size > 0) {
+                        updatedSet.forEach(gNameUpper => {
+                            showToast("Finansal İşlem Bildirimi", `📊 <b>${gNameUpper}</b> grubu finansal bakiyesi güncellendi.`, true);
+                        });
+                    }
+
+                    setTimeout(() => {
+                        updatedSet.forEach(gNameUpper => {
+                            const safeId = 'card-group-' + gNameUpper.replace(/[^A-Z0-9]/gi, '_');
+                            const cardEl = document.getElementById(safeId);
+                            if (cardEl) {
+                                cardEl.classList.remove('glow-updated');
+                                const badgeEl = cardEl.querySelector('.glow-badge');
+                                if (badgeEl) badgeEl.remove();
+                            }
+                        });
+                    }, 5000);
                 }
             }
+
+            isFirstLoad = false;
 
             // Render Masraflar
             const mc = document.getElementById('masraflar-container');
@@ -6102,7 +6134,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 const res = await fetch(url);
                 const d = await res.json();
                 updateDashboardUI(d, isManual);
-                if(isManual) showToast("Yenilendi", "Finans paneli güncellendi.", false);
+                if(isManual) showToast("Finansal Yenileme", "Finans paneli güncellendi.", false);
             } catch(e) {
                 console.error(e);
             }
@@ -6190,6 +6222,7 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
             content_length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(content_length) if content_length > 0 else b""
             updated_groups = []
+            group_changes = []
             if body:
                 try:
                     b_data = json.loads(body.decode('utf-8'))
@@ -6198,11 +6231,13 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                             updated_groups = b_data["updated_groups"]
                         elif "group" in b_data and isinstance(b_data["group"], str):
                             updated_groups = [b_data["group"]]
+                        if "group_changes" in b_data and isinstance(b_data["group_changes"], list):
+                            group_changes = b_data["group_changes"]
                 except Exception:
                     pass
 
             # Webhook geldiğinde canlı yayını tetikle
-            _update_executor.submit(broadcast_dashboard_update, updated_groups)
+            _update_executor.submit(broadcast_dashboard_update, updated_groups, group_changes)
             
             self._send_security_headers(200, "application/json; charset=utf-8")
             self.end_headers()
@@ -6250,6 +6285,7 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                     "masraflar": finans.get("masraflar", []),
                     "gruplar": finans["aktif_gruplar"],
                     "updated_groups": [],
+                    "group_changes": [],
                     "timestamp": time.time()
                 }
                 self.wfile.write(f"data: {json.dumps(initial_data)}\n\n".encode("utf-8"))
@@ -6306,7 +6342,6 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(DASHBOARD_HTML.encode("utf-8"))
 
-
     def log_message(self, format, *args): pass
 
 def run_dashboard_server():
@@ -6336,12 +6371,12 @@ def run_kapanis_scheduler():
         time.sleep(30)
 
 _last_sheet_fingerprint = None
+_prev_group_snapshot = {}
 
 def run_sheets_autosync_loop():
     """Google Sheets tablosunu arka planda kesintisiz (3 saniyede bir) takip eder.
-    Excel veya Google Sheets üzerinde herhangi bir kullanıcı bir veri girdiğinde veya değiştirdiğinde,
-    değişikliği anında tespit eder ve web paneline manuel yenileme OLMADAN otomatik canlı yayın yapar."""
-    global _last_sheet_fingerprint
+    Sadece ve sadece bakiyesi veya değerleri değişen SPESİFİK Gruba özel profesyonel bildirim oluşturur."""
+    global _last_sheet_fingerprint, _prev_group_snapshot
     import hashlib
 
     while True:
@@ -6355,9 +6390,69 @@ def run_sheets_autosync_loop():
 
             if _last_sheet_fingerprint is not None and current_fp != _last_sheet_fingerprint:
                 finans = tablodan_finans_ozeti_hesapla(veriler)
-                updated_groups = [g["ad"] for g in finans.get("aktif_gruplar", [])]
-                broadcast_dashboard_update(updated_groups)
-                print(f"[AutoSync] Google Sheets üzerinde canlı değişiklik tespit edildi ve anında web paneline yayınlandı.")
+                
+                updated_groups = []
+                group_changes = []
+                new_snapshot = {}
+                
+                for g in finans.get("aktif_gruplar", []):
+                    g_name = g["ad"].strip().upper()
+                    devir = round(float(g.get("devir", 0)), 2)
+                    kasa = round(float(g.get("kasa", 0)), 2)
+                    odenen = round(float(g.get("odenen", 0)), 2)
+                    komisyon = round(float(g.get("komisyon", 0)), 2)
+                    kalan = round(float(g.get("kalan", 0)), 2)
+                    
+                    g_values = (devir, kasa, odenen, komisyon, kalan)
+                    new_snapshot[g_name] = g_values
+                    
+                    if _prev_group_snapshot and g_name in _prev_group_snapshot:
+                        p_devir, p_kasa, p_odenen, p_kom, p_kalan = _prev_group_snapshot[g_name]
+                        if (p_devir, p_kasa, p_odenen, p_kom, p_kalan) != g_values:
+                            updated_groups.append(g["ad"])
+                            
+                            # Detaylı işlem türü ve profesyonel mesaj tespiti
+                            if odenen > p_odenen:
+                                diff = odenen - p_odenen
+                                msg = f"💸 <b>{g_name}</b> grubuna {paraFormatla(diff)} ödeme yapıldı."
+                            elif kasa > p_kasa:
+                                diff = kasa - p_kasa
+                                msg = f"💰 <b>{g_name}</b> grubuna {paraFormatla(diff)} kasa girişi işlendi."
+                            elif odenen < p_odenen:
+                                diff = p_odenen - odenen
+                                msg = f"💸 <b>{g_name}</b> grubunun ödeme tutarı {paraFormatla(diff)} düşürüldü."
+                            elif kasa < p_kasa:
+                                diff = p_kasa - kasa
+                                msg = f"💰 <b>{g_name}</b> grubunun kasa tutarı {paraFormatla(diff)} düzeltildi."
+                            elif komisyon != p_kom:
+                                msg = f"✂️ <b>{g_name}</b> grubunun komisyon/kesinti tutarı güncellendi."
+                            elif devir != p_devir:
+                                msg = f"🔄 <b>{g_name}</b> grubunun devir bakiyesi güncellendi."
+                            else:
+                                msg = f"📊 <b>{g_name}</b> grubu finansal bakiyesi güncellendi."
+                                
+                            group_changes.append({"grup": g_name, "message": msg})
+                            
+                    elif _prev_group_snapshot and g_name not in _prev_group_snapshot:
+                        updated_groups.append(g["ad"])
+                        group_changes.append({"grup": g_name, "message": f"🔹 <b>{g_name}</b> yeni aktif grup olarak eklendi."})
+                        
+                _prev_group_snapshot = new_snapshot
+                if updated_groups:
+                    broadcast_dashboard_update(updated_groups, group_changes)
+                    print(f"[AutoSync] Canlı değişiklik: {updated_groups}")
+            else:
+                finans = tablodan_finans_ozeti_hesapla(veriler)
+                _prev_group_snapshot = {
+                    g["ad"].strip().upper(): (
+                        round(float(g.get("devir", 0)), 2),
+                        round(float(g.get("kasa", 0)), 2),
+                        round(float(g.get("odenen", 0)), 2),
+                        round(float(g.get("komisyon", 0)), 2),
+                        round(float(g.get("kalan", 0)), 2)
+                    )
+                    for g in finans.get("aktif_gruplar", [])
+                }
 
             _last_sheet_fingerprint = current_fp
         except Exception:
