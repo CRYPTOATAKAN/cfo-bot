@@ -5775,19 +5775,81 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family:'Plus Jakarta Sans', sans-serif; }
-        body { background: #0a0f1d; color: #f1f5f9; min-height: 100vh; padding: 20px; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; margin-bottom:25px; padding-bottom:20px; border-bottom:1px solid #1e293b; }
-        .logo-area { display:flex; align-items:center; gap:12px; }
-        .logo-icon { width:46px; height:46px; border-radius:12px; background:linear-gradient(135deg, #3b82f6, #8b5cf6); display:flex; align-items:center; justify-content:center; font-size:24px; }
-        .title h1 { font-size:22px; font-weight:800; background:linear-gradient(to right, #60a5fa, #c084fc); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        body { 
+            background: #070a14; 
+            color: #f1f5f9; 
+            min-height: 100vh; 
+            padding: 24px 20px; 
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* DİNAMİK GÖKYÜZÜ / AURORA VE YILDIZ ELEMANLARI */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: 
+                radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.22) 0%, transparent 45%),
+                radial-gradient(circle at 85% 20%, rgba(139, 92, 246, 0.18) 0%, transparent 50%),
+                radial-gradient(circle at 50% 75%, rgba(14, 165, 233, 0.15) 0%, transparent 60%),
+                radial-gradient(circle at 80% 85%, rgba(236, 72, 153, 0.15) 0%, transparent 45%),
+                linear-gradient(180deg, #060914 0%, #0b1124 50%, #070b18 100%);
+            z-index: -2;
+            animation: skyAurora 20s ease-in-out infinite alternate;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: 
+                radial-gradient(2px 2px at 20px 30px, #ffffff, rgba(0,0,0,0)),
+                radial-gradient(2px 2px at 50px 80px, rgba(255,255,255,0.85), rgba(0,0,0,0)),
+                radial-gradient(1.5px 1.5px at 110px 40px, #ffffff, rgba(0,0,0,0)),
+                radial-gradient(2px 2px at 170px 130px, rgba(147, 197, 253, 0.9), rgba(0,0,0,0)),
+                radial-gradient(1.5px 1.5px at 240px 190px, #ffffff, rgba(0,0,0,0)),
+                radial-gradient(2px 2px at 320px 90px, rgba(255,255,255,0.85), rgba(0,0,0,0)),
+                radial-gradient(1px 1px at 410px 260px, #ffffff, rgba(0,0,0,0)),
+                radial-gradient(2.5px 2.5px at 490px 170px, rgba(192, 132, 252, 0.9), rgba(0,0,0,0)),
+                radial-gradient(2px 2px at 590px 300px, #ffffff, rgba(0,0,0,0)),
+                radial-gradient(1.5px 1.5px at 680px 100px, rgba(255,255,255,0.7), rgba(0,0,0,0)),
+                radial-gradient(2px 2px at 770px 230px, #ffffff, rgba(0,0,0,0)),
+                radial-gradient(1.5px 1.5px at 860px 350px, rgba(147, 197, 253, 0.9), rgba(0,0,0,0)),
+                radial-gradient(2px 2px at 950px 120px, #ffffff, rgba(0,0,0,0)),
+                radial-gradient(1px 1px at 1040px 280px, rgba(255,255,255,0.8), rgba(0,0,0,0));
+            background-repeat: repeat;
+            background-size: 550px 450px;
+            opacity: 0.6;
+            z-index: -1;
+            animation: starsTwinkle 7s ease-in-out infinite alternate;
+        }
+
+        @keyframes skyAurora {
+            0% { transform: scale(1); filter: hue-rotate(0deg); }
+            50% { transform: scale(1.04); filter: hue-rotate(25deg); }
+            100% { transform: scale(1); filter: hue-rotate(0deg); }
+        }
+
+        @keyframes starsTwinkle {
+            0% { opacity: 0.45; transform: translateY(0); }
+            50% { opacity: 0.8; }
+            100% { opacity: 0.45; transform: translateY(-4px); }
+        }
+
+        .container { max-width: 1220px; margin: 0 auto; }
+        .header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; margin-bottom:25px; padding-bottom:20px; border-bottom:1px solid rgba(255, 255, 255, 0.08); }
+        .logo-area { display:flex; align-items:center; gap:14px; }
+        .logo-icon { width:48px; height:48px; border-radius:14px; background:linear-gradient(135deg, #3b82f6, #8b5cf6); display:flex; align-items:center; justify-content:center; font-size:25px; box-shadow: 0 4px 15px rgba(59,130,246,0.3); }
+        .title h1 { font-size:23px; font-weight:800; background:linear-gradient(to right, #60a5fa, #c084fc, #f472b6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
         .title p { font-size:13px; color:#94a3b8; }
-        .status-badge { background:rgba(34, 197, 94, 0.15); border:1px solid #22c55e; color:#4ade80; padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600; display:flex; align-items:center; gap:6px; transition:all 0.3s ease; }
-        .status-dot { width:8px; height:8px; border-radius:50%; background:#22c55e; animation:pulse 2s infinite; }
+        .status-badge { background:rgba(34, 197, 94, 0.15); border:1px solid rgba(34, 197, 94, 0.5); color:#4ade80; padding:7px 16px; border-radius:20px; font-size:12px; font-weight:700; display:flex; align-items:center; gap:8px; backdrop-filter:blur(8px); transition:all 0.3s ease; }
+        .status-dot { width:9px; height:9px; border-radius:50%; background:#22c55e; box-shadow:0 0 10px #22c55e; animation:pulse 2s infinite; }
         @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
         
-        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(175px, 1fr)); gap:12px; margin-bottom:28px; }
-        .stat-card { background:#111827; border:1px solid #1f2937; border-radius:14px; padding:14px 12px; position:relative; overflow:hidden; transition:all 0.3s ease; }
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(175px, 1fr)); gap:14px; margin-bottom:30px; }
+        .stat-card { background:rgba(15, 23, 42, 0.75); border:1px solid rgba(255, 255, 255, 0.08); backdrop-filter:blur(12px); border-radius:16px; padding:16px 14px; position:relative; overflow:hidden; transition:all 0.3s ease; box-shadow:0 8px 25px rgba(0,0,0,0.3); }
+        .stat-card:hover { transform: translateY(-2px); border-color: rgba(96, 165, 250, 0.3); }
         .stat-card::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; }
         .stat-devir::before { background:#6366f1; }
         .stat-kasa::before { background:#3b82f6; }
@@ -5799,22 +5861,24 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         .stat-value { font-size:17px; font-weight:800; color:#ffffff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .stat-value .curr { font-size:14px; font-weight:600; opacity:0.85; }
         
-        .section-title { font-size:18px; font-weight:700; color:#f8fafc; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
-        .groups-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px; margin-bottom:30px; }
-        .group-card { background:#131d31; border:1px solid #202d46; border-radius:16px; padding:20px; transition:all 0.4s ease; position:relative; overflow:hidden; }
-        .group-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid #1f2d47; }
+        .section-title { font-size:18px; font-weight:700; color:#f8fafc; margin-bottom:16px; display:flex; align-items:center; gap:8px; text-shadow:0 2px 10px rgba(0,0,0,0.5); }
+        .groups-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px; margin-bottom:32px; }
+        .group-card { background:rgba(19, 29, 49, 0.78); border:1px solid rgba(255, 255, 255, 0.09); backdrop-filter:blur(14px); border-radius:18px; padding:22px; transition:all 0.4s ease; position:relative; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.35); }
+        .group-card:hover { border-color:rgba(96, 165, 250, 0.35); transform:translateY(-3px); }
+        .group-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid rgba(255, 255, 255, 0.08); }
         .group-name { font-size:16px; font-weight:700; color:#60a5fa; display:flex; align-items:center; gap:8px; }
-        .group-kalan-badge { background:rgba(16, 185, 129, 0.15); color:#34d399; padding:4px 10px; border-radius:8px; font-weight:700; font-size:13px; white-space:nowrap; }
+        .group-kalan-badge { background:rgba(16, 185, 129, 0.15); color:#34d399; padding:5px 12px; border-radius:10px; font-weight:700; font-size:13px; white-space:nowrap; border:1px solid rgba(16, 185, 129, 0.3); }
 
-        .masraflar-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px; margin-bottom:30px; }
-        .masraf-card { background:#1a1024; border:1px solid #3b1d54; border-radius:12px; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; }
+        .masraflar-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; margin-bottom:32px; }
+        .masraf-card { background:rgba(26, 16, 36, 0.8); border:1px solid rgba(236, 72, 153, 0.25); backdrop-filter:blur(10px); border-radius:14px; padding:16px 18px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 4px 18px rgba(0,0,0,0.3); transition:all 0.3s; }
+        .masraf-card:hover { transform:translateY(-2px); border-color:rgba(236, 72, 153, 0.5); }
         .masraf-name { font-weight:700; color:#f472b6; font-size:14px; display:flex; align-items:center; gap:6px; }
         .masraf-tutar { font-weight:800; color:#f87171; font-size:14px; }
         
         /* IŞIK YANIP SÖNME & PARLAMA ANİMASYONU (Glow Effect) */
         @keyframes groupPulseGlow {
             0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.9); border-color: #34d399; transform: scale(1.02); }
-            50% { box-shadow: 0 0 35px 12px rgba(96, 165, 250, 0.85); border-color: #60a5fa; transform: scale(1.03); background:#1e2942; }
+            50% { box-shadow: 0 0 40px 14px rgba(96, 165, 250, 0.85); border-color: #60a5fa; transform: scale(1.03); background:rgba(30, 41, 66, 0.95); }
             100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); transform: scale(1); }
         }
         .glow-updated {
@@ -5831,11 +5895,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         .row-item span:first-child { color:#94a3b8; }
         .row-item span:last-child { font-weight:600; }
         
-        .refresh-btn { background:#2563eb; color:white; border:none; padding:10px 20px; border-radius:10px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:8px; transition:background 0.2s; }
-        .refresh-btn:hover { background:#1d4ed8; }
+        .refresh-btn { background:linear-gradient(135deg, #2563eb, #1d4ed8); color:white; border:none; padding:10px 20px; border-radius:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:8px; transition:all 0.2s; box-shadow:0 4px 15px rgba(37,99,235,0.4); }
+        .refresh-btn:hover { background:linear-gradient(135deg, #1d4ed8, #1e40af); transform:translateY(-1px); }
         .footer { text-align:center; color:#64748b; font-size:12px; margin-top:40px; }
     </style>
 </head>
+
 <body>
     <div id="toast-container" style="position:fixed; top:24px; right:24px; z-index:99999; display:flex; flex-direction:column; gap:12px; pointer-events:none;"></div>
     <div class="container">
@@ -5891,8 +5956,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         </div>
 
         <div class="footer">
-            <p>HSY Kuyumculuk Finans Yönetim Sistemi © 2026 | Yazılım: @CRYPTOATAKAN</p>
+            <p>CFO Finans Yönetim Sistemi © 2026 | Yazılım: @CRYPTOATAKAN</p>
         </div>
+
     </div>
 
     <script>
