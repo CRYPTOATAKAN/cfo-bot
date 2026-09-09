@@ -11,8 +11,11 @@ import unicodedata
 import urllib.request
 import urllib.parse
 import concurrent.futures
+import queue
+from socketserver import ThreadingMixIn
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Optional, Dict, Any, List, Tuple, Set
+
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -1654,8 +1657,18 @@ def tablodan_finans_ozeti_hesapla(veriler: List[List[str]]) -> Dict[str, Any]:
     toplamDevir = toplamKasa = toplamOdenen = toplamKomisyon = toplamKalan = 0.0
     aktif_gruplar = []
     excel_toplam_satiri = None
+    masraflar = []
+    toplam_masraf = 0.0
     
     for row_idx, row in enumerate(veriler[1:], start=2):
+        if len(row) >= 10:
+            m_ad = row[8].strip()
+            if m_ad and "GENEL TOPLAM" not in m_ad.upper() and m_ad != "-":
+                m_fiyat = guvenliSayi(row[9])
+                if abs(m_fiyat) > 0.001:
+                    toplam_masraf += m_fiyat
+                    masraflar.append({"ad": m_ad, "fiyat": m_fiyat})
+
         if len(row) >= 2:
             grup_adi = row[1].strip()
             if not grup_adi or grup_adi == "*":
@@ -1687,6 +1700,8 @@ def tablodan_finans_ozeti_hesapla(veriler: List[List[str]]) -> Dict[str, Any]:
                         "odenen": odenen, "komisyon": kom, "kalan": kalan
                     })
                     
+    masraflar.sort(key=lambda x: x["fiyat"], reverse=True)
+
     if excel_toplam_satiri and any(abs(v) > 0.001 for v in excel_toplam_satiri.values()):
         toplamDevir = excel_toplam_satiri["devir"]
         toplamKasa = excel_toplam_satiri["kasa"]
@@ -1700,8 +1715,11 @@ def tablodan_finans_ozeti_hesapla(veriler: List[List[str]]) -> Dict[str, Any]:
         "odenen": toplamOdenen,
         "komisyon": toplamKomisyon,
         "kalan": toplamKalan,
+        "toplam_masraf": toplam_masraf,
+        "masraflar": masraflar,
         "aktif_gruplar": aktif_gruplar
     }
+
 
 def hizliOzetUret_impl() -> str:
     sh = get_spreadsheet()
@@ -5700,7 +5718,54 @@ def process_telegram_update(update: dict):
                 except Exception:
                     pass
 
-# --- MODERN CANLI CFO WEB PANELİ & API ---
+# --- MODERN CANLI CFO WEB PANELİ & REAL-TIME API (SSE & WEBHOOK) ---
+_sse_clients_lock = threading.Lock()
+_sse_clients = set()
+
+DASHBOARD_AUTH_TOKEN = os.environ.get("DASHBOARD_AUTH_TOKEN", "").strip()
+WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "").strip()
+
+def broadcast_dashboard_update(updated_groups: Optional[List[str]] = None):
+    """Google Sheets veya Telegram Bot değişikliğinde önbelleği yenileyip tüm canlı web istemcilerine SSE duyurusu yapar."""
+    try:
+        sh = get_spreadsheet(force_refresh=True)
+        sayfa = get_active_daily_sheet(sh, force_refresh=True)
+        veriler = sayfa.get_all_values()
+        finans = tablodan_finans_ozeti_hesapla(veriler)
+        
+        groups_list = []
+        if updated_groups:
+            for g in updated_groups:
+                if isinstance(g, str) and g.strip():
+                    groups_list.append(g.strip().upper())
+        
+        payload = {
+            "tarih": sayfa.title,
+            "devir": finans["devir"],
+            "kasa": finans["kasa"],
+            "odenen": finans["odenen"],
+            "komisyon": finans["komisyon"],
+            "kalan": finans["kalan"],
+            "toplam_masraf": finans.get("toplam_masraf", 0.0),
+            "masraflar": finans.get("masraflar", []),
+            "gruplar": finans["aktif_gruplar"],
+            "updated_groups": groups_list,
+            "timestamp": time.time()
+        }
+        msg = f"data: {json.dumps(payload)}\n\n"
+        
+        with _sse_clients_lock:
+            dead_clients = set()
+            for client_q in list(_sse_clients):
+                try:
+                    client_q.put_nowait(msg)
+                except queue.Full:
+                    dead_clients.add(client_q)
+            for q in dead_clients:
+                _sse_clients.discard(q)
+    except Exception as e:
+        print(f"Dashboard SSE broadcast hatası: {e}")
+
 DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -5717,39 +5782,62 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         .logo-icon { width:46px; height:46px; border-radius:12px; background:linear-gradient(135deg, #3b82f6, #8b5cf6); display:flex; align-items:center; justify-content:center; font-size:24px; }
         .title h1 { font-size:22px; font-weight:800; background:linear-gradient(to right, #60a5fa, #c084fc); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
         .title p { font-size:13px; color:#94a3b8; }
-        .status-badge { background:rgba(34, 197, 94, 0.15); border:1px solid #22c55e; color:#4ade80; padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600; display:flex; align-items:center; gap:6px; }
+        .status-badge { background:rgba(34, 197, 94, 0.15); border:1px solid #22c55e; color:#4ade80; padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600; display:flex; align-items:center; gap:6px; transition:all 0.3s ease; }
         .status-dot { width:8px; height:8px; border-radius:50%; background:#22c55e; animation:pulse 2s infinite; }
         @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
         
-        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(195px, 1fr)); gap:12px; margin-bottom:28px; }
-        .stat-card { background:#111827; border:1px solid #1f2937; border-radius:14px; padding:14px 12px; position:relative; overflow:hidden; }
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(175px, 1fr)); gap:12px; margin-bottom:28px; }
+        .stat-card { background:#111827; border:1px solid #1f2937; border-radius:14px; padding:14px 12px; position:relative; overflow:hidden; transition:all 0.3s ease; }
         .stat-card::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; }
         .stat-devir::before { background:#6366f1; }
         .stat-kasa::before { background:#3b82f6; }
         .stat-odenen::before { background:#f59e0b; }
         .stat-komisyon::before { background:#ec4899; }
+        .stat-masraf::before { background:#ef4444; }
         .stat-kalan::before { background:#10b981; }
         .stat-label { font-size:11px; color:#9ca3af; font-weight:700; text-transform:uppercase; margin-bottom:6px; letter-spacing:0.3px; }
         .stat-value { font-size:17px; font-weight:800; color:#ffffff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .stat-value .curr { font-size:14px; font-weight:600; opacity:0.85; }
         
         .section-title { font-size:18px; font-weight:700; color:#f8fafc; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
-        .groups-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:16px; margin-bottom:30px; }
-        .group-card { background:#131d31; border:1px solid #202d46; border-radius:16px; padding:20px; }
+        .groups-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px; margin-bottom:30px; }
+        .group-card { background:#131d31; border:1px solid #202d46; border-radius:16px; padding:20px; transition:all 0.4s ease; position:relative; overflow:hidden; }
         .group-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid #1f2d47; }
         .group-name { font-size:16px; font-weight:700; color:#60a5fa; display:flex; align-items:center; gap:8px; }
         .group-kalan-badge { background:rgba(16, 185, 129, 0.15); color:#34d399; padding:4px 10px; border-radius:8px; font-weight:700; font-size:13px; white-space:nowrap; }
+
+        .masraflar-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px; margin-bottom:30px; }
+        .masraf-card { background:#1a1024; border:1px solid #3b1d54; border-radius:12px; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; }
+        .masraf-name { font-weight:700; color:#f472b6; font-size:14px; display:flex; align-items:center; gap:6px; }
+        .masraf-tutar { font-weight:800; color:#f87171; font-size:14px; }
+        
+        /* IŞIK YANIP SÖNME & PARLAMA ANİMASYONU (Glow Effect) */
+        @keyframes groupPulseGlow {
+            0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.9); border-color: #34d399; transform: scale(1.02); }
+            50% { box-shadow: 0 0 35px 12px rgba(96, 165, 250, 0.85); border-color: #60a5fa; transform: scale(1.03); background:#1e2942; }
+            100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); transform: scale(1); }
+        }
+        .glow-updated {
+            animation: groupPulseGlow 1.6s ease-in-out 3 !important;
+            border: 2px solid #34d399 !important;
+        }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
         
         .row-item { display:flex; justify-content:space-between; margin-bottom:8px; font-size:13px; color:#cbd5e1; }
         .row-item span:first-child { color:#94a3b8; }
         .row-item span:last-child { font-weight:600; }
         
-        .refresh-btn { background:#2563eb; color:white; border:none; padding:10px 20px; border-radius:10px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:8px; }
+        .refresh-btn { background:#2563eb; color:white; border:none; padding:10px 20px; border-radius:10px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:8px; transition:background 0.2s; }
         .refresh-btn:hover { background:#1d4ed8; }
         .footer { text-align:center; color:#64748b; font-size:12px; margin-top:40px; }
     </style>
 </head>
 <body>
+    <div id="toast-container" style="position:fixed; top:24px; right:24px; z-index:99999; display:flex; flex-direction:column; gap:12px; pointer-events:none;"></div>
     <div class="container">
         <div class="header">
             <div class="logo-area">
@@ -5760,8 +5848,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 </div>
             </div>
             <div style="display:flex; align-items:center; gap:12px;">
-                <button class="refresh-btn" onclick="fetchData()">🔄 Yenile</button>
-                <div class="status-badge"><div class="status-dot"></div> CANLI SİSTEM</div>
+                <button class="refresh-btn" onclick="fetchData(true)">🔄 Manuel Yenile</button>
+                <div class="status-badge" id="live-status-badge"><div class="status-dot"></div> ANLIK CANLI SİSTEM (0s)</div>
             </div>
         </div>
 
@@ -5782,6 +5870,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 <div class="stat-label">✂️ Toplam Komisyon</div>
                 <div class="stat-value" id="toplam-komisyon" style="color:#f472b6;">0,00 ₺</div>
             </div>
+            <div class="stat-card stat-masraf">
+                <div class="stat-label">📉 TOPLAM MASRAF / GİDER</div>
+                <div class="stat-value" id="toplam-masraf" style="color:#f87171;">0,00 ₺</div>
+            </div>
             <div class="stat-card stat-kalan">
                 <div class="stat-label">🏦 NET KALAN KASA</div>
                 <div class="stat-value" id="toplam-kalan" style="color:#34d399;">0,00 ₺</div>
@@ -5793,12 +5885,20 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <p style="color:#94a3b8;">Veriler yükleniyor...</p>
         </div>
 
+        <div class="section-title">📉 Günlük Masraf Kalemleri ve Gider Listesi</div>
+        <div class="masraflar-grid" id="masraflar-container">
+            <p style="color:#94a3b8;">Masraf verileri yükleniyor...</p>
+        </div>
+
         <div class="footer">
             <p>HSY Kuyumculuk Finans Yönetim Sistemi © 2026 | Yazılım: @CRYPTOATAKAN</p>
         </div>
     </div>
 
     <script>
+        let prevGroupsState = {};
+        let sseSource = null;
+
         function fmt(n) {
             const num = Number(n);
             const isNeg = num < 0;
@@ -5813,69 +5913,307 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             return (isNeg ? '-' : '') + formatted + '<span class="curr">&nbsp;₺</span>';
         }
 
-        async function fetchData() {
-            try {
-                const res = await fetch('/api/dashboard');
-                const d = await res.json();
-                if(d.error) {
-                    alert('Hata: ' + d.error);
-                    return;
-                }
-                document.getElementById('time-text').innerText = 'Tarih: ' + d.tarih + ' | Son Güncelleme: ' + new Date().toLocaleTimeString('tr-TR');
-                document.getElementById('toplam-devir').innerHTML = fmtHtml(d.devir);
-                document.getElementById('toplam-kasa').innerHTML = fmtHtml(d.kasa);
-                document.getElementById('toplam-odenen').innerHTML = fmtHtml(d.odenen);
-                document.getElementById('toplam-komisyon').innerHTML = fmtHtml(d.komisyon);
-                document.getElementById('toplam-kalan').innerHTML = fmtHtml(d.kalan);
+        function showToast(title, message, isHighlight = false) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                pointer-events: auto;
+                background: ${isHighlight ? 'linear-gradient(135deg, #064e3b, #047857)' : '#1e293b'};
+                color: #ffffff;
+                border: 1px solid ${isHighlight ? '#34d399' : '#3b82f6'};
+                box-shadow: 0 10px 30px -5px rgba(0,0,0,0.6), 0 0 20px ${isHighlight ? 'rgba(52,211,153,0.5)' : 'rgba(59,130,246,0.3)'};
+                border-radius: 14px;
+                padding: 14px 18px;
+                min-width: 290px;
+                max-width: 400px;
+                font-size: 13px;
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+                transition: all 0.3s ease;
+            `;
+            toast.innerHTML = `
+                <div style="font-size:24px; filter:drop-shadow(0 0 8px #34d399);">⚡</div>
+                <div>
+                    <div style="font-weight:800; font-size:14px; color:${isHighlight ? '#6ee7b7' : '#93c5fd'}; margin-bottom:2px;">${title}</div>
+                    <div style="color:#e2e8f0; font-weight:500;">${message}</div>
+                </div>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(50px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 4500);
+        }
 
-                const gc = document.getElementById('groups-container');
-                if(!d.gruplar || d.gruplar.length === 0) {
-                    gc.innerHTML = '<p style="color:#94a3b8;">Henüz işlem görmüş aktif grup bulunmuyor.</p>';
-                    return;
-                }
+        function updateDashboardUI(d, isManual = false) {
+            if(d.error) {
+                showToast("Sistem Uyarısı", d.error, false);
+                return;
+            }
+            document.getElementById('time-text').innerText = 'Tarih: ' + d.tarih + ' | Son Güncelleme: ' + new Date().toLocaleTimeString('tr-TR');
+            document.getElementById('toplam-devir').innerHTML = fmtHtml(d.devir);
+            document.getElementById('toplam-kasa').innerHTML = fmtHtml(d.kasa);
+            document.getElementById('toplam-odenen').innerHTML = fmtHtml(d.odenen);
+            document.getElementById('toplam-komisyon').innerHTML = fmtHtml(d.komisyon);
+            document.getElementById('toplam-masraf').innerHTML = fmtHtml(d.toplam_masraf || 0);
+            document.getElementById('toplam-kalan').innerHTML = fmtHtml(d.kalan);
 
-                gc.innerHTML = d.gruplar.map(g => `
-                    <div class="group-card">
-                        <div class="group-header">
-                            <div class="group-name"><span>🔹</span> ${g.ad.toUpperCase()}</div>
-                            <div class="group-kalan-badge" style="background:${g.kalan < 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)'}; color:${g.kalan < 0 ? '#f87171' : '#34d399'};">${fmt(g.kalan)}</div>
+            // Render Gruplar
+            const gc = document.getElementById('groups-container');
+            if(!d.gruplar || d.gruplar.length === 0) {
+                gc.innerHTML = '<p style="color:#94a3b8;">Henüz işlem görmüş aktif grup bulunmuyor.</p>';
+            } else {
+                const updatedSet = new Set((d.updated_groups || []).map(g => String(g).toUpperCase().trim()));
+
+                d.gruplar.forEach(g => {
+                    const gNameUpper = g.ad.toUpperCase().trim();
+                    const prevKalan = prevGroupsState[gNameUpper];
+                    if (prevKalan !== undefined && prevKalan !== g.kalan) {
+                        updatedSet.add(gNameUpper);
+                    }
+                    prevGroupsState[gNameUpper] = g.kalan;
+                });
+
+                gc.innerHTML = d.gruplar.map(g => {
+                    const gNameUpper = g.ad.toUpperCase().trim();
+                    const isUpdated = updatedSet.has(gNameUpper);
+                    return `
+                        <div class="group-card ${isUpdated ? 'glow-updated' : ''}">
+                            <div class="group-header">
+                                <div class="group-name">
+                                    <span>🔹</span> ${gNameUpper}
+                                    ${isUpdated ? '<span style="font-size:11px; font-weight:800; color:#34d399; background:rgba(52,211,153,0.25); border:1px solid #34d399; padding:2px 8px; border-radius:10px; margin-left:6px; animation:pulse 1s infinite;">⚡ IŞIK GÜNCEL</span>' : ''}
+                                </div>
+                                <div class="group-kalan-badge" style="background:${g.kalan < 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)'}; color:${g.kalan < 0 ? '#f87171' : '#34d399'};">${fmt(g.kalan)}</div>
+                            </div>
+                            <div class="row-item">
+                                <span>🔄 Devir:</span>
+                                <span>${fmt(g.devir)}</span>
+                            </div>
+                            <div class="row-item">
+                                <span>💰 Eklenen Kasa:</span>
+                                <span>${fmt(g.kasa)}</span>
+                            </div>
+                            <div class="row-item">
+                                <span>💸 Ödenen:</span>
+                                <span>${fmt(g.odenen)}</span>
+                            </div>
+                            <div class="row-item">
+                                <span>✂️ Kesinti/Masraf:</span>
+                                <span>${fmt(g.komisyon)}</span>
+                            </div>
                         </div>
-                        <div class="row-item">
-                            <span>🔄 Devir:</span>
-                            <span>${fmt(g.devir)}</span>
-                        </div>
-                        <div class="row-item">
-                            <span>💰 Eklenen Kasa:</span>
-                            <span>${fmt(g.kasa)}</span>
-                        </div>
-                        <div class="row-item">
-                            <span>💸 Ödenen:</span>
-                            <span>${fmt(g.odenen)}</span>
-                        </div>
-                        <div class="row-item">
-                            <span>✂️ Kesinti/Masraf:</span>
-                            <span>${fmt(g.komisyon)}</span>
-                        </div>
+                    `;
+                }).join('');
+
+                if (updatedSet.size > 0 && !isManual) {
+                    const listNames = Array.from(updatedSet).join(', ');
+                    showToast('⚡ Canlı Değişiklik Tespit Edildi!', `<b>${listNames}</b> grubu anlık olarak güncellendi ve ışık yakıldı!`, true);
+                }
+            }
+
+            // Render Masraflar
+            const mc = document.getElementById('masraflar-container');
+            if(!d.masraflar || d.masraflar.length === 0) {
+                mc.innerHTML = '<p style="color:#94a3b8;">Bugün için kaydedilmiş bir masraf / gider bulunmuyor.</p>';
+            } else {
+                mc.innerHTML = d.masraflar.map(m => `
+                    <div class="masraf-card">
+                        <div class="masraf-name"><span>📌</span> ${m.ad.toUpperCase()}</div>
+                        <div class="masraf-tutar">${fmt(m.fiyat)}</div>
                     </div>
                 `).join('');
+            }
+        }
+
+        async function fetchData(isManual = false) {
+            try {
+                const token = new URLSearchParams(window.location.search).get('token') || '';
+                const url = '/api/dashboard' + (token ? '?token=' + encodeURIComponent(token) : '');
+                const res = await fetch(url);
+                const d = await res.json();
+                updateDashboardUI(d, isManual);
+                if(isManual) showToast("Yenilendi", "Finans paneli güncellendi.", false);
             } catch(e) {
                 console.error(e);
             }
         }
-        fetchData();
-        setInterval(fetchData, 15000);
+
+        function initSSE() {
+            if (sseSource) sseSource.close();
+            const token = new URLSearchParams(window.location.search).get('token') || '';
+            const streamUrl = '/api/stream' + (token ? '?token=' + encodeURIComponent(token) : '');
+            
+            sseSource = new EventSource(streamUrl);
+            
+            sseSource.onopen = function() {
+                const badge = document.getElementById('live-status-badge');
+                badge.innerHTML = '<div class="status-dot"></div> ANLIK CANLI SİSTEM (0s)';
+                badge.style.borderColor = '#22c55e';
+                badge.style.color = '#4ade80';
+            };
+            
+            sseSource.onmessage = function(event) {
+                try {
+                    const d = JSON.parse(event.data);
+                    updateDashboardUI(d, false);
+                } catch(e) {
+                    console.error("SSE parse error:", e);
+                }
+            };
+            
+            sseSource.onerror = function() {
+                const badge = document.getElementById('live-status-badge');
+                badge.innerHTML = '<div class="status-dot" style="background:#f59e0b;"></div> BAĞLANTI YENİLENİYOR...';
+                badge.style.borderColor = '#f59e0b';
+                badge.style.color = '#fbbf24';
+                setTimeout(fetchData, 8000);
+            };
+        }
+
+        fetchData(true);
+        initSSE();
     </script>
 </body>
 </html>
 """
 
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
+
 class LiveDashboardHandler(BaseHTTPRequestHandler):
+    def _send_security_headers(self, status=200, content_type="application/json; charset=utf-8"):
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
+        self.send_header("Content-Security-Policy", "default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com;")
+        self.send_header("Access-Control-Allow-Origin", os.environ.get("ALLOWED_ORIGIN", "*"))
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Webhook-Token, X-Dashboard-Token")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+
+    def _check_auth(self, parsed_url, token_secret=DASHBOARD_AUTH_TOKEN):
+        if not token_secret:
+            return True
+        query_params = urllib.parse.parse_qs(parsed_url.query)
+        req_token = query_params.get("token", [""])[0] or self.headers.get("X-Dashboard-Token", "") or self.headers.get("X-Webhook-Token", "")
+        if not req_token and "Authorization" in self.headers:
+            auth_h = self.headers.get("Authorization", "")
+            if auth_h.startswith("Bearer "):
+                req_token = auth_h[7:].strip()
+        return req_token == token_secret
+
+    def do_OPTIONS(self):
+        self._send_security_headers(200, "text/plain")
+        self.end_headers()
+
+    def do_POST(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path in ["/api/webhook", "/webhook/sheets", "/webhook"]:
+            secret = WEBHOOK_SECRET or DASHBOARD_AUTH_TOKEN
+            if not self._check_auth(parsed, secret):
+                self._send_security_headers(401, "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "Yetkisiz webhook erişimi"}).encode("utf-8"))
+                return
+
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length) if content_length > 0 else b""
+            updated_groups = []
+            if body:
+                try:
+                    b_data = json.loads(body.decode('utf-8'))
+                    if isinstance(b_data, dict):
+                        if "updated_groups" in b_data and isinstance(b_data["updated_groups"], list):
+                            updated_groups = b_data["updated_groups"]
+                        elif "group" in b_data and isinstance(b_data["group"], str):
+                            updated_groups = [b_data["group"]]
+                except Exception:
+                    pass
+
+            # Webhook geldiğinde canlı yayını tetikle
+            _update_executor.submit(broadcast_dashboard_update, updated_groups)
+            
+            self._send_security_headers(200, "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": "ok", "message": "Anlık canlı güncelleme tetiklendi."}).encode("utf-8"))
+        else:
+            self._send_security_headers(404, "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": "Endpoint bulunamadı"}).encode("utf-8"))
+
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
-        if parsed.path == "/api/dashboard":
+        
+        if parsed.path == "/api/stream":
+            if not self._check_auth(parsed, DASHBOARD_AUTH_TOKEN):
+                self._send_security_headers(401, "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
+                return
+
             self.send_response(200)
-            self.send_header("Content-type", "application/json; charset=utf-8")
-            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "keep-alive")
+            self.send_header("Access-Control-Allow-Origin", os.environ.get("ALLOWED_ORIGIN", "*"))
+            self.end_headers()
+
+            client_q = queue.Queue(maxsize=50)
+            with _sse_clients_lock:
+                _sse_clients.add(client_q)
+
+            try:
+                # İlk açılışta anlık veriyi gönder
+                sh = get_spreadsheet()
+                sayfa = get_active_daily_sheet(sh)
+                veriler = sayfa.get_all_values()
+                finans = tablodan_finans_ozeti_hesapla(veriler)
+                initial_data = {
+                    "tarih": sayfa.title,
+                    "devir": finans["devir"],
+                    "kasa": finans["kasa"],
+                    "odenen": finans["odenen"],
+                    "komisyon": finans["komisyon"],
+                    "kalan": finans["kalan"],
+                    "toplam_masraf": finans.get("toplam_masraf", 0.0),
+                    "masraflar": finans.get("masraflar", []),
+                    "gruplar": finans["aktif_gruplar"],
+                    "updated_groups": [],
+                    "timestamp": time.time()
+                }
+                self.wfile.write(f"data: {json.dumps(initial_data)}\n\n".encode("utf-8"))
+                self.wfile.flush()
+
+                last_ping = time.time()
+                while True:
+                    try:
+                        msg = client_q.get(timeout=2.0)
+                        self.wfile.write(msg.encode("utf-8"))
+                        self.wfile.flush()
+                    except queue.Empty:
+                        if time.time() - last_ping > 15:
+                            self.wfile.write(b": keep-alive\n\n")
+                            self.wfile.flush()
+                            last_ping = time.time()
+            except (ConnectionResetError, BrokenPipeError, Exception):
+                pass
+            finally:
+                with _sse_clients_lock:
+                    _sse_clients.discard(client_q)
+
+        elif parsed.path == "/api/dashboard":
+            if not self._check_auth(parsed, DASHBOARD_AUTH_TOKEN):
+                self._send_security_headers(401, "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
+                return
+
+            self._send_security_headers(200, "application/json; charset=utf-8")
             self.end_headers()
             try:
                 sh = get_spreadsheet()
@@ -5889,22 +6227,25 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                     "odenen": finans["odenen"],
                     "komisyon": finans["komisyon"],
                     "kalan": finans["kalan"],
+                    "toplam_masraf": finans.get("toplam_masraf", 0.0),
+                    "masraflar": finans.get("masraflar", []),
                     "gruplar": finans["aktif_gruplar"]
                 }
                 self.wfile.write(json.dumps(data).encode("utf-8"))
             except Exception as e:
-                self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+                print(f"API Dashboard sunucu hatası: {e}")
+                self.wfile.write(json.dumps({"error": "Veriler yüklenirken sunucu hatası oluştu."}).encode("utf-8"))
         else:
-            self.send_response(200)
-            self.send_header("Content-type", "text/html; charset=utf-8")
+            self._send_security_headers(200, "text/html; charset=utf-8")
             self.end_headers()
             self.wfile.write(DASHBOARD_HTML.encode("utf-8"))
-            
+
+
     def log_message(self, format, *args): pass
 
 def run_dashboard_server():
     port = int(os.environ.get("PORT", 8080))
-    server = HTTPServer(("0.0.0.0", port), LiveDashboardHandler)
+    server = ThreadedHTTPServer(("0.0.0.0", port), LiveDashboardHandler)
     server.serve_forever()
 
 def run_kapanis_scheduler():
@@ -5945,3 +6286,4 @@ if __name__ == "__main__":
                     _update_executor.submit(process_telegram_update, upd)
         except Exception as e:
             time.sleep(1)
+
