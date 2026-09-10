@@ -1563,26 +1563,112 @@ def toplu_duyuru_yayinla_callback(draft_id: str, hedef_filtre: str, gonderen_id:
     }
     return rapor, klavye
 
-def grup_kasa_analiz_fisi_uret(grup_ham: str) -> Tuple[str, Optional[dict]]:
+def cari_satir_bul(tum_veriler: List[List[str]], grup_ham: str) -> Tuple[Optional[int], Optional[List[str]], Optional[str], List[str]]:
+    """
+    Excel tablosunda cari satırını akıllı ve toleranslı şekilde arar:
+    1. Birebir tam eşleşme (Exact Match - Örn: 'BABA', 'EŞREF TETHER', 'SACİD')
+    2. Ön ek / başlangıç eşleşmesi (Starts-With - Örn: 'gnl' -> 'GNL TETHER', 'esref' -> 'EŞREF TETHER')
+    3. Ters başlangıç eşleşmesi (Cari adı aranan ifadenin başında ise)
+    4. Alt dize / içerme eşleşmesi (Contains - Örn: 'tether' -> 'EŞREF TETHER')
+    5. Kelime bazlı eşleşme (Multi-word Token Match)
+
+    Dönüş: (satir_no, row_data, gercek_cari_adi, aday_listesi)
+    """
     hedef_norm = normalize_text(grup_ham)
     if not hedef_norm:
+        return None, None, None, []
+
+    cariler = []
+    for i, row in enumerate(tum_veriler[1:], start=2):
+        if len(row) >= 2:
+            c_ad = row[1].strip()
+            if not c_ad or c_ad in ["*", "-"]:
+                continue
+            up = c_ad.upper()
+            if "GENEL TOPLAM" in up or "TOPLAM" in up or "FARK" in up or "MASRAF" in up:
+                continue
+            norm = normalize_text(c_ad)
+            if norm:
+                cariler.append((i, row, c_ad, norm))
+
+    # 1. Birebir Tam Eşleşme (Exact Match)
+    for i, row, c_ad, norm in cariler:
+        if norm == hedef_norm:
+            return i, row, c_ad, []
+
+    # 2. Ön Ek / Başlangıç Eşleşmesi (Starts-With)
+    starts = [c for c in cariler if c[3].startswith(hedef_norm)]
+    if len(starts) == 1:
+        return starts[0][0], starts[0][1], starts[0][2], []
+    elif len(starts) > 1:
+        return None, None, None, [c[2] for c in starts]
+
+    # 3. Ters Başlangıç Eşleşmesi
+    rev_starts = [c for c in cariler if hedef_norm.startswith(c[3]) and len(c[3]) >= 3]
+    if len(rev_starts) == 1:
+        return rev_starts[0][0], rev_starts[0][1], rev_starts[0][2], []
+    elif len(rev_starts) > 1:
+        return None, None, None, [c[2] for c in rev_starts]
+
+    # 4. Alt Dize / İçerme Eşleşmesi (Substring / Contains - en az 3 harf)
+    if len(hedef_norm) >= 3:
+        contains = [c for c in cariler if hedef_norm in c[3]]
+        if len(contains) == 1:
+            return contains[0][0], contains[0][1], contains[0][2], []
+        elif len(contains) > 1:
+            return None, None, None, [c[2] for c in contains]
+
+    # 5. Kelime Bazlı Eşleşme (Multi-word Token Match)
+    kelimeler = [normalize_text(w) for w in str(grup_ham).split() if w]
+    if len(kelimeler) > 1:
+        token_matches = [c for c in cariler if all(k in c[3] for k in kelimeler)]
+        if len(token_matches) == 1:
+            return token_matches[0][0], token_matches[0][1], token_matches[0][2], []
+        elif len(token_matches) > 1:
+            return None, None, None, [c[2] for c in token_matches]
+
+    return None, None, None, []
+
+def grup_kasa_analiz_fisi_uret(grup_ham: str) -> Tuple[str, Optional[dict]]:
+    if not grup_ham or not str(grup_ham).strip():
         raise ValueError("Grup adı boş olamaz.")
         
     sh = get_spreadsheet()
     sayfa = get_active_daily_sheet(sh)
     tum_veriler = get_sheet_values_fast(sayfa)
     
-    hedef_satir = None
-    gercek_grup_adi = grup_ham.strip().upper()
+    satir_idx, hedef_satir, gercek_grup_adi, adaylar = cari_satir_bul(tum_veriler, str(grup_ham).strip())
     
-    for row in tum_veriler[1:]:
-        if len(row) >= 2 and normalize_text(row[1]) == hedef_norm:
-            hedef_satir = row
-            gercek_grup_adi = row[1].strip()
-            break
-            
+    if adaylar:
+        butonlar = []
+        for ad in adaylar[:8]:
+            butonlar.append([{"text": f"📊 {ad}", "callback_data": f"rapor_{ad}"}])
+        butonlar.append([{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}])
+        
+        aday_komutlar = "\n".join([f"• <code>/kasa {ad}</code>" for ad in adaylar[:8]])
+        mesaj = (
+            f"🔍 <b>Birden Fazla Cari Eşleşti!</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+            f"\"<b>{grup_ham}</b>\" araması için birden fazla sonuç bulundu.\n"
+            f"Lütfen aradığınız cariyi seçin:\n\n"
+            f"{aday_komutlar}\n\n"
+            f"💡 <i>Butonlara dokunarak da görüntüleyebilirsiniz:</i>"
+        )
+        return mesaj, {"inline_keyboard": butonlar}
+        
     if not hedef_satir:
-        raise ValueError(f"Tabloda '<b>{grup_ham}</b>' adlı grup bulunamadı. Lütfen grup adını kontrol edin.")
+        mevcut_cariler = []
+        for r in tum_veriler[1:]:
+            if len(r) >= 2:
+                c_ad = r[1].strip()
+                if c_ad and c_ad not in ["*", "-"] and "TOPLAM" not in c_ad.upper() and "MASRAF" not in c_ad.upper() and "FARK" not in c_ad.upper():
+                    mevcut_cariler.append(c_ad)
+        
+        oneri_metni = ""
+        if mevcut_cariler:
+            oneri_listesi = mevcut_cariler[:8]
+            oneri_metni = "\n\n💡 <b>Mevcut Carilerden Bazıları:</b>\n" + "\n".join([f"• <code>/kasa {c}</code>" for c in oneri_listesi])
+            
+        raise ValueError(f"Tabloda '<b>{grup_ham}</b>' adlı grup bulunamadı. Lütfen grup adını kontrol edin.{oneri_metni}")
         
     vals = [guvenliSayi(x) for x in hedef_satir[1:7]]
     while len(vals) < 6:
@@ -1867,6 +1953,21 @@ def parse_grup_ve_tutar(parametreler: List[str]) -> Tuple[str, float]:
         params[0] = params[0] + params[1]
         params.pop(1)
 
+    # Sondan başa doğru ardışık sayı parçalarını tespit et (Örn: ["EŞREF", "TETHER", "1", "500", "000"] veya ["EŞREF", "TETHER", "50000"])
+    idx = len(params) - 1
+    while idx >= 1 and re.search(r'\d', params[idx]) and not re.search(r'[a-zA-ZçğıöşüÇĞİÖŞÜ]', params[idx]):
+        idx -= 1
+    if idx < len(params) - 1:
+        sayi_adayi = "".join(params[idx+1:]).replace(" ", "")
+        try:
+            t_val = guvenliSayi(sayi_adayi)
+            if t_val != 0.0 or sayi_adayi in ["0", "0,0", "0.0", "0,00", "0.00"]:
+                grup_adayi = " ".join(params[:idx+1]).strip()
+                if grup_adayi:
+                    return grup_adayi, t_val
+        except Exception:
+            pass
+
     # 1. Sondaki parametre sayı mı kontrol et (Örn: /masrafekle Yemek 500 veya /masrafekle Ofis Gideri 1.250,50)
     son_str = params[-1].strip()
     if re.search(r'\d', son_str):
@@ -1930,7 +2031,6 @@ def _get_cari_lock(cari_adi: str) -> threading.Lock:
 def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int, chat_id: int = 0) -> str:
     parcalar = komut_metni.strip().split()[1:]
     grup_ham, tutar = parse_grup_ve_tutar_akilli(parcalar, chat_id)
-    hedef_norm = normalize_text(grup_ham)
     
     # 1. Kilitli grup kontrolü
     if grup_ham.upper() in app_state.get("KILITLI_GRUPLAR", set()):
@@ -1951,79 +2051,86 @@ def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int, 
         sayfa = get_active_daily_sheet(sh)
         tum_veriler = get_sheet_values_fast(sayfa)
         
-        for i, row in enumerate(tum_veriler[1:], start=2):
-            if len(row) >= 2 and normalize_text(row[1]) == hedef_norm:
-                with _hucre_formul_hafizasi_lock:
-                    mevcut_raw = _hucre_formul_hafizasi.get((sayfa.title, i, sutun_idx))
-                
-                if mevcut_raw is None:
-                    mevcut_raw = row[sutun_idx - 1].strip() if len(row) >= sutun_idx else ""
-                    if mevcut_raw and not mevcut_raw.startswith("=") and guvenliSayi(mevcut_raw) != 0.0:
-                        try:
-                            c = sayfa.cell(i, sutun_idx, value_render_option="FORMULA")
-                            if c and c.value:
-                                mevcut_raw = str(c.value).strip()
-                        except Exception:
-                            pass
-
-                mevcut_val = guvenliSayi(mevcut_raw if (mevcut_raw and str(mevcut_raw).startswith("=")) else (row[sutun_idx - 1] if len(row) >= sutun_idx else 0.0))
-                yeni_val = round(mevcut_val + (tutar * carp), 2)
-                yeni_formul = yeni_formul_olustur(mevcut_raw, tutar, carp)
-                
-                # Bellek RAM ayna güncellemesi (0 ms hızında)
-                with _hucre_formul_hafizasi_lock:
-                    _hucre_formul_hafizasi[(sayfa.title, i, sutun_idx)] = yeni_formul
-                update_sheet_matrix_memory(sayfa.title, i, sutun_idx, yeni_val)
-                
-                # Arka planda güvenli ve sıralı Sheets güncellemesi (Telegram asla Sheets gecikmesinde takılmaz)
-                _kuyruga_sayfa_yazma_ekle(sayfa.title, i, sutun_idx, yeni_formul)
-                
-                _islem_kaydet({
-                    "sayfa": sayfa.title, "satir": i, "sutun": sutun_idx,
-                    "eskiDeger": mevcut_raw, "eskiSayisal": mevcut_val,
-                    "yeniDeger": yeni_formul, "yeniSayisal": yeni_val,
-                    "grupAdi": row[1], "islemTuru": isim
-                })
-                sistemeLogYaz(isim, f"{row[1].upper()} | {paraFormatla(tutar * carp)} ({yeni_formul})")
-
+        satir_idx, hedef_row, gercek_grup_adi, adaylar = cari_satir_bul(tum_veriler, grup_ham)
+        if adaylar:
+            aday_str = "\n".join([f"• <code>{a}</code>" for a in adaylar[:5]])
+            raise ValueError(f"⚠️ <b>Birden Fazla Cari Eşleşti!</b>\n'<b>{grup_ham}</b>' araması için birden fazla sonuç bulundu. Lütfen tam adını yazın:\n\n{aday_str}")
+        if not hedef_row:
+            raise ValueError(f"Tabloda '<b>{grup_ham}</b>' adlı grup bulunamadı.")
+            
+        i = satir_idx
+        row = hedef_row
+        
+        with _hucre_formul_hafizasi_lock:
+            mevcut_raw = _hucre_formul_hafizasi.get((sayfa.title, i, sutun_idx))
+        
+        if mevcut_raw is None:
+            mevcut_raw = row[sutun_idx - 1].strip() if len(row) >= sutun_idx else ""
+            if mevcut_raw and not mevcut_raw.startswith("=") and guvenliSayi(mevcut_raw) != 0.0:
                 try:
-                    _update_executor.submit(
-                        broadcast_dashboard_update,
-                        [row[1]],
-                        [{"grup": row[1].upper(), "message": f"{grupEmojisiBul(row[1])} <b>{row[1].upper()}</b>: {paraFormatla(tutar * carp)} {isim.lower()} işlendi."}]
-                    )
+                    c = sayfa.cell(i, sutun_idx, value_render_option="FORMULA")
+                    if c and c.value:
+                        mevcut_raw = str(c.value).strip()
                 except Exception:
                     pass
-                
-                row_vals = [guvenliSayi(x) for x in row[1:7]]
-                while len(row_vals) < 6: row_vals.append(0.0)
-                row_vals[sutun_idx - 2] = yeni_val
-                dDevir, dKasa, dOdenen, dKomisyon = row_vals[1], row_vals[2], row_vals[3], row_vals[4]
-                dKalan = round(dDevir + dKasa - dOdenen - dKomisyon, 2)
-                row_vals[5] = dKalan
-                update_sheet_matrix_memory(sayfa.title, i, 7, dKalan)
-                
-                alarm_str = ""
-                alarmlar = app_state.get("BAKIYE_ALARMLARI", {})
-                if row[1].upper() in alarmlar:
-                    limit_tutar = alarmlar[row[1].upper()]
-                    if dKalan >= limit_tutar:
-                        alarm_str = f"\n\n🚨 <b>BAKİYE ALARMI!</b> Cari kalan bakiyesi belirlenen kritik eşiği ({paraFormatla(limit_tutar)}) aştı!"
-                
-                oto_str = " <i>(Gruptan Otomatik Algılandı)</i>" if (chat_id and chat_id in app_state.get("GRUP_BAGLANTILARI", {})) else ""
 
-                return (
-                    f"✅ <b>{isim} Başarılı!</b>\n━━━━━━━━━━━━━━━━\n"
-                    f"{grupEmojisiBul(row[1])} <b>{row[1].upper()}</b>{oto_str}\n"
-                    f"💵 İşlem Tutarı: <b>{paraFormatla(tutar * carp)}</b>\n\n"
-                    f"🔄 Devir: {paraFormatla(dDevir)}\n"
-                    f"💰 Kasa: {paraFormatla(dKasa)}\n"
-                    f"💸 Ödenen: {paraFormatla(dOdenen)}\n"
-                    f"✂️ Komisyon: {paraFormatla(dKomisyon)}\n"
-                    f"🏦 <b>Kalan: {paraFormatla(dKalan)}</b>{alarm_str}\n\n"
-                    f"<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
-                )
-        raise ValueError(f"Tabloda '<b>{grup_ham}</b>' adlı grup bulunamadı.")
+        mevcut_val = guvenliSayi(mevcut_raw if (mevcut_raw and str(mevcut_raw).startswith("=")) else (row[sutun_idx - 1] if len(row) >= sutun_idx else 0.0))
+        yeni_val = round(mevcut_val + (tutar * carp), 2)
+        yeni_formul = yeni_formul_olustur(mevcut_raw, tutar, carp)
+        
+        # Bellek RAM ayna güncellemesi (0 ms hızında)
+        with _hucre_formul_hafizasi_lock:
+            _hucre_formul_hafizasi[(sayfa.title, i, sutun_idx)] = yeni_formul
+        update_sheet_matrix_memory(sayfa.title, i, sutun_idx, yeni_val)
+        
+        # Arka planda güvenli ve sıralı Sheets güncellemesi (Telegram asla Sheets gecikmesinde takılmaz)
+        _kuyruga_sayfa_yazma_ekle(sayfa.title, i, sutun_idx, yeni_formul)
+        
+        _islem_kaydet({
+            "sayfa": sayfa.title, "satir": i, "sutun": sutun_idx,
+            "eskiDeger": mevcut_raw, "eskiSayisal": mevcut_val,
+            "yeniDeger": yeni_formul, "yeniSayisal": yeni_val,
+            "grupAdi": row[1], "islemTuru": isim
+        })
+        sistemeLogYaz(isim, f"{row[1].upper()} | {paraFormatla(tutar * carp)} ({yeni_formul})")
+
+        try:
+            _update_executor.submit(
+                broadcast_dashboard_update,
+                [row[1]],
+                [{"grup": row[1].upper(), "message": f"{grupEmojisiBul(row[1])} <b>{row[1].upper()}</b>: {paraFormatla(tutar * carp)} {isim.lower()} işlendi."}]
+            )
+        except Exception:
+            pass
+        
+        row_vals = [guvenliSayi(x) for x in row[1:7]]
+        while len(row_vals) < 6: row_vals.append(0.0)
+        row_vals[sutun_idx - 2] = yeni_val
+        dDevir, dKasa, dOdenen, dKomisyon = row_vals[1], row_vals[2], row_vals[3], row_vals[4]
+        dKalan = round(dDevir + dKasa - dOdenen - dKomisyon, 2)
+        row_vals[5] = dKalan
+        update_sheet_matrix_memory(sayfa.title, i, 7, dKalan)
+        
+        alarm_str = ""
+        alarmlar = app_state.get("BAKIYE_ALARMLARI", {})
+        if row[1].upper() in alarmlar:
+            limit_tutar = alarmlar[row[1].upper()]
+            if dKalan >= limit_tutar:
+                alarm_str = f"\n\n🚨 <b>BAKİYE ALARMI!</b> Cari kalan bakiyesi belirlenen kritik eşiği ({paraFormatla(limit_tutar)}) aştı!"
+        
+        oto_str = " <i>(Gruptan Otomatik Algılandı)</i>" if (chat_id and chat_id in app_state.get("GRUP_BAGLANTILARI", {})) else ""
+
+        return (
+            f"✅ <b>{isim} Başarılı!</b>\n━━━━━━━━━━━━━━━━\n"
+            f"{grupEmojisiBul(row[1])} <b>{row[1].upper()}</b>{oto_str}\n"
+            f"💵 İşlem Tutarı: <b>{paraFormatla(tutar * carp)}</b>\n\n"
+            f"🔄 Devir: {paraFormatla(dDevir)}\n"
+            f"💰 Kasa: {paraFormatla(dKasa)}\n"
+            f"💸 Ödenen: {paraFormatla(dOdenen)}\n"
+            f"✂️ Komisyon: {paraFormatla(dKomisyon)}\n"
+            f"🏦 <b>Kalan: {paraFormatla(dKalan)}</b>{alarm_str}\n\n"
+            f"<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
+        )
 
 def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
     parcalar = komut_metni.strip().split()[1:]
@@ -6722,7 +6829,11 @@ def process_telegram_update(update: dict):
         is_group = chat_id < 0
 
         if not text.startswith("/"):
-            return
+            # Özel sohbette 'kasa ...' veya 'durum ...' gibi komutların başına / koyulmadan yazılmasını tolere et
+            if not is_group and (text.lower().startswith("kasa ") or text.lower().startswith("durum ") or text.lower() in ["kasa", "durum"]):
+                text = "/" + text
+            else:
+                return
 
         komut_parcalari = text.split()
         ana_komut = komut_parcalari[0].lower().split("@")[0]
@@ -6761,20 +6872,17 @@ def process_telegram_update(update: dict):
                 )
                 return
 
-            if ana_komut in ["/kasa", "/durum", "/kasaekle"]:
+            if ana_komut in ["/kasa", "/durum", "/kasaekle", "/cari"]:
                 if ana_komut == "/kasaekle":
                     yazma_denemesi = True
+                elif ana_komut in ["/durum", "/cari"]:
+                    yazma_denemesi = False
                 else:
                     args = komut_parcalari[1:]
                     yazma_denemesi = False
-                    if len(args) >= 2:
+                    # Sadece parametrelerde sayı/tutar varsa yazma işlemidir
+                    if args and any(re.search(r'\d', a) for a in args):
                         yazma_denemesi = True
-                    elif len(args) == 1:
-                        try:
-                            _ = float(args[0].replace(".", "").replace(",", "."))
-                            yazma_denemesi = True
-                        except ValueError:
-                            yazma_denemesi = False
                 if yazma_denemesi:
                     yetkisiz_uyari_gonder(
                         chat_id,
@@ -6829,7 +6937,8 @@ def process_telegram_update(update: dict):
             return
 
         # /kasa, /kasaekle veya /durum
-        if ana_komut in ["/kasa", "/durum", "/kasaekle"]:
+        # /kasa, /kasaekle, /durum veya /cari
+        if ana_komut in ["/kasa", "/durum", "/kasaekle", "/cari"]:
             args = komut_parcalari[1:]
             baglantilar = app_state.get("GRUP_BAGLANTILARI", {})
 
@@ -6858,23 +6967,35 @@ def process_telegram_update(update: dict):
                     else:
                         telegramMesajGonder(
                             chat_id,
-                            "💡 <b>Kasa Komutu Kullanım Rehberi:</b>\n━━━━━━━━━━━\n"
-                            "• <code>/kasa</code> : Bağlı grupta canlı durum fişini görüntüler.\n"
-                            "• <code>/kasa 3744753</code> veya <code>/kasaekle 3744753</code> : Grupta kasaya para ekler.\n"
-                            "• <code>/kasa SACİD 1500</code> : Kasaya para ekler.\n"
-                            "• <code>/kasasil 500</code> veya <code>/kasasil SACİD 500</code> : Kasadan siler.\n\n"
+                            "💡 <b>Cari Kasa Sorgulama Rehberi:</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+                            "Özel sohbet üzerinden dilediğiniz kişinin veya grubun kasasını anında görüntüleyebilirsiniz:\n\n"
+                            "• <code>/kasa [Cari Adı]</code> veya <code>/durum [Cari Adı]</code>\n"
+                            "  <i>Örnek: <code>/kasa BABA</code></i>\n"
+                            "  <i>Örnek: <code>/kasa EŞREF TETHER</code></i>\n"
+                            "  <i>Örnek: <code>/kasa SACİD</code></i>\n"
+                            "  <i>Örnek: <code>/kasa GNL</code></i>\n\n"
+                            "• <b>Para Ekleme / Silme:</b>\n"
+                            "  <i>Örnek: <code>/kasa SACİD 1500000</code></i>\n"
+                            "  <i>Örnek: <code>/kasasil SACİD 500000</code></i>\n\n"
                             "<i>Gruplarda tek tuşla kullanmak için grupta <code>/grupbagla SACİD</code> yazınız.</i>"
                         )
                         return
 
-            # 3. Parametre girildiğinde (/kasa SACİD veya /kasa 1500 veya /kasa SACİD 1500)
-            # Eğer tek bir cari adı girilmişse (hiç rakam içermiyorsa) -> Canlı Kasa Fişi
-            if len(args) == 1 and not re.search(r'\d', args[0]):
-                grup_adi = args[0]
+            # 3. /durum veya /cari komutu: Her zaman durum fişi sorgulama (asla para eklemez)
+            if ana_komut in ["/durum", "/cari"]:
+                grup_adi = " ".join(args).strip()
                 islemi_analiz_bildirimiyle_yap(chat_id, grup_kasa_analiz_fisi_uret, grup_adi)
                 return
 
-            # Diğer tüm durumlarda kasaya ekleme işlemi (Bağlı grupta otomatik tanır)
+            # 4. /kasa komutunda:
+            # Eğer parametrelerde hiç rakam yoksa (Örn: /kasa baba, /kasa eşref tether, /kasa EŞREF TETHER, /kasa gnl):
+            # Kesinlikle Canlı Kasa Fişi sorgulamasıdır!
+            if not any(re.search(r'\d', a) for a in args):
+                grup_adi = " ".join(args).strip()
+                islemi_analiz_bildirimiyle_yap(chat_id, grup_kasa_analiz_fisi_uret, grup_adi)
+                return
+
+            # Diğer tüm durumlarda kasaya ekleme işlemi (Bağlı grupta tek sayı veya Cari + Tutar)
             islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 4, "Kasa Ekleme", 1, chat_id)
             return
 
