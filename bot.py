@@ -592,6 +592,75 @@ def update_sheet_matrix_memory(sayfa_title: str, row_1based: int, col_1based: in
             _cached_sheet_matrix[r_idx][c_idx] = str(val)
             _cached_sheet_matrix_time = now
 
+# --- ARKA PLAN GOOGLE SHEETS FORMÜL & YAZMA MOTORU ---
+# Telegram kullanıcıları ve grupları asla Google Sheets ağ gecikmesinde (2-4 sn) takılmaz;
+# işlemler RAM aynasında 0 ms'de hesaplanıp Telegram'a anında iletilir,
+# ardından sıralı FIFO iş parçacığı tarafından Google Sheets'e eksiksiz ve hatasız yazılır.
+_sheet_write_queue = queue.Queue()
+_hucre_formul_hafizasi: Dict[Tuple[str, int, int], str] = {}
+_hucre_formul_hafizasi_lock = threading.Lock()
+
+def _sheet_write_worker_loop():
+    while True:
+        try:
+            item = _sheet_write_queue.get()
+            if item is None:
+                break
+            sayfa_title, satir, sutun, val = item
+            for attempt in range(3):
+                try:
+                    sh = get_spreadsheet()
+                    ws = sh.worksheet(sayfa_title)
+                    ws.update_cell(satir, sutun, val)
+                    break
+                except Exception as e:
+                    time.sleep(1.0 * (attempt + 1))
+                    if attempt == 2:
+                        print(f"Sheet write error after 3 attempts ({sayfa_title}, {satir}, {sutun}): {e}")
+            _sheet_write_queue.task_done()
+        except Exception as e:
+            print(f"Sheet write worker exception: {e}")
+
+_sheet_writer_thread = threading.Thread(target=_sheet_write_worker_loop, daemon=True, name="SheetWriteWorker")
+_sheet_writer_thread.start()
+
+def _kuyruga_sayfa_yazma_ekle(sayfa_title: str, satir: int, sutun: int, val: Any):
+    """Google Sheets hücre güncellemesini sıraya koyar; Telegram'ı 0.001 ms bile bekletmez."""
+    _sheet_write_queue.put((sayfa_title, satir, sutun, val))
+
+def formul_sayi_formatla(val: float) -> str:
+    """Google Sheets formülleri için temiz sayı dizesi üretir (Örn: 1500000 veya 1500.50)."""
+    if abs(val - round(val)) < 0.00001:
+        return str(int(round(val)))
+    else:
+        return f"{round(val, 2):.2f}".rstrip('0').rstrip('.')
+
+def yeni_formul_olustur(mevcut_raw: Any, tutar: float, carp: int) -> str:
+    """
+    Excel hücresine tek bir toplam sayı yazmak yerine canlı formül zinciri üretir:
+    - İlk işlem: =1500000
+    - İkinci işlem (+2000000): =1500000+2000000
+    - Silme işlemi (-500000): =1500000+2000000-500000
+    """
+    tutar_str = formul_sayi_formatla(abs(tutar))
+    govde = str(mevcut_raw).strip() if mevcut_raw is not None else ""
+    
+    if govde.startswith("="):
+        govde = govde[1:].strip()
+    elif govde and guvenliSayi(govde) != 0.0:
+        govde = formul_sayi_formatla(guvenliSayi(govde))
+    else:
+        govde = ""
+
+    if carp > 0:
+        if not govde:
+            return f"={tutar_str}"
+        return f"={govde}+{tutar_str}"
+    else:
+        if not govde:
+            return f"=-{tutar_str}"
+        return f"={govde}-{tutar_str}"
+
 def bugununTarihiniAl() -> str:
     """Aktif en son sayfanın adını döner."""
     try:
@@ -679,6 +748,23 @@ def guvenliSayi(deger) -> float:
     metin = str(deger).strip()
     if metin in ["", "-"]: return 0.0
     
+    # Formül çözümleme desteği (Örn: =1500000+2000000-500000)
+    if metin.startswith("="):
+        expr = metin[1:].replace(" ", "")
+        if re.match(r'^[0-9+\-.,]+$', expr):
+            try:
+                tokens = re.findall(r'[+\-]?[^+\-]+', expr)
+                toplam = 0.0
+                for tok in tokens:
+                    tok = tok.strip()
+                    if not tok: continue
+                    sign = -1.0 if tok.startswith('-') else 1.0
+                    clean_tok = tok.lstrip('+-')
+                    toplam += sign * guvenliSayi(clean_tok)
+                return round(toplam, 2)
+            except Exception:
+                pass
+
     eksi_mi = "-" in metin or "(" in metin
     multiplier = 1.0
     m_lower = metin.lower()
@@ -1606,12 +1692,13 @@ def rehber_kategori_metni(kategori: str) -> str:
             "🏢 <b>KASA VE ÖDEME İŞLEMLERİ</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n\n"
             "• <code>/kasa</code> : <i>Bağlı Telegram grubunda tek tuşla canlı kasa durum fişini döker.</i>\n"
-            "• <code>/kasa [Grup] [Tutar]</code> : <i>Kasaya nakit ekler (Örn: /kasa SACİD 500.000).</i>\n"
-            "• <code>/kasasil [Grup] [Tutar]</code> : <i>Kasa tutarından düşer (Örn: /kasasil SACİD 50.000).</i>\n"
-            "• <code>/odeme [Grup] [Tutar]</code> : <i>Yapılan ödemeyi işler (Örn: /odeme SACİD 100.000).</i>\n"
-            "• <code>/odemesil [Grup] [Tutar]</code> : <i>Ödenen tutardan düşer.</i>\n"
-            "• <code>/devir [Grup] [Tutar]</code> : <i>Cari satırına devir/borç ekler (Örn: /devir TİGER 250.000).</i>\n"
-            "• <code>/devirsil [Grup] [Tutar]</code> : <i>Devir tutarından düşer.</i>\n"
+            "• <code>/kasa [Tutar]</code> veya <code>/kasaekle [Tutar]</code> : <i>Bağlı grupta doğrudan kasaya nakit ekler (Örn: /kasa 3744753).</i>\n"
+            "• <code>/kasa [Grup] [Tutar]</code> : <i>Belirtilen gruba nakit ekler (Örn: /kasa SACİD 500.000).</i>\n"
+            "• <code>/kasasil [Tutar]</code> : <i>Bağlı grupta kasa tutarından düşer (Örn: /kasasil 50.000).</i>\n"
+            "• <code>/odeme [Tutar]</code> : <i>Bağlı grupta ödeme işler (Örn: /odeme 100.000).</i>\n"
+            "• <code>/odemesil [Tutar]</code> : <i>Bağlı grupta ödenen tutardan düşer.</i>\n"
+            "• <code>/devir [Tutar]</code> : <i>Bağlı grupta devir ekler.</i>\n"
+            "• <code>/devirsil [Tutar]</code> : <i>Devir tutarından düşer.</i>\n"
             "• <code>/toplu</code> : ⚡ <i>Çoklu hızlı işlem: Birden fazla kasa, ödeme, masraf hareketini tek mesajda işler.</i>\n"
             "• <code>/gerial</code> : <i>En son yapılan hatalı işlemi hafızadan geri alır.</i>\n"
             "• <code>/not [Metin]</code> : <i>Şirket hafızasına kalıcı not ekler (Örn: /not SACİD saat 18:00'de ödeme yapacak).</i>\n"
@@ -1800,6 +1887,35 @@ def parse_grup_ve_tutar(parametreler: List[str]) -> Tuple[str, float]:
 
     raise ValueError("Lütfen geçerli bir sayısal tutar girin! Örnek: <code>/kasa TİGER 1500</code> veya <code>/masrafekle Yemek 500</code>")
 
+def parse_grup_ve_tutar_akilli(parametreler: List[str], chat_id: int = 0) -> Tuple[str, float]:
+    """
+    Parametreleri akıllıca ayrıştırır:
+    1. Bağlı grupta ise ve sadece sayı/tutar girilmişse (Örn: /kasa 3744753 veya /kasa 3 744 753)
+       grubu otomatik olarak bağlı gruptan alır.
+    2. Grup adı ve tutar açıkça belirtilmişse standart parse_grup_ve_tutar çağrılır.
+    """
+    params = list(parametreler)
+    if params and params[0].startswith("/"):
+        params = params[1:]
+    if not params:
+        raise ValueError("Eksik bilgi! Lütfen bir tutar girin. Örnek: <code>/kasa 3744753</code> veya <code>/kasa SACİD 3744753</code>")
+
+    if not app_state.get("GRUP_BAGLANTILARI"):
+        grup_baglantilarini_guncelle()
+    baglantilar = app_state.get("GRUP_BAGLANTILARI", {})
+    if chat_id and chat_id in baglantilar:
+        birlestirilmis = "".join(params).replace(" ", "")
+        if not re.search(r'[a-zA-ZçğıöşüÇĞİÖŞÜ]', birlestirilmis):
+            try:
+                t = guvenliSayi(birlestirilmis)
+                if t != 0.0 or birlestirilmis in ["0", "0,0", "0.0", "0,00", "0.00"]:
+                    grup_adi = baglantilar[chat_id]["grup"]
+                    return grup_adi, t
+            except Exception:
+                pass
+
+    return parse_grup_ve_tutar(params)
+
 # --- CARİ BAZLI ATOMİK İŞLEM KİLİDİ (CONCURRENCY SAFETY) ---
 _cari_locks = {}
 _cari_locks_guard = threading.Lock()
@@ -1811,9 +1927,9 @@ def _get_cari_lock(cari_adi: str) -> threading.Lock:
             _cari_locks[norm] = threading.Lock()
         return _cari_locks[norm]
 
-def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int) -> str:
+def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int, chat_id: int = 0) -> str:
     parcalar = komut_metni.strip().split()[1:]
-    grup_ham, tutar = parse_grup_ve_tutar(parcalar)
+    grup_ham, tutar = parse_grup_ve_tutar_akilli(parcalar, chat_id)
     hedef_norm = normalize_text(grup_ham)
     
     # 1. Kilitli grup kontrolü
@@ -1821,7 +1937,7 @@ def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int) 
         raise ValueError(f"⛔ <b>{grup_ham.upper()}</b> grubunun kasası geçici olarak dondurulmuştur/kilitlidir. Veri girilemez.")
         
     # 2. Maksimum işlem limiti kontrolü
-    max_limit = app_state.get("MAX_TRANSACTION_LIMIT", 1000000.0)
+    max_limit = app_state.get("MAX_TRANSACTION_LIMIT", 100000000.0)
     if tutar > max_limit:
         raise ValueError(
             f"⛔ <b>İşlem Limiti Aşıldı!</b>\n"
@@ -1837,17 +1953,38 @@ def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int) 
         
         for i, row in enumerate(tum_veriler[1:], start=2):
             if len(row) >= 2 and normalize_text(row[1]) == hedef_norm:
-                mevcut_val = guvenliSayi(row[sutun_idx - 1]) if len(row) >= sutun_idx else 0.0
-                yeni_val = round(mevcut_val + (tutar * carp), 2)
+                with _hucre_formul_hafizasi_lock:
+                    mevcut_raw = _hucre_formul_hafizasi.get((sayfa.title, i, sutun_idx))
                 
+                if mevcut_raw is None:
+                    mevcut_raw = row[sutun_idx - 1].strip() if len(row) >= sutun_idx else ""
+                    if mevcut_raw and not mevcut_raw.startswith("=") and guvenliSayi(mevcut_raw) != 0.0:
+                        try:
+                            c = sayfa.cell(i, sutun_idx, value_render_option="FORMULA")
+                            if c and c.value:
+                                mevcut_raw = str(c.value).strip()
+                        except Exception:
+                            pass
+
+                mevcut_val = guvenliSayi(mevcut_raw if (mevcut_raw and str(mevcut_raw).startswith("=")) else (row[sutun_idx - 1] if len(row) >= sutun_idx else 0.0))
+                yeni_val = round(mevcut_val + (tutar * carp), 2)
+                yeni_formul = yeni_formul_olustur(mevcut_raw, tutar, carp)
+                
+                # Bellek RAM ayna güncellemesi (0 ms hızında)
+                with _hucre_formul_hafizasi_lock:
+                    _hucre_formul_hafizasi[(sayfa.title, i, sutun_idx)] = yeni_formul
                 update_sheet_matrix_memory(sayfa.title, i, sutun_idx, yeni_val)
-                sayfa.update_cell(i, sutun_idx, yeni_val)
+                
+                # Arka planda güvenli ve sıralı Sheets güncellemesi (Telegram asla Sheets gecikmesinde takılmaz)
+                _kuyruga_sayfa_yazma_ekle(sayfa.title, i, sutun_idx, yeni_formul)
                 
                 _islem_kaydet({
                     "sayfa": sayfa.title, "satir": i, "sutun": sutun_idx,
-                    "eskiDeger": mevcut_val, "grupAdi": row[1], "islemTuru": isim
+                    "eskiDeger": mevcut_raw, "eskiSayisal": mevcut_val,
+                    "yeniDeger": yeni_formul, "yeniSayisal": yeni_val,
+                    "grupAdi": row[1], "islemTuru": isim
                 })
-                sistemeLogYaz(isim, f"{row[1].upper()} | {paraFormatla(tutar * carp)}")
+                sistemeLogYaz(isim, f"{row[1].upper()} | {paraFormatla(tutar * carp)} ({yeni_formul})")
 
                 try:
                     _update_executor.submit(
@@ -1873,9 +2010,11 @@ def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int) 
                     if dKalan >= limit_tutar:
                         alarm_str = f"\n\n🚨 <b>BAKİYE ALARMI!</b> Cari kalan bakiyesi belirlenen kritik eşiği ({paraFormatla(limit_tutar)}) aştı!"
                 
+                oto_str = " <i>(Gruptan Otomatik Algılandı)</i>" if (chat_id and chat_id in app_state.get("GRUP_BAGLANTILARI", {})) else ""
+
                 return (
                     f"✅ <b>{isim} Başarılı!</b>\n━━━━━━━━━━━━━━━━\n"
-                    f"{grupEmojisiBul(row[1])} <b>{row[1].upper()}</b>\n"
+                    f"{grupEmojisiBul(row[1])} <b>{row[1].upper()}</b>{oto_str}\n"
                     f"💵 İşlem Tutarı: <b>{paraFormatla(tutar * carp)}</b>\n\n"
                     f"🔄 Devir: {paraFormatla(dDevir)}\n"
                     f"💰 Kasa: {paraFormatla(dKasa)}\n"
@@ -6622,17 +6761,20 @@ def process_telegram_update(update: dict):
                 )
                 return
 
-            if ana_komut in ["/kasa", "/durum"]:
-                args = komut_parcalari[1:]
-                yazma_denemesi = False
-                if len(args) >= 2:
+            if ana_komut in ["/kasa", "/durum", "/kasaekle"]:
+                if ana_komut == "/kasaekle":
                     yazma_denemesi = True
-                elif len(args) == 1:
-                    try:
-                        _ = float(args[0].replace(".", "").replace(",", "."))
+                else:
+                    args = komut_parcalari[1:]
+                    yazma_denemesi = False
+                    if len(args) >= 2:
                         yazma_denemesi = True
-                    except ValueError:
-                        yazma_denemesi = False
+                    elif len(args) == 1:
+                        try:
+                            _ = float(args[0].replace(".", "").replace(",", "."))
+                            yazma_denemesi = True
+                        except ValueError:
+                            yazma_denemesi = False
                 if yazma_denemesi:
                     yetkisiz_uyari_gonder(
                         chat_id,
@@ -6686,12 +6828,20 @@ def process_telegram_update(update: dict):
                 islemi_analiz_bildirimiyle_yap(chat_id, grup_senkronize_impl, goster_bildirim=True)
             return
 
-        # /kasa veya /durum
-        if ana_komut in ["/kasa", "/durum"]:
+        # /kasa, /kasaekle veya /durum
+        if ana_komut in ["/kasa", "/durum", "/kasaekle"]:
             args = komut_parcalari[1:]
             baglantilar = app_state.get("GRUP_BAGLANTILARI", {})
 
-            # 1. Hiçbir parametre girilmediğinde (/kasa)
+            # 1. /kasaekle komutu
+            if ana_komut == "/kasaekle":
+                if not args:
+                    telegramMesajGonder(chat_id, "⚠️ Lütfen eklenecek tutarı belirtin! Örnek: <code>/kasaekle 3744753</code> veya <code>/kasaekle SACİD 3744753</code>")
+                    return
+                islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 4, "Kasa Ekleme", 1, chat_id)
+                return
+
+            # 2. Hiçbir parametre girilmediğinde (/kasa veya /durum) -> Canlı Fiş
             if len(args) == 0:
                 if chat_id in baglantilar:
                     grup_adi = baglantilar[chat_id]["grup"]
@@ -6709,41 +6859,24 @@ def process_telegram_update(update: dict):
                         telegramMesajGonder(
                             chat_id,
                             "💡 <b>Kasa Komutu Kullanım Rehberi:</b>\n━━━━━━━━━━━\n"
-                            "• <code>/kasa SACİD</code> : Grup durum fişini görüntüler.\n"
+                            "• <code>/kasa</code> : Bağlı grupta canlı durum fişini görüntüler.\n"
+                            "• <code>/kasa 3744753</code> veya <code>/kasaekle 3744753</code> : Grupta kasaya para ekler.\n"
                             "• <code>/kasa SACİD 1500</code> : Kasaya para ekler.\n"
-                            "• <code>/kasasil SACİD 500</code> : Kasadan siler.\n\n"
+                            "• <code>/kasasil 500</code> veya <code>/kasasil SACİD 500</code> : Kasadan siler.\n\n"
                             "<i>Gruplarda tek tuşla kullanmak için grupta <code>/grupbagla SACİD</code> yazınız.</i>"
                         )
                         return
 
-            # 2. Tek parametre girildiğinde (/kasa SACİD veya /kasa 1500)
-            elif len(args) == 1:
-                param_sayi_mi = False
-                try:
-                    _ = float(args[0].replace(".", "").replace(",", "."))
-                    param_sayi_mi = True
-                except ValueError:
-                    param_sayi_mi = False
-
-                if not param_sayi_mi:
-                    # Grup adı girilmiş -> Canlı Kasa Fişi
-                    grup_adi = args[0]
-                    islemi_analiz_bildirimiyle_yap(chat_id, grup_kasa_analiz_fisi_uret, grup_adi)
-                    return
-                else:
-                    # Sayı girilmiş -> Bağlı grupta ise o grubun kasasına ekle
-                    if chat_id in baglantilar:
-                        grup_adi = baglantilar[chat_id]["grup"]
-                        islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, f"/kasa {grup_adi} {args[0]}", 4, "Kasa Ekleme", 1)
-                        return
-                    else:
-                        telegramMesajGonder(chat_id, "⚠️ Lütfen hangi gruba işlem yapıldığını belirtin! Örnek: <code>/kasa SACİD 1500</code>")
-                        return
-
-            # 3. İki veya daha fazla parametre girildiğinde (/kasa SACİD 1500)
-            else:
-                islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 4, "Kasa Ekleme", 1)
+            # 3. Parametre girildiğinde (/kasa SACİD veya /kasa 1500 veya /kasa SACİD 1500)
+            # Eğer tek bir cari adı girilmişse (hiç rakam içermiyorsa) -> Canlı Kasa Fişi
+            if len(args) == 1 and not re.search(r'\d', args[0]):
+                grup_adi = args[0]
+                islemi_analiz_bildirimiyle_yap(chat_id, grup_kasa_analiz_fisi_uret, grup_adi)
                 return
+
+            # Diğer tüm durumlarda kasaya ekleme işlemi (Bağlı grupta otomatik tanır)
+            islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 4, "Kasa Ekleme", 1, chat_id)
+            return
 
         if ana_komut in ["/start", "/menu", "/menü"]:
             telegramMesajGonder(chat_id, "👋 <b>CFO ve Finans Yönetim Botu</b>\nLütfen bir işlem seçin:\n\n👨💻 <i>Yazılım: @CRYPTOATAKAN © 2026</i>", menuKlavyesiOlustur(is_group))
@@ -6874,16 +7007,16 @@ def process_telegram_update(update: dict):
         elif ana_komut == "/yenigun":
             metin, klavye = yenigun_baslat_mesaji()
             telegramMesajGonder(chat_id, metin, klavye)
-        elif ana_komut == "/kasasil":
-            islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 4, "Kasa Silme", -1)
-        elif ana_komut == "/odeme":
-            islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 5, "Ödenen Ekleme", 1)
-        elif ana_komut == "/odemesil":
-            islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 5, "Ödenen Silme", -1)
-        elif ana_komut == "/devir":
-            islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 3, "Devir Ekleme", 1)
-        elif ana_komut == "/devirsil":
-            islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 3, "Devir Silme", -1)
+        elif ana_komut in ["/kasasil", "/kasacikar", "/kasaçıkar"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 4, "Kasa Silme", -1, chat_id)
+        elif ana_komut in ["/odeme", "/odemeekle", "/ödeme", "/ödemeekle"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 5, "Ödenen Ekleme", 1, chat_id)
+        elif ana_komut in ["/odemesil", "/ödemesil"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 5, "Ödenen Silme", -1, chat_id)
+        elif ana_komut in ["/devir", "/devirekle"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 3, "Devir Ekleme", 1, chat_id)
+        elif ana_komut in ["/devirsil"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 3, "Devir Silme", -1, chat_id)
         elif ana_komut == "/masrafekle":
             islemi_analiz_bildirimiyle_yap(chat_id, masrafVerisiYaz_impl, text, "Masraf Ekleme", 1)
         elif ana_komut == "/masrafsil":
@@ -6975,8 +7108,12 @@ def process_telegram_update(update: dict):
                     update_sheet_matrix_memory(last["sayfa"], last["satir"], 9, eski_ad)
                     update_sheet_matrix_memory(last["sayfa"], last["satir"], 10, last["eskiDeger"])
                 else:
-                    sayfa.update_cell(last["satir"], last["sutun"], last["eskiDeger"])
-                    update_sheet_matrix_memory(last["sayfa"], last["satir"], last["sutun"], last["eskiDeger"])
+                    eski_val = last.get("eskiDeger", "")
+                    eski_sayisal = last.get("eskiSayisal", guvenliSayi(eski_val))
+                    with _hucre_formul_hafizasi_lock:
+                        _hucre_formul_hafizasi[(last["sayfa"], last["satir"], last["sutun"])] = eski_val
+                    update_sheet_matrix_memory(last["sayfa"], last["satir"], last["sutun"], eski_sayisal)
+                    _kuyruga_sayfa_yazma_ekle(last["sayfa"], last["satir"], last["sutun"], eski_val)
                     
                 sistemeLogYaz("İptal Edilen İşlem", f"{last['grupAdi']} ({last['islemTuru']})")
                 kalan_sayi = len(gecmis)
