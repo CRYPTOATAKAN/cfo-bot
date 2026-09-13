@@ -601,6 +601,51 @@ _sheet_write_queue = queue.Queue()
 _hucre_formul_hafizasi: Dict[Tuple[str, int, int], str] = {}
 _hucre_formul_hafizasi_lock = threading.Lock()
 
+# --- GOOGLE SHEETS HATA KURTARMA KUYRUĞU (DEAD-LETTER QUEUE / DLQ) ---
+FAILED_WRITES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "failed_writes.json")
+_sheet_failed_writes: List[dict] = []
+_sheet_failed_writes_lock = threading.Lock()
+
+def _load_failed_writes():
+    global _sheet_failed_writes
+    try:
+        if os.path.exists(FAILED_WRITES_FILE):
+            with open(FAILED_WRITES_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                if isinstance(data, list):
+                    with _sheet_failed_writes_lock:
+                        _sheet_failed_writes = data
+    except Exception as e:
+        print(f"Failed writes load error: {e}")
+
+def _save_failed_writes():
+    try:
+        with _sheet_failed_writes_lock:
+            with open(FAILED_WRITES_FILE, "w", encoding="utf-8") as f:
+                json.dump(_sheet_failed_writes, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Failed writes save error: {e}")
+
+_load_failed_writes()
+
+def _alert_kurucu_failed_write(failed_item: dict):
+    def alert_worker():
+        try:
+            msg = (
+                f"🚨 <b>DİKKAT: GOOGLE SHEETS YAZMA HATASI!</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"📁 <b>Sayfa:</b> <code>{failed_item.get('sayfa')}</code>\n"
+                f"📍 <b>Hücre:</b> Satır {failed_item.get('satir')}, Sütun {failed_item.get('sutun')}\n"
+                f"📝 <b>Değer:</b> <code>{failed_item.get('val')}</code>\n"
+                f"⚠️ <b>Hata:</b> <code>{str(failed_item.get('hata'))[:120]}</code>\n\n"
+                f"🔒 <i>İşlem RAM'de korunuyor ve <b>Kurtarma Kuyruğuna (DLQ)</b> alındı. Sistem otomatik olarak yeniden yazmayı deneyecektir.</i>\n\n"
+                f"💡 Durumu incelemek için: <code>/kuyruk</code> veya <code>/kurtar</code>"
+            )
+            telegramMesajGonder(KURUCU_ID, msg)
+        except Exception:
+            pass
+    threading.Thread(target=alert_worker, daemon=True).start()
+
 def _sheet_write_worker_loop():
     while True:
         try:
@@ -608,22 +653,87 @@ def _sheet_write_worker_loop():
             if item is None:
                 break
             sayfa_title, satir, sutun, val = item
+            success = False
+            last_err = ""
             for attempt in range(3):
                 try:
                     sh = get_spreadsheet()
                     ws = sh.worksheet(sayfa_title)
                     ws.update_cell(satir, sutun, val)
+                    success = True
                     break
                 except Exception as e:
+                    last_err = str(e)
                     time.sleep(1.0 * (attempt + 1))
                     if attempt == 2:
                         print(f"Sheet write error after 3 attempts ({sayfa_title}, {satir}, {sutun}): {e}")
+            if not success:
+                failed_item = {
+                    "id": f"{int(time.time()*1000)}_{satir}_{sutun}",
+                    "sayfa": sayfa_title,
+                    "satir": satir,
+                    "sutun": sutun,
+                    "val": val,
+                    "hata": last_err,
+                    "zaman": suankiZamaniAl().strftime("%d.%m.%Y %H:%M:%S"),
+                    "deneme_sayisi": 3,
+                    "son_deneme": time.time()
+                }
+                with _sheet_failed_writes_lock:
+                    _sheet_failed_writes.append(failed_item)
+                _save_failed_writes()
+                _alert_kurucu_failed_write(failed_item)
+                sistemeLogYaz("DLQ Hatası", f"{sayfa_title} R{satir}C{sutun} yazılamadı: {last_err}")
+                
             _sheet_write_queue.task_done()
         except Exception as e:
             print(f"Sheet write worker exception: {e}")
 
 _sheet_writer_thread = threading.Thread(target=_sheet_write_worker_loop, daemon=True, name="SheetWriteWorker")
 _sheet_writer_thread.start()
+
+def _sheet_failed_retry_worker_loop():
+    """Her 45 saniyede bir hata kuyruğundaki (DLQ) başarısız yazımları Google Sheets'e tekrar yazmayı dener."""
+    while True:
+        time.sleep(45)
+        try:
+            with _sheet_failed_writes_lock:
+                if not _sheet_failed_writes:
+                    continue
+                items_to_retry = list(_sheet_failed_writes)
+                
+            kurtarilanlar = []
+            sh = get_spreadsheet()
+            for item in items_to_retry:
+                try:
+                    ws = sh.worksheet(item["sayfa"])
+                    ws.update_cell(item["satir"], item["sutun"], item["val"])
+                    kurtarilanlar.append(item["id"])
+                except Exception as e:
+                    item["deneme_sayisi"] = item.get("deneme_sayisi", 0) + 1
+                    item["hata"] = str(e)
+                    item["son_deneme"] = time.time()
+                    
+            if kurtarilanlar:
+                with _sheet_failed_writes_lock:
+                    _sheet_failed_writes[:] = [x for x in _sheet_failed_writes if x["id"] not in kurtarilanlar]
+                _save_failed_writes()
+                sistemeLogYaz("DLQ Otomatik Kurtarma", f"{len(kurtarilanlar)} işlem başarıyla Google Sheets'e işlendi.")
+                try:
+                    telegramMesajGonder(
+                        KURUCU_ID,
+                        f"✅ <b>HATA KURTARMA BAŞARILI!</b>\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n"
+                        f"Daha önce Google Sheets'e yazılamayan <b>{len(kurtarilanlar)} adet işlem</b> arka planda otomatik olarak başarıyla tablonuza işlendi.\n"
+                        f"Kalan kurtarma kuyruğu: <b>{len(_sheet_failed_writes)}</b> adet."
+                    )
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"DLQ retry worker error: {e}")
+
+_sheet_dlq_thread = threading.Thread(target=_sheet_failed_retry_worker_loop, daemon=True, name="SheetDLQRetryWorker")
+_sheet_dlq_thread.start()
 
 def _kuyruga_sayfa_yazma_ekle(sayfa_title: str, satir: int, sutun: int, val: Any):
     """Google Sheets hücre güncellemesini sıraya koyar; Telegram'ı 0.001 ms bile bekletmez."""
@@ -1865,6 +1975,7 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/id</code> veya <code>/myid</code> : 🆔 <i>Sohbet ve kullanıcı Telegram ID numaranızı gösterir.</i>\n"
             "• <code>/panellink</code> veya <code>/panel</code> : 🌐 <i>Web Yönetim Paneli doğrudan giriş bağlantısı.</i>\n"
             "• <code>/kuyruk</code> : ⚡ <i>Arka plan Google Sheets FIFO kuyruğu ve RAM gecikme metrikleri.</i>\n"
+            "• <code>/kurtar</code> : 🛡️ <i>Google Sheets hata kurtarma (DLQ) kuyruğundaki bekleyen işlemleri zorlar.</i>\n"
             "• <code>/apidurum</code> veya <code>/health</code> : 🩺 <i>Telegram, Sheets, Tron TRC-20 ve Kur API sağlık testi.</i>\n"
             "• <code>/cache</code> veya <code>/flush</code> : 🧹 <i>Google Sheets ve yetki önbelleklerini canlıda tazeler.</i>\n"
             "• <code>/logs [n]</code> : 📋 <i>Sistemdeki son n adet işlem ve hata logunu listeler.</i>\n"
@@ -1923,6 +2034,7 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/id</code> / <code>/myid</code> : 🆔 Telegram ID görüntüleme.\n"
             "• <code>/panel</code> / <code>/panellink</code> : 🌐 CFO Web Dashboard linki.\n"
             "• <code>/kuyruk</code> : ⚡ Arka plan Google Sheets FIFO kuyruğu ve RAM gecikmesi.\n"
+            "• <code>/kurtar</code> : 🛡️ Google Sheets hata kurtarma (DLQ) kuyruğundaki işlemleri zorlar.\n"
             "• <code>/apidurum</code> / <code>/health</code> : 🩺 Telegram, Sheets, Tron TRC-20, Kur API sağlık testi.\n"
             "• <code>/cache</code> / <code>/flush</code> : 🧹 Önbellek tazeleme.\n"
             "• <code>/logs [n]</code> : 📋 Son sistem loglarını listeleme.\n"
@@ -2042,6 +2154,61 @@ def _get_cari_lock(cari_adi: str) -> threading.Lock:
         if norm not in _cari_locks:
             _cari_locks[norm] = threading.Lock()
         return _cari_locks[norm]
+
+# --- MÜKERRER İŞLEM VE ÇİFT TIKLAMA KORUMASI (IDEMPOTENCY GUARD) ---
+_idempotency_cache: Dict[str, float] = {}
+_idempotency_lock = threading.Lock()
+
+def mukerrer_islem_mi(user_id: int, komut_metni: str, pencere_saniye: float = 3.5) -> Tuple[bool, float]:
+    """
+    Finansal komutlarda çift tıklama / mükerrer mesaj gönderimini engeller.
+    Eğer aynı kullanıcı aynı finansal komutu pencere_saniye içinde gönderirse True döner.
+    """
+    if not komut_metni or not user_id:
+        return False, 0.0
+        
+    t = komut_metni.strip().lower()
+    parcalar = t.split()
+    if not parcalar:
+        return False, 0.0
+        
+    ana_komut = parcalar[0].split("@")[0]
+    
+    finansal_komutlar = {
+        "/kasa", "/kasaekle", "/kasasil", "/kasacikar", "/kasaçıkar",
+        "/odeme", "/odemeekle", "/ödeme", "/ödemeekle", "/odemesil", "/ödemesil",
+        "/devir", "/devirekle", "/devirsil",
+        "/masrafekle", "/masrafsil",
+        "/toplu", "/topluislem", "/hizli",
+        "/cariekle"
+    }
+    
+    if ana_komut not in finansal_komutlar:
+        return False, 0.0
+        
+    # /kasa sorgusu ise (parametrelerde rakam yoksa) mükerrerlik engeli uygulanmaz
+    if ana_komut in ["/kasa", "/durum"]:
+        args = parcalar[1:]
+        if not any(re.search(r'\d', a) for a in args):
+            return False, 0.0
+
+    now = time.time()
+    norm_cmd = re.sub(r'\s+', ' ', t)
+    cache_key = f"{user_id}:{norm_cmd}"
+    
+    with _idempotency_lock:
+        # 60 saniyeden eski kayıtları temizle
+        for k in list(_idempotency_cache.keys()):
+            if now - _idempotency_cache[k] > 60.0:
+                del _idempotency_cache[k]
+                
+        if cache_key in _idempotency_cache:
+            gecen = now - _idempotency_cache[cache_key]
+            if gecen < pencere_saniye:
+                return True, gecen
+                
+        _idempotency_cache[cache_key] = now
+        return False, 0.0
 
 def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int, chat_id: int = 0) -> str:
     parcalar = komut_metni.strip().split()[1:]
@@ -6806,19 +6973,79 @@ def kuyruk_durumu_impl() -> str:
         formul_sayisi = len(_hucre_formul_hafizasi)
     now_str = suankiZamaniAl().strftime("%H:%M:%S")
     
+    with _sheet_failed_writes_lock:
+        dlq_sayisi = len(_sheet_failed_writes)
+        
     durum_emoji = "🟢" if bekleyen == 0 else ("🟡" if bekleyen < 5 else "🔴")
     worker_durum = "Aktif (Çalışıyor)" if calisiyor else "Durduruldu / Hata"
+    
+    dlq_emoji = "🟢" if dlq_sayisi == 0 else "🚨"
+    dlq_satiri = f"🛡️ <b>Hata Kurtarma (DLQ):</b> {dlq_emoji} <b>{dlq_sayisi}</b> başarısız işlem bekliyor"
+    if dlq_sayisi > 0:
+        dlq_satiri += "\n💡 <i>Başarısız yazımları hemen zorlamak için: <code>/kurtar</code></i>"
     
     return (
         f"⚡ <b>GOOGLE SHEETS YAZMA KUYRUĞU VE PERFORMANS</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"📊 <b>Kuyruk Durumu:</b> {durum_emoji} <b>{bekleyen}</b> işlem sırada bekliyor\n"
+        f"{dlq_satiri}\n"
         f"🧵 <b>Yazıcı Thread (Worker):</b> <code>{worker_durum}</code>\n"
         f"🧠 <b>RAM Formül Önbelleği:</b> {formul_sayisi} aktif hücre\n"
         f"⏱️ <b>Telegram Yanıt Süresi:</b> <b>&lt; 5 ms</b> (Ultra Hızlı)\n"
         f"🕒 <b>Sorgu Saati:</b> {now_str}\n\n"
         f"💡 <i>Kullanıcı komutları anında RAM'de hesaplanır ve Telegram'a yansıtılır; Google Sheets'e arka planda sırayla yazılır.</i>"
     )
+
+def kurtar_basarisiz_yazimlari_impl() -> str:
+    with _sheet_failed_writes_lock:
+        toplam = len(_sheet_failed_writes)
+        if toplam == 0:
+            return (
+                "✅ <b>HATA KURTARMA KUYRUĞU TERTEMİZ!</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━\n"
+                "Google Sheets'e yazılamayan hiçbir başarısız işlem bulunmamaktadır.\n"
+                "Tüm işlemler tablonuzla %100 senkronizedir."
+            )
+        items_to_retry = list(_sheet_failed_writes)
+        
+    kurtarilanlar = []
+    hatalar = []
+    sh = get_spreadsheet()
+    for item in items_to_retry:
+        try:
+            ws = sh.worksheet(item["sayfa"])
+            ws.update_cell(item["satir"], item["sutun"], item["val"])
+            kurtarilanlar.append(item["id"])
+        except Exception as e:
+            hatalar.append(f"• {item['sayfa']} R{item['satir']}C{item['sutun']}: {e}")
+            item["deneme_sayisi"] = item.get("deneme_sayisi", 0) + 1
+            item["hata"] = str(e)
+            item["son_deneme"] = time.time()
+            
+    if kurtarilanlar:
+        with _sheet_failed_writes_lock:
+            _sheet_failed_writes[:] = [x for x in _sheet_failed_writes if x["id"] not in kurtarilanlar]
+        _save_failed_writes()
+        sistemeLogYaz("DLQ Manuel Kurtarma", f"{len(kurtarilanlar)}/{toplam} işlem kurtarıldı.")
+        
+    kalan = len(_sheet_failed_writes)
+    if kalan == 0:
+        return (
+            f"🎉 <b>TÜM BAŞARISIZ İŞLEMLER KURTARILDI!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"Google Sheets'e yazılamayan <b>{len(kurtarilanlar)} adet işlem</b> başarıyla tablonuza işlendi.\n"
+            f"Kurtarma kuyruğu tamamen sıfırlandı."
+        )
+    else:
+        hata_str = "\n".join(hatalar[:5])
+        return (
+            f"⚠️ <b>KISMİ KURTARMA RAPORU</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"✅ Başarıyla Yazılan: <b>{len(kurtarilanlar)}</b> adet\n"
+            f"❌ Hala Hata Veren: <b>{kalan}</b> adet\n\n"
+            f"<b>Son Hata Detayı:</b>\n{hata_str}\n\n"
+            f"💡 <i>Sistem 45 saniye aralıklarla arka planda otomatik denemeye devam edecektir.</i>"
+        )
 
 def api_saglik_durumu_impl() -> str:
     sonuclar = []
@@ -6971,7 +7198,7 @@ def islemi_analiz_bildirimiyle_yap(chat_id: int, islem_fn, *args, goster_bildiri
         # İlerleme çubuğunu başlat (%20)
         ilk_metin = yukleme_adim_metni_uret(fn_name, 20)
         yukleniyor = telegramMesajGonder(chat_id, ilk_metin, kapat_butonu_ekle=False)
-        msg_id = yukleniyor.get("result", {}).get("message_id") if yukleniyor.get("ok") else None
+        msg_id = yukleniyor.get("result", {}).get("message_id") if (isinstance(yukleniyor, dict) and yukleniyor.get("ok")) else None
 
         # Arka planda non-blocking animatör (ana işlemi asla bekletmez/yavaşlatmaz)
         def animasyon_worker(m_id, f_name):
@@ -7090,6 +7317,30 @@ def _process_telegram_update_core(update: dict):
                 telegramMesajGonder(chat_id, metin, klavye)
             try:
                 telegram_api("answerCallbackQuery", {"callback_query_id": cq["id"], "text": "🔄 Canlı kurlar güncellendi!"})
+            except Exception:
+                pass
+        elif data == "kurtar_dlq":
+            islemi_analiz_bildirimiyle_yap(chat_id, kurtar_basarisiz_yazimlari_impl, goster_bildirim=True)
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq["id"], "text": "🔄 Hata kurtarma işlemi çalıştırıldı!"})
+            except Exception:
+                pass
+        elif data == "kuyruk_yenile":
+            msg_id = cq.get("message", {}).get("message_id")
+            metin = kuyruk_durumu_impl()
+            with _sheet_failed_writes_lock:
+                dlq_sayisi = len(_sheet_failed_writes)
+            klavye_butonlari = []
+            if dlq_sayisi > 0:
+                klavye_butonlari.append([{"text": "🚨 Hatalı İşlemleri Şimdi Kurtar", "callback_data": "kurtar_dlq"}])
+            klavye_butonlari.append([{"text": "🔄 Yenile", "callback_data": "kuyruk_yenile"}])
+            klavye = {"inline_keyboard": klavye_butonlari}
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+            else:
+                telegramMesajGonder(chat_id, metin, klavye)
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq["id"], "text": "🔄 Kuyruk durumu güncellendi!"})
             except Exception:
                 pass
         elif data == "menu_yenigun":
@@ -7405,6 +7656,20 @@ def _process_telegram_update_core(update: dict):
             )
             return
 
+        # =========================================================================
+        # ⚡ İDEMPOTENCY GUARD: Çift Tıklama & Mükerrer İşlem Engelleme
+        # =========================================================================
+        is_dup, gecen_sn = mukerrer_islem_mi(user_id, text)
+        if is_dup:
+            telegramMesajGonder(
+                chat_id,
+                f"⚠️ <b>Mükerrer İşlem Engellendi!</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"Bu işlem <b>{gecen_sn:.1f} saniye önce</b> zaten işlendi. Çift işlem riskine karşı koruma sağlandı.\n\n"
+                f"💡 <i>Aynı işlemi tekrar kasıtlı olarak yapmak istiyorsanız lütfen birkaç saniye bekleyip yeniden gönderiniz.</i>"
+            )
+            return
+
         # /t veya /rezerv veya /varlik (TRC-20 Canlı Rezerv & Varlık Raporu)
         if ana_komut in ["/t", "/rezerv", "/varlik"]:
             if user_id != KURUCU_ID:
@@ -7688,7 +7953,18 @@ def _process_telegram_update_core(update: dict):
         elif ana_komut in ["/hareketler", "/hareket", "/islemler", "/işlemler"]:
             islemi_analiz_bildirimiyle_yap(chat_id, cari_gunluk_hareketler_impl, text, chat_id)
         elif ana_komut in ["/kuyruk", "/queue", "/senkronkuyrugu"]:
-            islemi_analiz_bildirimiyle_yap(chat_id, kuyruk_durumu_impl)
+            def kuyruk_goster():
+                metin = kuyruk_durumu_impl()
+                with _sheet_failed_writes_lock:
+                    dlq_sayisi = len(_sheet_failed_writes)
+                klavye_butonlari = []
+                if dlq_sayisi > 0:
+                    klavye_butonlari.append([{"text": "🚨 Hatalı İşlemleri Şimdi Kurtar", "callback_data": "kurtar_dlq"}])
+                klavye_butonlari.append([{"text": "🔄 Yenile", "callback_data": "kuyruk_yenile"}])
+                return metin, {"inline_keyboard": klavye_butonlari}
+            islemi_analiz_bildirimiyle_yap(chat_id, kuyruk_goster)
+        elif ana_komut in ["/kurtar", "/dlqkurtar", "/retryqueue"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, kurtar_basarisiz_yazimlari_impl, goster_bildirim=True)
         elif ana_komut in ["/apidurum", "/health", "/saglik", "/servisler"]:
             islemi_analiz_bildirimiyle_yap(chat_id, api_saglik_durumu_impl, goster_bildirim=True)
         elif ana_komut in ["/alarm", "/alarmlar"]:
