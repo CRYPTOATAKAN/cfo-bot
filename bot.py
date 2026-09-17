@@ -605,6 +605,17 @@ def update_sheet_matrix_memory(sayfa_title: str, row_1based: int, col_1based: in
             _cached_sheet_matrix[r_idx][c_idx] = str(val)
             _cached_sheet_matrix_time = now
 
+def set_sheet_cache_matrix(sayfa_title: str, veriler: List[List[str]]):
+    """RAM önbelleğindeki tam tabloyu anında en güncel verilerle eşitler (0.001 ms)."""
+    global _cached_sheet_matrix, _cached_sheet_matrix_title, _cached_sheet_matrix_time, _cached_sheet_matrices
+    now = time.time()
+    data_copy = [list(r) for r in veriler]
+    with _cached_sheet_matrix_lock:
+        _cached_sheet_matrices[sayfa_title] = {"data": data_copy, "time": now}
+        _cached_sheet_matrix = data_copy
+        _cached_sheet_matrix_title = sayfa_title
+        _cached_sheet_matrix_time = now
+
 # --- ARKA PLAN GOOGLE SHEETS FORMÜL & YAZMA MOTORU ---
 # Telegram kullanıcıları ve grupları asla Google Sheets ağ gecikmesinde (2-4 sn) takılmaz;
 # işlemler RAM aynasında 0 ms'de hesaplanıp Telegram'a anında iletilir,
@@ -2288,6 +2299,14 @@ def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int, 
         })
         sistemeLogYaz(isim, f"{row[1].upper()} | {paraFormatla(tutar * carp)} ({yeni_formul})")
 
+        row_vals = [guvenliSayi(x) for x in row[1:7]]
+        while len(row_vals) < 6: row_vals.append(0.0)
+        row_vals[sutun_idx - 2] = yeni_val
+        dDevir, dKasa, dOdenen, dKomisyon = row_vals[1], row_vals[2], row_vals[3], row_vals[4]
+        dKalan = round(dDevir + dKasa - dOdenen - dKomisyon, 2)
+        row_vals[5] = dKalan
+        update_sheet_matrix_memory(sayfa.title, i, 7, dKalan)
+
         try:
             _update_executor.submit(
                 broadcast_dashboard_update,
@@ -2296,14 +2315,6 @@ def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int, 
             )
         except Exception:
             pass
-        
-        row_vals = [guvenliSayi(x) for x in row[1:7]]
-        while len(row_vals) < 6: row_vals.append(0.0)
-        row_vals[sutun_idx - 2] = yeni_val
-        dDevir, dKasa, dOdenen, dKomisyon = row_vals[1], row_vals[2], row_vals[3], row_vals[4]
-        dKalan = round(dDevir + dKasa - dOdenen - dKomisyon, 2)
-        row_vals[5] = dKalan
-        update_sheet_matrix_memory(sayfa.title, i, 7, dKalan)
         
         alarm_str = ""
         alarmlar = app_state.get("BAKIYE_ALARMLARI", {})
@@ -2476,6 +2487,10 @@ def tablodan_finans_ozeti_hesapla(veriler: List[List[str]]) -> Dict[str, Any]:
                 while len(vals) < 6: vals.append(0.0)
                 devir, kasa, odenen, kom, kalan = vals[1], vals[2], vals[3], vals[4], vals[5]
                 
+                # Excel'de formül girilmemiş veya 0 ise otomatik hesapla
+                if abs(kalan) < 0.001 and any(abs(x) > 0.001 for x in [devir, kasa, odenen, kom]):
+                    kalan = round(devir + kasa - odenen - kom, 2)
+
                 toplamDevir += devir
                 toplamKasa += kasa
                 toplamOdenen += odenen
@@ -8136,13 +8151,25 @@ _sse_clients = set()
 
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "").strip()
 
-def broadcast_dashboard_update(updated_groups: Optional[List[str]] = None, group_changes: Optional[List[dict]] = None):
+def broadcast_dashboard_update(updated_groups: Optional[List[str]] = None, 
+                               group_changes: Optional[List[dict]] = None,
+                               veriler: Optional[List[List[str]]] = None,
+                               finans: Optional[Dict[str, Any]] = None,
+                               sheet_title: Optional[str] = None):
     """Google Sheets veya Telegram Bot değişikliğinde önbelleği yenileyip tüm canlı web istemcilerine SSE duyurusu yapar."""
     try:
-        sh = get_spreadsheet()
-        sayfa = get_active_daily_sheet(sh)
-        veriler = get_sheet_values_fast(sayfa)
-        finans = tablodan_finans_ozeti_hesapla(veriler)
+        if finans is None or sheet_title is None:
+            sh = get_spreadsheet()
+            sayfa = get_active_daily_sheet(sh)
+            sheet_title = getattr(sayfa, "title", str(sayfa))
+            if veriler is not None:
+                set_sheet_cache_matrix(sheet_title, veriler)
+            else:
+                # Dış tetikleme veya webhook çağrılarında RAM önbelleğini baypas ederek en güncel veriyi zorunlu çek
+                veriler = get_sheet_values_fast(sayfa, force_refresh=True)
+            finans = tablodan_finans_ozeti_hesapla(veriler)
+        elif veriler is not None:
+            set_sheet_cache_matrix(sheet_title, veriler)
         
         groups_list = []
         if updated_groups:
@@ -8151,7 +8178,7 @@ def broadcast_dashboard_update(updated_groups: Optional[List[str]] = None, group
                     groups_list.append(g.strip().upper())
         
         payload = {
-            "tarih": sayfa.title,
+            "tarih": sheet_title,
             "devir": finans["devir"],
             "kasa": finans["kasa"],
             "odenen": finans["odenen"],
@@ -8693,7 +8720,7 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                 # İlk açılışta anlık veriyi gönder
                 sh = get_spreadsheet()
                 sayfa = get_active_daily_sheet(sh)
-                veriler = get_sheet_values_fast(sayfa)
+                veriler = get_sheet_values_fast(sayfa, max_age_seconds=2.0)
                 finans = tablodan_finans_ozeti_hesapla(veriler)
                 initial_data = {
                     "tarih": sayfa.title,
@@ -8741,7 +8768,7 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
             try:
                 sh = get_spreadsheet()
                 sayfa = get_active_daily_sheet(sh)
-                veriler = get_sheet_values_fast(sayfa)
+                veriler = get_sheet_values_fast(sayfa, max_age_seconds=2.0)
                 finans = tablodan_finans_ozeti_hesapla(veriler)
                 data = {
                     "tarih": sayfa.title,
@@ -8841,6 +8868,9 @@ def run_sheets_autosync_loop():
             sayfa = get_active_daily_sheet(sh, force_refresh=True)
             veriler = sayfa.get_all_values()
             
+            # RAM önbelleğini her zaman en son Google Sheets tablosuyla senkronize et
+            set_sheet_cache_matrix(sayfa.title, veriler)
+            
             data_str = json.dumps(veriler, ensure_ascii=False)
             current_fp = hashlib.md5(data_str.encode('utf-8')).hexdigest()
 
@@ -8916,8 +8946,8 @@ def run_sheets_autosync_loop():
                 _prev_group_snapshot = new_snapshot
                 _prev_masraf_snapshot = new_masraf_snapshot
 
-                # Fingerprint değiştiyse istisnasız HER ZAMAN canlı web paneline bildirim ve veri gönder
-                broadcast_dashboard_update(updated_groups, group_changes)
+                # Fingerprint değiştiyse istisnasız HER ZAMAN canlı web paneline bildirim ve taze veri gönder
+                broadcast_dashboard_update(updated_groups, group_changes, veriler=veriler, finans=finans, sheet_title=sayfa.title)
                 print(f"[AutoSync] Canlı değişiklik yayınlandı. Gruplar: {updated_groups}, Masraf Değişimi: {new_masraf_snapshot != _prev_masraf_snapshot}")
             else:
                 finans = tablodan_finans_ozeti_hesapla(veriler)
@@ -8937,9 +8967,9 @@ def run_sheets_autosync_loop():
                 }
 
             _last_sheet_fingerprint = current_fp
-        except Exception:
-            pass
-        time.sleep(10)
+        except Exception as err:
+            print(f"[AutoSync Hatası]: {err}")
+        time.sleep(3)
 
 # --- MAIN LOOP (LONG POLLING WITH THREAD POOL) ---
 if __name__ == "__main__":
