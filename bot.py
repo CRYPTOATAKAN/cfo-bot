@@ -8316,8 +8316,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="CFO Bot">
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='25' fill='%231e293b'/%3E%3Ctext y='.9em' font-size='70' x='15'%3E💼%3C/text%3E%3C/svg%3E">
-    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='25' fill='%231e293b'/%3E%3Ctext y='.9em' font-size='70' x='15'%3E💼%3C/text%3E%3C/svg%3E">
+    <link rel="icon" type="image/jpeg" href="/cfo_emblem.jpg">
+    <link rel="apple-touch-icon" href="/cfo_emblem.jpg">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family:'Plus Jakarta Sans', sans-serif; }
@@ -8388,7 +8388,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         /* HEADER & KONTROLLER */
         .header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:24px; padding-bottom:18px; border-bottom:1px solid rgba(255, 255, 255, 0.08); }
         .logo-area { display:flex; align-items:center; gap:14px; }
-        .logo-icon { width:50px; height:50px; border-radius:15px; background:linear-gradient(135deg, #3b82f6, #8b5cf6); display:flex; align-items:center; justify-content:center; font-size:26px; box-shadow: 0 6px 20px rgba(59,130,246,0.35); flex-shrink:0; }
+        .logo-icon { width:52px; height:52px; border-radius:15px; background:radial-gradient(circle at center, #111d2e 0%, #060b13 100%); display:flex; align-items:center; justify-content:center; box-shadow: 0 0 20px rgba(16, 185, 129, 0.35), 0 0 40px rgba(59, 130, 246, 0.2); border: 1px solid rgba(52, 211, 153, 0.4); flex-shrink:0; overflow:hidden; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .logo-icon:hover { transform: scale(1.06) rotate(1deg); box-shadow: 0 0 25px rgba(16, 185, 129, 0.6), 0 0 50px rgba(59, 130, 246, 0.35); border-color: rgba(52, 211, 153, 0.8); }
+        .logo-icon img { width:100%; height:100%; object-fit:cover; display:block; border-radius:14px; }
         .title h1 { font-size:22px; font-weight:800; background:linear-gradient(to right, #60a5fa, #c084fc, #f472b6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:-0.4px; }
         .title p { font-size:12px; color:#94a3b8; font-weight:500; margin-top:2px; }
         
@@ -9003,7 +9005,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <!-- HEADER -->
         <div class="header">
             <div class="logo-area">
-                <div class="logo-icon">💼</div>
+                <div class="logo-icon" title="CFO Sovereign Shield - Finansal Güvenlik & Kasa Hakimiyeti">
+                    <img src="/cfo_emblem.jpg" alt="CFO" onerror="this.onerror=null; this.parentElement.innerHTML='<svg viewBox=\'0 0 100 100\' width=\'38\' height=\'38\' fill=\'none\'><polygon points=\'50,5 90,26 90,74 50,95 10,74 10,26\' fill=\'%230e1a2b\' stroke=\'%2310b981\' stroke-width=\'4\'/><polygon points=\'50,22 75,36 75,64 50,78 25,64 25,36\' fill=\'none\' stroke=\'%23fbbf24\' stroke-width=\'3\'/><path d=\'M30 62 L45 47 L56 56 L72 38 M72 38 H60 M72 38 V50\' stroke=\'%2334d399\' stroke-width=\'4.5\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/></svg>';">
+                </div>
                 <div class="title">
                     <h1>CFO CANLI FİNANS PANELİ</h1>
                     <p id="time-text">Yükleniyor...</p>
@@ -9015,14 +9019,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 <select id="date-select" class="header-select" onchange="onDateChanged(this.value)" title="Geçmiş Tarih Seçimi">
                     <option value="">📅 Güncel Canlı Bilanço</option>
                 </select>
-
-                <!-- 3. ÇOKLU PARA BİRİMİ: USDT / TRY ÇEVİRİCİ -->
-                <div style="display:inline-flex; align-items:center; gap:6px;">
-                    <button id="currency-toggle-btn" class="control-btn" onclick="toggleCurrency()" title="Para Birimi Değiştir">
-                        <span id="currency-flag">💵</span> <span id="currency-label">TRY (₺)</span>
-                    </button>
-                    <span id="exchange-rate-tag" class="rate-badge" onclick="switchTab('rates')" style="cursor:pointer;" title="Canlı piyasa ve borsa kurlarını görüntüle">💱 1 USDT = <span id="header-usdt-rate">{{USDT_RATE}}</span> ₺</span>
-                </div>
 
                 <!-- 1. RAPOR DIŞA AKTARMA (CSV & PRINT PDF) -->
                 <div class="export-dropdown">
@@ -9065,8 +9061,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <button id="tab-btn-finance" class="nav-tab-btn active" onclick="switchTab('finance')">
                 <span>📊</span> Kasa & Finans Paneli
             </button>
-            <button id="tab-btn-rates" class="nav-tab-btn" onclick="switchTab('rates')">
-                <span>💱</span> Canlı Piyasa & Kurlar <span class="rate-badge" style="margin-left:4px; font-size:10px; padding:2px 6px; background:rgba(16,185,129,0.2); border-color:#10b981; color:#34d399;">CANLI</span>
+            <button id="tab-btn-trends" class="nav-tab-btn" onclick="switchTab('trends')">
+                <span>📈</span> Gün İçi Nakit Akışı & İşlem Hacmi
             </button>
         </div>
 
@@ -9124,20 +9120,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 </div>
             </div>
 
-            <!-- 6. GÜN İÇİ NAKİT AKIŞ VE CARİ HACİM GRAFİĞİ -->
-            <div class="trend-chart-box" id="trend-chart-box">
-                <div class="trend-header">
-                    <div class="trend-title">📈 GÜN İÇİ CARİ NAKİT AKIŞI VE İŞLEM HACMİ</div>
-                    <div class="chart-legend">
-                        <div class="leg-item"><div class="leg-dot" style="background:#3b82f6;"></div> Kasa Girişi</div>
-                        <div class="leg-item"><div class="leg-dot" style="background:#f59e0b;"></div> Yapılan Ödeme</div>
-                    </div>
-                </div>
-                <div class="chart-canvas-wrapper" id="trend-chart-container">
-                    <p style="color:#94a3b8; font-size:12px; text-align:center; padding:15px 0;">Grafik verisi yükleniyor...</p>
-                </div>
-            </div>
-
             <!-- 1. ARAMA VE AKILLI FİLTRELEME ARAÇ ÇUBUĞU -->
             <div class="toolbar">
                 <div class="search-area">
@@ -9177,147 +9159,22 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         </div>
         <!-- /TAB 1: KASA & FİNANS PANELİ -->
 
-        <!-- TAB 2: CANLI PİYASA & BORSA KURLARI -->
-        <div id="tab-rates" class="tab-content">
-            <!-- PİYASA BAŞLIK VE YENİLEME ÇUBUĞU -->
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px; padding:16px 20px; background:rgba(15,23,42,0.7); border:1px solid rgba(255,255,255,0.08); border-radius:16px; backdrop-filter:blur(12px);">
-                <div>
-                    <h2 style="font-size:18px; font-weight:800; color:#ffffff; display:flex; align-items:center; gap:8px;">
-                        <span>💱</span> CANLI PİYASA VE DÖVİZ KURLARI
-                    </h2>
-                    <p style="font-size:12px; color:#94a3b8; margin-top:2px;">
-                        Kapalıçarşı Harem Serbest Piyasa Doları, Altın, Binance ve Kripto Borsaları Anlık Fiyat Tahtası
-                    </p>
-                </div>
-                <div style="display:flex; align-items:center; gap:12px;">
-                    <span id="rates-time-text" style="font-size:12px; color:#94a3b8; font-weight:600;">Son Güncelleme: --:--:--</span>
-                    <button class="control-btn refresh-btn" onclick="fetchMarketRates(true)" style="padding:8px 16px;">🔄 Kurları Yenile</button>
-                </div>
-            </div>
-
-            <!-- SPOTLIGHT KUR KARTLARI -->
-            <div class="market-cards-grid">
-                <!-- 1. BİNANCE USDT/TRY -->
-                <div class="market-card" style="border-color:rgba(234,179,8,0.3);">
-                    <div class="market-card-header">
-                        <div class="market-card-title"><span>🟡</span> BİNANCE USDT/TRY</div>
-                        <span id="rate-binance-change" class="market-change-badge change-neutral">%0.00</span>
-                    </div>
-                    <div class="market-price-big"><span id="rate-binance-last">0,00</span> <span style="font-size:16px; font-weight:600; opacity:0.85;">₺</span></div>
-                    <div class="market-sub-grid">
-                        <div class="market-sub-item">
-                            <div class="label">🔺 24s En Yüksek</div>
-                            <div class="val" id="rate-binance-high">0,00 ₺</div>
-                        </div>
-                        <div class="market-sub-item">
-                            <div class="label">🔻 24s En Düşük</div>
-                            <div class="val" id="rate-binance-low">0,00 ₺</div>
-                        </div>
+        <!-- TAB 2: GÜN İÇİ CARİ NAKİT AKIŞI VE İŞLEM HACMİ -->
+        <div id="tab-trends" class="tab-content">
+            <div class="trend-chart-box" id="trend-chart-box" style="margin-bottom:0;">
+                <div class="trend-header">
+                    <div class="trend-title" style="font-size:15px;">📈 GÜN İÇİ CARİ NAKİT AKIŞI VE İŞLEM HACMİ</div>
+                    <div class="chart-legend">
+                        <div class="leg-item"><div class="leg-dot" style="background:#3b82f6;"></div> Kasa Girişi</div>
+                        <div class="leg-item"><div class="leg-dot" style="background:#f59e0b;"></div> Yapılan Ödeme</div>
                     </div>
                 </div>
-
-                <!-- 2. HAREM KAPALIÇARŞI DOLARI -->
-                <div class="market-card" style="border-color:rgba(59,130,246,0.3);">
-                    <div class="market-card-header">
-                        <div class="market-card-title"><span>🏛️</span> HAREM (Kapalıçarşı Doları)</div>
-                        <span class="market-change-badge change-neutral" style="font-size:11px;">USD / TRY</span>
-                    </div>
-                    <div class="market-price-big"><span id="rate-harem-usd-satis">0,00</span> <span style="font-size:16px; font-weight:600; opacity:0.85;">₺</span></div>
-                    <div class="market-sub-grid">
-                        <div class="market-sub-item">
-                            <div class="label">💵 Alış Fiyatı</div>
-                            <div class="val" id="rate-harem-usd-alis">0,00 ₺</div>
-                        </div>
-                        <div class="market-sub-item">
-                            <div class="label">↔️ Alış-Satış Makası</div>
-                            <div class="val" id="rate-harem-usd-makas" style="color:#60a5fa;">0,00 ₺</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 3. HAREM KAPALIÇARŞI EUROSU -->
-                <div class="market-card" style="border-color:rgba(139,92,246,0.3);">
-                    <div class="market-card-header">
-                        <div class="market-card-title"><span>💶</span> HAREM (Kapalıçarşı Eurosu)</div>
-                        <span class="market-change-badge change-neutral" style="font-size:11px;">EUR / TRY</span>
-                    </div>
-                    <div class="market-price-big"><span id="rate-harem-eur-satis">0,00</span> <span style="font-size:16px; font-weight:600; opacity:0.85;">₺</span></div>
-                    <div class="market-sub-grid">
-                        <div class="market-sub-item">
-                            <div class="label">💶 Alış Fiyatı</div>
-                            <div class="val" id="rate-harem-eur-alis">0,00 ₺</div>
-                        </div>
-                        <div class="market-sub-item">
-                            <div class="label">↔️ Alış-Satış Makası</div>
-                            <div class="val" id="rate-harem-eur-makas" style="color:#c084fc;">0,00 ₺</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 4. KAPALIÇARŞI ALTIN & EMTİA -->
-                <div class="market-card" style="border-color:rgba(245,158,11,0.3);">
-                    <div class="market-card-header">
-                        <div class="market-card-title"><span>🥇</span> KAPALIÇARŞI ALTIN & EMTİA</div>
-                        <span class="market-change-badge change-neutral" style="font-size:11px;">Harem Altın</span>
-                    </div>
-                    <div class="market-price-big"><span id="rate-gold-gram">0</span> <span style="font-size:16px; font-weight:600; opacity:0.85;">₺ (Gram)</span></div>
-                    <div class="market-sub-grid">
-                        <div class="market-sub-item">
-                            <div class="label">👑 Ons Altın</div>
-                            <div class="val" id="rate-gold-ons">$0</div>
-                        </div>
-                        <div class="market-sub-item">
-                            <div class="label">🥈 Gümüş (Gram)</div>
-                            <div class="val" id="rate-silver">0,00 ₺</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ARBİTRAJ VE BORSA KARŞILAŞTIRMA TABLOSU -->
-            <div class="rates-table-wrapper">
-                <div style="font-size:15px; font-weight:700; color:#f8fafc; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
-                    <div style="display:flex; align-items:center; gap:8px;">
-                        <span>🏦</span> KRİPTO BORSALARI USDT/TRY FİYAT VE ARBİTRAJ TAHTASI
-                    </div>
-                    <div style="font-size:11.5px; color:#94a3b8; font-weight:500;">
-                        Binance, Paribu, BtcTurk, OKX ve WhiteBit Canlı Fiyat Akışı
-                    </div>
-                </div>
-                <table class="rates-table">
-                    <thead>
-                        <tr>
-                            <th>Borsa</th>
-                            <th>Anlık USDT Kuru</th>
-                            <th>24s En Yüksek</th>
-                            <th>24s En Düşük</th>
-                            <th>Binance Farkı (Arbitraj)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="rates-table-body">
-                        <tr><td colspan="5" style="text-align:center; color:#94a3b8; padding:20px;">Borsa verileri yükleniyor...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- SERBEST PİYASA TCMB / DÖVİZ KURLARI -->
-            <div class="section-title">🌍 Serbest Piyasa & Merkez Bankası Kurları</div>
-            <div class="market-cards-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
-                <div class="market-card">
-                    <div class="market-card-title"><span>🇺🇸</span> SERBEST PİYASA USD</div>
-                    <div class="market-price-big" id="rate-fiat-usd" style="font-size:22px; margin-top:8px;">0,00 ₺</div>
-                </div>
-                <div class="market-card">
-                    <div class="market-card-title"><span>🇪🇺</span> SERBEST PİYASA EUR</div>
-                    <div class="market-price-big" id="rate-fiat-eur" style="font-size:22px; margin-top:8px;">0,00 ₺</div>
-                </div>
-                <div class="market-card">
-                    <div class="market-card-title"><span>🇬🇧</span> SERBEST PİYASA GBP (Sterlin)</div>
-                    <div class="market-price-big" id="rate-fiat-gbp" style="font-size:22px; margin-top:8px;">0,00 ₺</div>
+                <div class="chart-canvas-wrapper" id="trend-chart-container">
+                    <p style="color:#94a3b8; font-size:12px; text-align:center; padding:25px 0;">Grafik verisi yükleniyor...</p>
                 </div>
             </div>
         </div>
-        <!-- /TAB 2: CANLI PİYASA & BORSA KURLARI -->
+        <!-- /TAB 2: GÜN İÇİ CARİ NAKİT AKIŞI VE İŞLEM HACMİ -->
 
         <div class="footer">
             <p>CFO Finans Yönetim Sistemi © 2026 | Yazılım: @CRYPTOATAKAN</p>
@@ -9383,8 +9240,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         let activeFilter = 'all';
         let selectedDate = '';
         
-        // 3. Çoklu Para Birimi State & Canlı Kur (USDT / TRY)
-        let activeCurrency = localStorage.getItem('cfo_currency') || 'TRY'; // 'TRY' | 'USDT'
+        // Para Birimi State (Varsayılan TRY)
+        let activeCurrency = 'TRY';
         let usdtRate = 0;
         let activeTab = 'finance';
 
@@ -9398,189 +9255,30 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         function switchTab(tabName) {
             activeTab = tabName;
             const btnFinance = document.getElementById('tab-btn-finance');
-            const btnRates = document.getElementById('tab-btn-rates');
+            const btnTrends = document.getElementById('tab-btn-trends');
             const tabFinance = document.getElementById('tab-finance');
-            const tabRates = document.getElementById('tab-rates');
+            const tabTrends = document.getElementById('tab-trends');
             
-            if (tabName === 'rates') {
+            if (tabName === 'trends') {
                 if (btnFinance) btnFinance.classList.remove('active');
-                if (btnRates) btnRates.classList.add('active');
+                if (btnTrends) btnTrends.classList.add('active');
                 if (tabFinance) tabFinance.classList.remove('active');
-                if (tabRates) tabRates.classList.add('active');
-                fetchMarketRates(false);
+                if (tabTrends) tabTrends.classList.add('active');
+                if (currentDashboardData && currentDashboardData.gruplar) {
+                    renderTrendChart(currentDashboardData.gruplar);
+                }
             } else {
-                if (btnRates) btnRates.classList.remove('active');
+                if (btnTrends) btnTrends.classList.remove('active');
                 if (btnFinance) btnFinance.classList.add('active');
-                if (tabRates) tabRates.classList.remove('active');
+                if (tabTrends) tabTrends.classList.remove('active');
                 if (tabFinance) tabFinance.classList.add('active');
             }
         }
 
-        async function fetchMarketRates(isManual = false) {
-            try {
-                const url = '/api/rates?' + (token ? 'token=' + encodeURIComponent(token) + '&' : '') + '_t=' + Date.now();
-                const res = await fetch(url);
-                const data = await res.json();
-                if (data && !data.error) {
-                    renderMarketRates(data);
-                    if (isManual) showToast("Piyasa Kurları", "Borsa ve Kapalıçarşı kurları güncellendi.", false);
-                }
-            } catch(e) {
-                console.warn('Canlı kurlar çekilemedi:', e);
-            }
-        }
-
-        function renderMarketRates(data) {
-            if (!data) return;
-            
-            // Binance
-            const b = data.binance || {};
-            if (b && b.last) {
-                const bLast = Number(b.last) || 0;
-                const elLast = document.getElementById('rate-binance-last');
-                if (elLast) elLast.innerText = bLast.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                const elHigh = document.getElementById('rate-binance-high');
-                if (elHigh) elHigh.innerText = Number(b.high || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
-                const elLow = document.getElementById('rate-binance-low');
-                if (elLow) elLow.innerText = Number(b.low || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
-                
-                const ch = Number(b.change || 0);
-                const chBadge = document.getElementById('rate-binance-change');
-                if (chBadge) {
-                    chBadge.innerText = (ch >= 0 ? '+' : '') + ch.toFixed(2) + '%';
-                    chBadge.className = 'market-change-badge ' + (ch > 0 ? 'change-up' : (ch < 0 ? 'change-down' : 'change-neutral'));
-                }
-                
-                if (bLast > 0) {
-                    usdtRate = bLast;
-                    const tag = document.getElementById('header-usdt-rate');
-                    if (tag) tag.innerText = usdtRate.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                }
-            }
-
-            // Harem Dolar
-            const h = data.harem || {};
-            const usd = h.usd || [0, 0];
-            const uAlis = Number(usd[0]) || 0;
-            const uSatis = Number(usd[1]) || 0;
-            const uMakas = Math.abs(uSatis - uAlis);
-            const elUsdSatis = document.getElementById('rate-harem-usd-satis');
-            if (elUsdSatis) elUsdSatis.innerText = uSatis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const elUsdAlis = document.getElementById('rate-harem-usd-alis');
-            if (elUsdAlis) elUsdAlis.innerText = uAlis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
-            const elUsdMakas = document.getElementById('rate-harem-usd-makas');
-            if (elUsdMakas) elUsdMakas.innerText = uMakas.toFixed(2).replace('.', ',') + ' ₺';
-
-            // Harem Euro
-            const eur = h.eur || [0, 0];
-            const eAlis = Number(eur[0]) || 0;
-            const eSatis = Number(eur[1]) || 0;
-            const eMakas = Math.abs(eSatis - eAlis);
-            const elEurSatis = document.getElementById('rate-harem-eur-satis');
-            if (elEurSatis) elEurSatis.innerText = eSatis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const elEurAlis = document.getElementById('rate-harem-eur-alis');
-            if (elEurAlis) elEurAlis.innerText = eAlis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
-            const elEurMakas = document.getElementById('rate-harem-eur-makas');
-            if (elEurMakas) elEurMakas.innerText = eMakas.toFixed(2).replace('.', ',') + ' ₺';
-
-            // Altın & Emtia
-            const gold = h.gold || {};
-            const elGoldGram = document.getElementById('rate-gold-gram');
-            if (elGoldGram) elGoldGram.innerText = Number(gold.gram || 0).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
-            const elGoldOns = document.getElementById('rate-gold-ons');
-            if (elGoldOns) elGoldOns.innerText = '$' + Number(gold.ons || 0).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
-            const elSilver = document.getElementById('rate-silver');
-            if (elSilver) elSilver.innerText = Number(gold.gumus || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
-
-            // Arbitraj Tablosu
-            const exchanges = [
-                { name: 'Binance', icon: '🟡', data: data.binance },
-                { name: 'Paribu', icon: '🔵', data: data.paribu },
-                { name: 'BtcTurk', icon: '🟢', data: data.btcturk },
-                { name: 'OKX', icon: '⚫', data: data.okx },
-                { name: 'WhiteBit', icon: '⚪', data: data.whitebit }
-            ];
-
-            const tbody = document.getElementById('rates-table-body');
-            if (tbody) {
-                const baseBinance = Number((data.binance && data.binance.last) || 0);
-                tbody.innerHTML = exchanges.map(ex => {
-                    const d = ex.data || {};
-                    const last = Number(d.last || 0);
-                    const high = Number(d.high || 0);
-                    const low = Number(d.low || 0);
-                    
-                    let diffBadge = '<span style="color:#94a3b8;">-</span>';
-                    if (last > 0 && baseBinance > 0) {
-                        const diff = last - baseBinance;
-                        if (Math.abs(diff) < 0.005) {
-                            diffBadge = '<span class="market-change-badge change-neutral">Referans</span>';
-                        } else if (diff > 0) {
-                            diffBadge = `<span class="market-change-badge change-up">+${diff.toFixed(2)} ₺</span>`;
-                        } else {
-                            diffBadge = `<span class="market-change-badge change-down">${diff.toFixed(2)} ₺</span>`;
-                        }
-                    }
-
-                    return `
-                        <tr>
-                            <td class="exchange-name-cell"><span>${ex.icon}</span> <b>${ex.name}</b></td>
-                            <td style="font-weight:800; color:#ffffff; font-size:14px;">${last > 0 ? last.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺' : '<span style="color:#64748b;">Veri bekleniyor</span>'}</td>
-                            <td style="color:#cbd5e1;">${high > 0 ? high.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺' : '-'}</td>
-                            <td style="color:#cbd5e1;">${low > 0 ? low.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺' : '-'}</td>
-                            <td>${diffBadge}</td>
-                        </tr>
-                    `;
-                }).join('');
-            }
-
-            // Serbest Piyasa TCMB / Fiat
-            const fiat = data.fiat || {};
-            const elFiatUsd = document.getElementById('rate-fiat-usd');
-            if (elFiatUsd) {
-                elFiatUsd.innerText = (Number(fiat.TRY) || uSatis || 0).toFixed(2).replace('.', ',') + ' ₺';
-            }
-            const elFiatEur = document.getElementById('rate-fiat-eur');
-            if (elFiatEur) {
-                const eurTry = (fiat.TRY && fiat.EUR) ? (Number(fiat.TRY) / Number(fiat.EUR)) : eSatis;
-                elFiatEur.innerText = (eurTry || 0).toFixed(2).replace('.', ',') + ' ₺';
-            }
-            const elFiatGbp = document.getElementById('rate-fiat-gbp');
-            if (elFiatGbp) {
-                const gbpTry = (fiat.TRY && fiat.GBP) ? (Number(fiat.TRY) / Number(fiat.GBP)) : ((uSatis || 0) * 1.28);
-                elFiatGbp.innerText = (gbpTry || 0).toFixed(2).replace('.', ',') + ' ₺';
-            }
-
-            if (data.time_str && document.getElementById('rates-time-text')) {
-                document.getElementById('rates-time-text').innerText = 'Son Güncelleme: ' + data.time_str;
-            }
-        }
-
-        async function fetchExchangeRate() {
-            try {
-                const url = '/api/exchange_rate?' + (token ? 'token=' + encodeURIComponent(token) + '&' : '') + '_t=' + Date.now();
-                const res = await fetch(url);
-                const data = await res.json();
-                if (data && data.rate && Number(data.rate) > 0) {
-                    usdtRate = Number(data.rate);
-                    const tag = document.getElementById('header-usdt-rate');
-                    if (tag) {
-                        tag.innerText = usdtRate.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                    }
-                }
-            } catch(e) {
-                console.warn('Kur sorgulama hatası:', e);
-            }
-        }
-
-        function toggleCurrency() {
-            activeCurrency = (activeCurrency === 'TRY') ? 'USDT' : 'TRY';
-            localStorage.setItem('cfo_currency', activeCurrency);
-            updateControlButtonsUI();
-            if (currentDashboardData) {
-                renderDashboard(currentDashboardData, false, []);
-            }
-        }
+        function toggleCurrency() {}
+        function fetchMarketRates() {}
+        function renderMarketRates() {}
+        function fetchExchangeRate() {}
 
         // UI Başlangıç Durumlarını Güncelle
         function updateControlButtonsUI() {
@@ -9608,21 +9306,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 sBtn.classList.remove('active');
                 sIcon.innerText = '🔕';
                 sText.innerText = 'Sessiz';
-            }
-
-            const cBtn = document.getElementById('currency-toggle-btn');
-            const cFlag = document.getElementById('currency-flag');
-            const cLabel = document.getElementById('currency-label');
-            if (cBtn && cFlag && cLabel) {
-                if (activeCurrency === 'USDT') {
-                    cBtn.classList.add('active');
-                    cFlag.innerText = '💲';
-                    cLabel.innerText = 'USDT ($)';
-                } else {
-                    cBtn.classList.remove('active');
-                    cFlag.innerText = '💵';
-                    cLabel.innerText = 'TRY (₺)';
-                }
             }
         }
 
@@ -10379,28 +10062,14 @@ CFO Canlı Finans Sistemi`;
                 console.warn("Sunucu ilk veri render uyarısı:", e);
             }
         }
-        if (serverInitialRates) {
-            try {
-                renderMarketRates(serverInitialRates);
-            } catch(e) {
-                console.warn("Sunucu ilk kurlar render uyarısı:", e);
-            }
-        }
-
-        fetchExchangeRate();
         fetchSheetsList();
         fetchData(false);
         initSSE();
-        fetchMarketRates(false);
 
-        // Kurları arka planda 15 saniyede bir güncelle
+        // 30 saniyede bir veri kontrolü
         setInterval(() => {
-            if (activeTab === 'rates') {
-                fetchMarketRates(false);
-            } else {
-                fetchExchangeRate();
-            }
-        }, 15000);
+            fetchData(false);
+        }, 30000);
     </script>
 </body>
 </html>
@@ -10539,6 +10208,22 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         
+        if parsed.path in ("/cfo_emblem.jpg", "/logo.png", "/cfo_emblem.png", "/favicon.ico"):
+            img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cfo_emblem.jpg")
+            if not os.path.exists(img_path):
+                img_path = "cfo_emblem.jpg"
+            if os.path.exists(img_path):
+                try:
+                    with open(img_path, "rb") as f:
+                        img_bytes = f.read()
+                    self._send_response_data(200, "image/jpeg", img_bytes, extra_headers={
+                        "Cache-Control": "public, max-age=86400",
+                        "Access-Control-Allow-Origin": "*"
+                    })
+                    return
+                except Exception as e:
+                    print(f"Emblem serve hatası: {e}")
+        
         if parsed.path == "/manifest.json":
             manifest_data = {
                 "name": "CFO Canlı Finans Paneli",
@@ -10549,9 +10234,9 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                 "theme_color": "#070a14",
                 "icons": [
                     {
-                        "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='25' fill='%231e293b'/%3E%3Ctext y='.9em' font-size='70' x='15'%3E💼%3C/text%3E%3C/svg%3E",
+                        "src": "/cfo_emblem.jpg",
                         "sizes": "192x192 512x512",
-                        "type": "image/svg+xml",
+                        "type": "image/jpeg",
                         "purpose": "any maskable"
                     }
                 ]
