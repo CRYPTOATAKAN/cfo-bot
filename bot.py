@@ -77,6 +77,18 @@ app_state = {
     "START_TIME": time.time()
 }
 
+DASHBOARD_AUTH_TOKEN = os.environ.get("DASHBOARD_AUTH_TOKEN", "").strip()
+if not DASHBOARD_AUTH_TOKEN:
+    import hashlib
+    DASHBOARD_AUTH_TOKEN = hashlib.sha256(f"cfo_dashboard_{TELEGRAM_TOKEN}".encode()).hexdigest()[:24]
+
+def panel_linki_uret() -> str:
+    base_url = app_state.get("WEB_APP_URL", WEB_APP_URL).strip().rstrip("/")
+    if DASHBOARD_AUTH_TOKEN:
+        sep = "&" if "?" in base_url else "?"
+        return f"{base_url}{sep}token={DASHBOARD_AUTH_TOKEN}"
+    return base_url
+
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
@@ -4406,6 +4418,39 @@ def sync_iban_update(hesap_kodu: str, cari_adi: str = ""):
     except Exception as e:
         print(f"Günlük sayfa IBAN güncelleme uyarısı: {e}")
 
+def _iban_token_match(letters: str, num: str, h_ad: str) -> bool:
+    """
+    İBAN hesap adı ile aranan harf ve rakam token'ını eşleştirir.
+    Aşırı gevşek regex hatalarını önler (örn: /t2 yazıldığında 'KUVEYT TURK 2' ile eşleşmesini engeller).
+    """
+    if not letters or not num or not h_ad:
+        return False
+    h_norm = normalize_hesap_kodu(h_ad)
+    if not h_norm:
+        return False
+        
+    # 1. Rakam kontrolü: num ya tam sayının sonunda olmalı ya da bağımsız sayı tokeni olmalı
+    h_digits = re.findall(r'\d+', h_norm)
+    if not h_digits or (h_digits[-1] != num and not (h_norm.endswith(num) or re.search(rf'(?<!\d){num}(?!\d)', h_norm))):
+        return False
+
+    # 2. Harf kontrolü:
+    # Tek harfli aramalar (örn: 'T2', 'K1') asla uzun kelimelerin ('KUVEYTTURK', 'GARANTI') içine sızmamalıdır!
+    h_tokens = [normalize_hesap_kodu(w) for w in h_ad.split() if normalize_hesap_kodu(w)]
+    
+    # Eğer aranan harf tek karakter ise (len == 1):
+    # Sadece hesap adındaki bağımsız bir kelime o harften ibaretse (örn: 'T 2') veya hesap kodu o harf+rakamla başlıyorsa eşleşebilir.
+    if len(letters) == 1:
+        return any(tok == letters for tok in h_tokens) or h_norm.startswith(letters + num)
+        
+    # Çok harfli aramalar (len >= 2):
+    # Hesap adının başında olmalı veya hesaptaki kelimelerden biri bu harflerle başlamalıdır (örn: 'CYL', 'ARS', 'EMLAK')
+    if h_norm.startswith(letters):
+        return True
+    if len(letters) >= 3 and any(tok.startswith(letters) for tok in h_tokens):
+        return True
+    return False
+
 def iban_sablon_bul(veriler=None, aranan_kod: str = ""):
     """
     Aranan IBAN koduna ait şablon verisini 'İBANLAR' sayfasında:
@@ -4487,24 +4532,21 @@ def iban_sablon_bul(veriler=None, aranan_kod: str = ""):
         for idx, row in enumerate(iban_veriler, start=1):
             if len(row) > 0 and row[0].strip() and row[0].strip().upper() != "HESAP KODU":
                 h_ad = row[0].strip()
-                h_norm = normalize_hesap_kodu(h_ad)
-                if letters in h_norm and (h_norm.endswith(num) or re.search(rf'{num}(?!\d)', h_norm)):
+                if _iban_token_match(letters, num, h_ad):
                     sablon = row[1].strip() if len(row) > 1 else ""
                     cari = row[3].strip() if len(row) > 3 else (row[2].strip() if len(row) > 2 else "")
                     return idx, h_ad, sablon, cari
 
             if len(row) > 5 and row[5].strip() and row[5].strip().upper() != "HESAP KODU":
                 h_ad = row[5].strip()
-                h_norm = normalize_hesap_kodu(h_ad)
-                if letters in h_norm and (h_norm.endswith(num) or re.search(rf'{num}(?!\d)', h_norm)):
+                if _iban_token_match(letters, num, h_ad):
                     sablon = row[6].strip() if len(row) > 6 else ""
                     cari = row[7].strip() if len(row) > 7 else ""
                     return idx, h_ad, sablon, cari
 
             if len(row) > 4 and row[4].strip() and row[4].strip().upper() != "HESAP KODU":
                 h_ad = row[4].strip()
-                h_norm = normalize_hesap_kodu(h_ad)
-                if letters in h_norm and (h_norm.endswith(num) or re.search(rf'{num}(?!\d)', h_norm)):
+                if _iban_token_match(letters, num, h_ad):
                     sablon = row[5].strip() if len(row) > 5 else ""
                     cari = row[6].strip() if len(row) > 6 else ""
                     return idx, h_ad, sablon, cari
@@ -4714,22 +4756,19 @@ def iban_hesap_bul(veriler: List[List[str]] = None, aranan_kod: str = ""):
         for idx, row in enumerate(iban_veriler, start=1):
             if len(row) > 0 and row[0].strip() and row[0].strip().upper() != "HESAP KODU":
                 h_ad = row[0].strip()
-                h_norm = normalize_hesap_kodu(h_ad)
-                if letters in h_norm and (h_norm.endswith(num) or re.search(rf'{num}(?!\d)', h_norm)):
+                if _iban_token_match(letters, num, h_ad):
                     mevcut_cari = row[3].strip() if len(row) > 3 else (row[2].strip() if len(row) > 2 else "")
                     return idx, 4, h_ad, mevcut_cari, True
 
             if len(row) > 5 and row[5].strip() and row[5].strip().upper() != "HESAP KODU":
                 h_ad = row[5].strip()
-                h_norm = normalize_hesap_kodu(h_ad)
-                if letters in h_norm and (h_norm.endswith(num) or re.search(rf'{num}(?!\d)', h_norm)):
+                if _iban_token_match(letters, num, h_ad):
                     mevcut_cari = row[7].strip() if len(row) > 7 else ""
                     return idx, 8, h_ad, mevcut_cari, True
 
             if len(row) > 4 and row[4].strip() and row[4].strip().upper() != "HESAP KODU":
                 h_ad = row[4].strip()
-                h_norm = normalize_hesap_kodu(h_ad)
-                if letters in h_norm and (h_norm.endswith(num) or re.search(rf'{num}(?!\d)', h_norm)):
+                if _iban_token_match(letters, num, h_ad):
                     mevcut_cari = row[6].strip() if len(row) > 6 else ""
                     return idx, 7, h_ad, mevcut_cari, True
 
@@ -6459,7 +6498,7 @@ def sistem_durumu_impl() -> str:
         f"🚨 <b>Aktif Bakiye Alarmları:</b> <code>{alarm_sayisi} Adet</code>\n"
         f"↺ <b>Undo (Geri Alma) Hafızası:</b> <code>{gecmis_sayisi} / 10 İşlem</code>\n"
         f"🕒 <b>Otomatik Kapanış Saati:</b> <code>{app_state.get('KAPANIS_SAATI', '23:00')}</code>\n"
-        f"🌐 <b>Canlı Dashboard URL:</b>\n{app_state.get('WEB_APP_URL', WEB_APP_URL)}"
+        f"🌐 <b>Canlı Dashboard URL:</b>\n{panel_linki_uret()}"
     )
 
 def sistem_yeniden_yukle_impl() -> str:
@@ -7776,7 +7815,7 @@ def _process_telegram_update_core(update: dict):
         elif ana_komut in ["/qr", "/tronqr", "/tron", "/cuzdan", "/cüzdan", "/adres"]:
             cuzdanQrUret_impl(chat_id, text)
         elif ana_komut in ["/panel", "/webpanel"]:
-            cur_panel_url = app_state.get("WEB_APP_URL", WEB_APP_URL)
+            cur_panel_url = panel_linki_uret()
             panel_btn = {
                 "inline_keyboard": [
                     [{"text": "🚀 Canlı CFO Panelini Aç", "url": cur_panel_url}],
@@ -7798,7 +7837,7 @@ def _process_telegram_update_core(update: dict):
                 return
             p_args = text.split()[1:]
             if not p_args:
-                cur = app_state.get("WEB_APP_URL", WEB_APP_URL)
+                cur = panel_linki_uret()
                 telegramMesajGonder(
                     chat_id,
                     f"🌐 <b>Mevcut Canlı Panel Linki:</b>\n{cur}\n\n"
@@ -8095,11 +8134,6 @@ def process_telegram_update(update: dict):
 _sse_clients_lock = threading.Lock()
 _sse_clients = set()
 
-DASHBOARD_AUTH_TOKEN = os.environ.get("DASHBOARD_AUTH_TOKEN", "").strip()
-if not DASHBOARD_AUTH_TOKEN:
-    import secrets
-    DASHBOARD_AUTH_TOKEN = secrets.token_urlsafe(24)
-    print(f"[Güvenlik] DASHBOARD_AUTH_TOKEN atanmadı, rastgele güvenli token üretildi.")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "").strip()
 
 def broadcast_dashboard_update(updated_groups: Optional[List[str]] = None, group_changes: Optional[List[dict]] = None):
@@ -8501,9 +8535,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             }
         }
 
+        const serverToken = '{{DASHBOARD_TOKEN}}';
+        const queryToken = new URLSearchParams(window.location.search).get('token') || '';
+        const token = queryToken || serverToken || '';
+
         async function fetchData(isManual = false) {
             try {
-                const token = new URLSearchParams(window.location.search).get('token') || '';
                 const url = '/api/dashboard' + (token ? '?token=' + encodeURIComponent(token) : '');
                 const res = await fetch(url);
                 const d = await res.json();
@@ -8516,7 +8553,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
         function initSSE() {
             if (sseSource) sseSource.close();
-            const token = new URLSearchParams(window.location.search).get('token') || '';
             const streamUrl = '/api/stream' + (token ? '?token=' + encodeURIComponent(token) : '');
             
             sseSource = new EventSource(streamUrl);
@@ -8579,6 +8615,14 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
             auth_h = self.headers.get("Authorization", "")
             if auth_h.startswith("Bearer "):
                 req_token = auth_h[7:].strip()
+        if not req_token and "Cookie" in self.headers:
+            import http.cookies
+            try:
+                cookies = http.cookies.SimpleCookie(self.headers.get("Cookie", ""))
+                if "dashboard_token" in cookies:
+                    req_token = cookies["dashboard_token"].value
+            except Exception:
+                pass
         import hmac
         return hmac.compare_digest(req_token, token_secret) if (req_token and token_secret) else False
 
@@ -8715,9 +8759,42 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                 print(f"API Dashboard sunucu hatası: {e}")
                 self.wfile.write(json.dumps({"error": "Veriler yüklenirken sunucu hatası oluştu."}).encode("utf-8"))
         else:
+            if DASHBOARD_AUTH_TOKEN and not self._check_auth(parsed, DASHBOARD_AUTH_TOKEN):
+                self._send_security_headers(401, "text/html; charset=utf-8")
+                self.end_headers()
+                unauth_html = """<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yetkisiz Erişim | CFO Bot</title>
+    <style>
+        body { background: #0b1329; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .box { background: #111c38; border: 1px solid #ef4444; border-radius: 16px; padding: 32px; max-width: 420px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .icon { font-size: 48px; margin-bottom: 16px; }
+        h2 { margin: 0 0 12px 0; color: #f87171; font-size: 20px; }
+        p { color: #94a3b8; font-size: 14px; line-height: 1.6; margin: 0 0 16px 0; }
+        .hint { background: rgba(239,68,68,0.1); border: 1px dashed rgba(239,68,68,0.3); border-radius: 8px; padding: 12px; font-size: 13px; color: #cbd5e1; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <div class="icon">🔒</div>
+        <h2>Yetkisiz Erişim</h2>
+        <p>Bu finansal yönetim paneli koruma altındadır ve doğrudan erişime kapalıdır.</p>
+        <div class="hint">Lütfen Telegram botu üzerinden <b>/panel</b> komutunu kullanarak yetkili bağlantınızla giriş yapınız.</div>
+    </div>
+</body>
+</html>"""
+                self.wfile.write(unauth_html.encode("utf-8"))
+                return
+
             self._send_security_headers(200, "text/html; charset=utf-8")
+            if DASHBOARD_AUTH_TOKEN:
+                self.send_header("Set-Cookie", f"dashboard_token={DASHBOARD_AUTH_TOKEN}; Path=/; SameSite=Lax; Max-Age=31536000; HttpOnly")
             self.end_headers()
-            self.wfile.write(DASHBOARD_HTML.encode("utf-8"))
+            html_to_send = DASHBOARD_HTML.replace("{{DASHBOARD_TOKEN}}", DASHBOARD_AUTH_TOKEN or "")
+            self.wfile.write(html_to_send.encode("utf-8"))
 
     def log_message(self, format, *args): pass
 
