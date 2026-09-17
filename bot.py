@@ -6490,6 +6490,103 @@ def yedek_olustur_impl(chat_id: int):
     except Exception as e:
         return f"⚠️ <b>Yedekleme Hatası:</b> {e}"
 
+def gun_sonu_excel_yedegi_uret(sayfa_adi: str = None, veriler: list = None) -> bytes:
+    """Aktif günün finansal tablosundan Excel ile doğrudan açılabilen (UTF-8 BOM'lu) CSV verisi üretir."""
+    if veriler is None or sayfa_adi is None:
+        sh = get_spreadsheet()
+        sayfa = get_active_daily_sheet(sh)
+        sayfa_adi = getattr(sayfa, "title", "Bilanço")
+        veriler = get_sheet_values_fast(sayfa)
+    
+    finans = tablodan_finans_ozeti_hesapla(veriler)
+    devir = finans.get("devir", 0.0)
+    kasa = finans.get("kasa", 0.0)
+    odenen = finans.get("odenen", 0.0)
+    komisyon = finans.get("komisyon", 0.0)
+    masraf = finans.get("toplam_masraf", 0.0)
+    kalan = finans.get("kalan", 0.0)
+    net_kar = komisyon - masraf
+    kar_marji = (net_kar / kasa * 100) if kasa > 0 else ((net_kar / komisyon * 100) if komisyon > 0 else 0.0)
+    
+    import io, csv
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=';')
+    
+    simdi_str = suankiZamaniAl().strftime("%d.%m.%Y %H:%M:%S")
+    writer.writerow(["CFO FINANS YONETIM SISTEMI - GUN SONU BILANCOSU VE YEDEGI"])
+    writer.writerow(["Bilanço Tarihi", sayfa_adi, "Oluşturulma Zamanı", simdi_str])
+    writer.writerow([])
+    
+    writer.writerow(["--- GENEL FINANSAL OZET (KPI) ---"])
+    writer.writerow(["Metrik", "Tutar (TL)"])
+    writer.writerow(["Toplam Devir", f"{devir:.2f}".replace('.', ',')])
+    writer.writerow(["Eklenen Kasa", f"{kasa:.2f}".replace('.', ',')])
+    writer.writerow(["Toplam Ödenen", f"{odenen:.2f}".replace('.', ',')])
+    writer.writerow(["Toplam Komisyon", f"{komisyon:.2f}".replace('.', ',')])
+    writer.writerow(["Toplam Masraf / Gider", f"{masraf:.2f}".replace('.', ',')])
+    writer.writerow(["Net Kalan Kasa", f"{kalan:.2f}".replace('.', ',')])
+    writer.writerow(["ŞİRKET NET KÂRI (CFO KPI)", f"{net_kar:.2f}".replace('.', ',')])
+    writer.writerow(["Net Kârlılık Marjı (%)", f"%{kar_marji:.2f}".replace('.', ',')])
+    writer.writerow([])
+    
+    writer.writerow(["--- AKTIF CARI VE GRUP HESAP DOKUMU ---"])
+    writer.writerow(["Sıra", "Grup / Cari Adı", "Devir", "Eklenen Kasa", "Ödenen", "Kesinti / Komisyon", "Kalan Bakiye", "Finansal Durum"])
+    
+    for idx, g in enumerate(finans.get("aktif_gruplar", []), 1):
+        g_ad = g.get("ad", "")
+        g_devir = g.get("devir", 0.0)
+        g_kasa = g.get("kasa", 0.0)
+        g_odenen = g.get("odenen", 0.0)
+        g_kom = g.get("komisyon", 0.0)
+        g_kalan = g.get("kalan", 0.0)
+        durum = "Borçlu" if g_kalan < -0.01 else ("Alacaklı" if g_kalan > 0.01 else "Sıfır / Nötr")
+        writer.writerow([
+            idx,
+            g_ad,
+            f"{g_devir:.2f}".replace('.', ','),
+            f"{g_kasa:.2f}".replace('.', ','),
+            f"{g_odenen:.2f}".replace('.', ','),
+            f"{g_kom:.2f}".replace('.', ','),
+            f"{g_kalan:.2f}".replace('.', ','),
+            durum
+        ])
+    writer.writerow([])
+    
+    writer.writerow(["--- GUNLUK MASRAF VE GIDER DETAYLARI ---"])
+    writer.writerow(["Sıra", "Masraf Açıklaması", "Tutar (TL)"])
+    masraflar = finans.get("masraflar", [])
+    if masraflar:
+        for idx, m in enumerate(masraflar, 1):
+            m_ad = m.get("ad", "")
+            m_fiyat = m.get("fiyat", 0.0)
+            writer.writerow([idx, m_ad, f"{m_fiyat:.2f}".replace('.', ',')])
+    else:
+        writer.writerow(["-", "Masraf kaydı bulunmuyor", "0,00"])
+    writer.writerow([])
+    writer.writerow(["CFO Finans Sistemi Otomatik Yedekleme Servisi"])
+    
+    csv_text = output.getvalue()
+    return b'\xef\xbb\xbf' + csv_text.encode('utf-8')
+
+def yedek_excel_gonder_impl(chat_id: int):
+    """Aktif bilanço tablosunun Excel CSV yedeğini üretip Telegram sohbetine gönderir."""
+    try:
+        sh = get_spreadsheet()
+        sayfa = get_active_daily_sheet(sh)
+        csv_bytes = gun_sonu_excel_yedegi_uret(sayfa.title, get_sheet_values_fast(sayfa))
+        dosya_adi = f"CFO_GunSonu_Bilanço_{sayfa.title.replace('.', '_')}.csv"
+        caption = (
+            f"🛡️ <b>CFO Excel Bilanço Yedeği</b>\n"
+            f"📅 Bilanço: <b>{sayfa.title}</b>\n"
+            f"🕒 Zaman: <i>{suankiZamaniAl().strftime('%H:%M:%S')}</i>\n"
+            f"📊 <i>Excel ile doğrudan açılabilir rapor tablosu.</i>"
+        )
+        telegram_dosya_gonder(chat_id, dosya_adi, csv_bytes, caption)
+        sistemeLogYaz("Excel Yedek Alındı", f"Bilanço Excel yedeği gönderildi: {dosya_adi}")
+        return "✅ <b>Güncel bilanço Excel (CSV) yedeği başarıyla oluşturuldu ve sohbete gönderildi!</b>"
+    except Exception as e:
+        return f"⚠️ <b>Excel Yedekleme Hatası:</b> {e}"
+
 def sistem_durumu_impl() -> str:
     """Uptime, thread pool ve sistem metriklerini verir."""
     start_t = app_state.get("START_TIME", time.time())
@@ -7980,6 +8077,8 @@ def _process_telegram_update_core(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, son_loglari_getir_impl, n_val, goster_bildirim=True)
         elif ana_komut in ["/backup", "/yedek"]:
             islemi_analiz_bildirimiyle_yap(chat_id, yedek_olustur_impl, chat_id, goster_bildirim=True)
+        elif ana_komut in ["/yedek_excel", "/exceleyedek", "/excel_yedek", "/yedekexcel"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, yedek_excel_gonder_impl, chat_id, goster_bildirim=True)
         elif ana_komut in ["/status", "/sistemmetrik"]:
             islemi_analiz_bildirimiyle_yap(chat_id, sistem_durumu_impl, goster_bildirim=True)
         elif ana_komut == "/reload":
@@ -8328,6 +8427,55 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         .control-btn:hover { background: rgba(30, 41, 59, 0.9); transform: translateY(-1px); border-color: rgba(255,255,255,0.25); }
         .control-btn.active { background: rgba(99, 102, 241, 0.25); border-color: #818cf8; color: #a5b4fc; }
 
+        .rate-badge {
+            font-size: 11px;
+            font-weight: 700;
+            color: #93c5fd;
+            background: rgba(37, 99, 235, 0.18);
+            border: 1px solid rgba(59, 130, 246, 0.35);
+            padding: 6px 10px;
+            border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+
+        .export-dropdown { position: relative; display: inline-block; }
+        .export-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 6px;
+            background: #0f172a;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 14px;
+            padding: 6px;
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 175px;
+            z-index: 1000;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            backdrop-filter: blur(12px);
+        }
+        .export-menu.show { display: flex; }
+        .export-item {
+            background: none;
+            border: none;
+            color: #e2e8f0;
+            padding: 8px 12px;
+            text-align: left;
+            font-size: 12.5px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .export-item:hover { background: rgba(51, 65, 85, 0.8); color: #60a5fa; }
+
         .status-badge { 
             background:rgba(34, 197, 94, 0.15); 
             border:1px solid rgba(34, 197, 94, 0.5); 
@@ -8348,8 +8496,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         
         @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
         
-        /* 6'LI İSTATİSTİK GRID */
-        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(175px, 1fr)); gap:14px; margin-bottom:20px; }
+        /* 7'Lİ İSTATİSTİK GRID (CFO KPI) */
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(155px, 1fr)); gap:12px; margin-bottom:20px; }
         .stat-card { background:rgba(15, 23, 42, 0.78); border:1px solid rgba(255, 255, 255, 0.08); backdrop-filter:blur(14px); border-radius:16px; padding:16px 14px; position:relative; overflow:hidden; transition:all 0.3s ease; box-shadow:0 8px 25px rgba(0,0,0,0.3); }
         .stat-card:hover { transform: translateY(-2px); border-color: rgba(96, 165, 250, 0.35); }
         .stat-card::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; }
@@ -8359,9 +8507,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         .stat-komisyon::before { background:#ec4899; }
         .stat-masraf::before { background:#ef4444; }
         .stat-kalan::before { background:#10b981; }
-        .stat-label { font-size:11px; color:#9ca3af; font-weight:700; text-transform:uppercase; margin-bottom:6px; letter-spacing:0.3px; }
-        .stat-value { font-size:17px; font-weight:800; color:#ffffff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .stat-value .curr { font-size:14px; font-weight:600; opacity:0.85; }
+        .stat-kar::before { background:linear-gradient(180deg, #10b981, #06b6d4); }
+        .stat-label { font-size:10.5px; color:#9ca3af; font-weight:700; text-transform:uppercase; margin-bottom:6px; letter-spacing:0.3px; }
+        .stat-value { font-size:16.5px; font-weight:800; color:#ffffff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .stat-value .curr { font-size:13.5px; font-weight:600; opacity:0.85; }
+        .stat-sub { font-size:11px; font-weight:700; color:#94a3b8; margin-top:4px; display:flex; align-items:center; gap:4px; }
 
         /* FİNANSAL DAĞILIM VE LİKİDİTE ÇUBUĞU */
         .liquidity-box {
@@ -8469,8 +8619,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         
         .section-title { font-size:17px; font-weight:700; color:#f8fafc; margin-bottom:14px; display:flex; align-items:center; gap:8px; text-shadow:0 2px 10px rgba(0,0,0,0.5); }
         .groups-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px; margin-bottom:32px; }
-        .group-card { background:rgba(19, 29, 49, 0.78); border:1px solid rgba(255, 255, 255, 0.09); backdrop-filter:blur(14px); border-radius:18px; padding:22px; transition:all 0.3s ease; position:relative; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.35); }
-        .group-card:hover { border-color:rgba(96, 165, 250, 0.35); transform:translateY(-3px); }
+        .group-card { background:rgba(19, 29, 49, 0.78); border:1px solid rgba(255, 255, 255, 0.09); backdrop-filter:blur(14px); border-radius:18px; padding:22px; transition:all 0.3s ease; position:relative; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.35); cursor:pointer; }
+        .group-card:hover { border-color:rgba(96, 165, 250, 0.5); transform:translateY(-3px); box-shadow:0 12px 35px rgba(0,0,0,0.5), 0 0 20px rgba(59,130,246,0.2); }
         .group-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid rgba(255, 255, 255, 0.08); }
         .group-name { font-size:16px; font-weight:700; color:#60a5fa; display:flex; align-items:center; gap:8px; }
         .group-kalan-badge { padding:5px 12px; border-radius:10px; font-weight:700; font-size:13px; white-space:nowrap; border:1px solid rgba(16, 185, 129, 0.3); }
@@ -8515,6 +8665,178 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         .refresh-btn { background:linear-gradient(135deg, #2563eb, #1d4ed8); color:white; border:none; box-shadow:0 4px 15px rgba(37,99,235,0.4); }
         .refresh-btn:hover { background:linear-gradient(135deg, #1d4ed8, #1e40af); }
         .footer { text-align:center; color:#64748b; font-size:12px; margin-top:40px; }
+
+        /* GÜN İÇİ NAKİT AKIŞ VE CARİ HACİM GRAFİĞİ */
+        .trend-chart-box {
+            background: rgba(15, 23, 42, 0.72);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 18px 20px;
+            margin-bottom: 24px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+        }
+        .trend-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .trend-title {
+            font-size: 12.5px;
+            font-weight: 700;
+            color: #cbd5e1;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .chart-legend {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            font-size: 11.5px;
+            font-weight: 600;
+            color: #94a3b8;
+        }
+        .chart-canvas-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            padding-top: 4px;
+        }
+        .chart-svg {
+            width: 100%;
+            min-width: 620px;
+            height: 220px;
+            display: block;
+        }
+
+        /* MODAL / CARİ DETAY PENCERESİ */
+        .modal-backdrop {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(4, 7, 18, 0.82);
+            backdrop-filter: blur(10px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            padding: 16px;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+        .modal-backdrop.show { display: flex; opacity: 1; }
+        .modal-card {
+            background: #0f172a;
+            border: 1px solid rgba(96, 165, 250, 0.35);
+            border-radius: 20px;
+            width: 100%;
+            max-width: 520px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.85), 0 0 30px rgba(59,130,246,0.25);
+            overflow: hidden;
+            transform: scale(0.95);
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .modal-backdrop.show .modal-card { transform: scale(1); }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 22px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(30, 41, 59, 0.5);
+        }
+        .modal-title-box { display: flex; align-items: center; gap: 12px; }
+        .modal-icon {
+            width: 42px; height: 42px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+        .modal-title-box h2 { font-size: 17px; font-weight: 800; color: #f8fafc; margin: 0; }
+        .modal-status-pill {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 9px;
+            border-radius: 6px;
+            margin-top: 4px;
+        }
+        .modal-close-btn {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #94a3b8;
+            font-size: 15px;
+            cursor: pointer;
+            width: 32px; height: 32px;
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .modal-close-btn:hover { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+        .modal-body { padding: 22px; }
+        .modal-kpi-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .modal-kpi-item {
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 12px 14px;
+        }
+        .modal-kpi-label { font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+        .modal-kpi-val { font-size: 15px; font-weight: 800; color: #ffffff; }
+        .modal-net-box {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(6, 78, 59, 0.3));
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            border-radius: 14px;
+            padding: 16px;
+            text-align: center;
+            margin-bottom: 18px;
+        }
+        .modal-net-label { font-size: 11px; font-weight: 800; color: #6ee7b7; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 4px; }
+        .modal-net-val { font-size: 22px; font-weight: 900; color: #ffffff; }
+        .modal-actions { display: flex; flex-direction: column; gap: 8px; }
+        .modal-copy-btn {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #ffffff;
+            border: none;
+            border-radius: 12px;
+            padding: 12px 16px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 15px rgba(37,99,235,0.35);
+            transition: all 0.2s;
+        }
+        .modal-copy-btn:hover { background: linear-gradient(135deg, #1d4ed8, #1e40af); transform: translateY(-1px); }
+
+        /* YAZDIRMA & PDF ŞABLONU */
+        @media print {
+            body { background: #ffffff !important; color: #000000 !important; padding: 10px !important; }
+            body::before, body::after { display: none !important; }
+            .header-controls, .toolbar, .refresh-btn, .search-area, .filter-chips, #toast-container, .modal-backdrop, .status-badge { display: none !important; }
+            .stat-card { background: #ffffff !important; border: 1px solid #cccccc !important; color: #000000 !important; box-shadow: none !important; }
+            .stat-value { color: #000000 !important; }
+            .group-card { background: #ffffff !important; border: 1px solid #cccccc !important; color: #000000 !important; box-shadow: none !important; page-break-inside: avoid; }
+            .group-name { color: #000000 !important; }
+            .row-item { color: #333333 !important; }
+            .row-item span:first-child { color: #555555 !important; }
+            .trend-chart-box, .liquidity-box { border: 1px solid #cccccc !important; background: #fafafa !important; }
+            .title h1 { -webkit-text-fill-color: #000000 !important; color: #000000 !important; }
+        }
     </style>
 </head>
 
@@ -8538,6 +8860,29 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                     <option value="">📅 Güncel Canlı Bilanço</option>
                 </select>
 
+                <!-- 3. ÇOKLU PARA BİRİMİ: USDT / TRY ÇEVİRİCİ -->
+                <div style="display:inline-flex; align-items:center; gap:6px;">
+                    <button id="currency-toggle-btn" class="control-btn" onclick="toggleCurrency()" title="Para Birimi Değiştir">
+                        <span id="currency-flag">💵</span> <span id="currency-label">TRY (₺)</span>
+                    </button>
+                    <span id="exchange-rate-tag" class="rate-badge">1 USDT = 38,50 ₺</span>
+                </div>
+
+                <!-- 1. RAPOR DIŞA AKTARMA (CSV & PRINT PDF) -->
+                <div class="export-dropdown">
+                    <button id="export-btn" class="control-btn" onclick="toggleExportMenu(event)" title="Raporu Dışa Aktar">
+                        <span>📥</span> <span>Dışa Aktar</span>
+                    </button>
+                    <div id="export-menu" class="export-menu">
+                        <button class="export-item" onclick="exportToCsv()">
+                            <span>📄</span> Excel (CSV) İndir
+                        </button>
+                        <button class="export-item" onclick="printReport()">
+                            <span>🖨️</span> PDF / Yazdır
+                        </button>
+                    </div>
+                </div>
+
                 <!-- 2. GİZLİLİK MODU -->
                 <button id="privacy-btn" class="control-btn" onclick="togglePrivacy()" title="Bakiye Gizliliği">
                     <span id="privacy-icon">👁️</span> <span id="privacy-text">Gizle</span>
@@ -8559,7 +8904,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             </div>
         </div>
 
-        <!-- 6'LI İSTATİSTİK KARTLARI -->
+        <!-- 7'Lİ İSTATİSTİK KARTLARI (CFO KPI) -->
         <div class="stats-grid">
             <div class="stat-card stat-devir">
                 <div class="stat-label">🔄 Toplam Devir</div>
@@ -8578,12 +8923,17 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 <div class="stat-value" id="toplam-komisyon" style="color:#f472b6;">0,00 ₺</div>
             </div>
             <div class="stat-card stat-masraf">
-                <div class="stat-label">📉 TOPLAM MASRAF / GİDER</div>
+                <div class="stat-label">📉 TOPLAM MASRAF</div>
                 <div class="stat-value" id="toplam-masraf" style="color:#f87171;">0,00 ₺</div>
             </div>
             <div class="stat-card stat-kalan">
                 <div class="stat-label">🏦 NET KALAN KASA</div>
                 <div class="stat-value" id="toplam-kalan" style="color:#34d399;">0,00 ₺</div>
+            </div>
+            <div class="stat-card stat-kar" id="card-stat-kar">
+                <div class="stat-label">💎 ŞİRKET NET KÂRI (KPI)</div>
+                <div class="stat-value" id="toplam-net-kar" style="color:#10b981;">0,00 ₺</div>
+                <div class="stat-sub" id="kar-marji-badge">Kâr Marjı: %0.00</div>
             </div>
         </div>
 
@@ -8603,6 +8953,20 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 <div class="progress-segment seg-odenen" id="seg-odenen" style="width:0%;" title="Ödenen"></div>
                 <div class="progress-segment seg-komisyon" id="seg-komisyon" style="width:0%;" title="Komisyon"></div>
                 <div class="progress-segment seg-masraf" id="seg-masraf" style="width:0%;" title="Masraf"></div>
+            </div>
+        </div>
+
+        <!-- 6. GÜN İÇİ NAKİT AKIŞ VE CARİ HACİM GRAFİĞİ -->
+        <div class="trend-chart-box" id="trend-chart-box">
+            <div class="trend-header">
+                <div class="trend-title">📈 GÜN İÇİ CARİ NAKİT AKIŞI VE İŞLEM HACMİ</div>
+                <div class="chart-legend">
+                    <div class="leg-item"><div class="leg-dot" style="background:#3b82f6;"></div> Kasa Girişi</div>
+                    <div class="leg-item"><div class="leg-dot" style="background:#f59e0b;"></div> Yapılan Ödeme</div>
+                </div>
+            </div>
+            <div class="chart-canvas-wrapper" id="trend-chart-container">
+                <p style="color:#94a3b8; font-size:12px; text-align:center; padding:15px 0;">Grafik verisi yükleniyor...</p>
             </div>
         </div>
 
@@ -8648,6 +9012,51 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         </div>
     </div>
 
+    <!-- 4. GRUP / CARİ DETAY PENCERESİ (MODAL) -->
+    <div id="group-modal" class="modal-backdrop" onclick="closeGroupModal(event)">
+        <div class="modal-card" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title-box">
+                    <div class="modal-icon">🏢</div>
+                    <div>
+                        <h2 id="modal-group-name">GRUP ADI</h2>
+                        <span id="modal-group-status" class="modal-status-pill">Durum</span>
+                    </div>
+                </div>
+                <button class="modal-close-btn" onclick="closeGroupModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-kpi-grid">
+                    <div class="modal-kpi-item">
+                        <div class="modal-kpi-label">🔄 Devir Bakiyesi</div>
+                        <div class="modal-kpi-val" id="modal-devir">0,00 ₺</div>
+                    </div>
+                    <div class="modal-kpi-item">
+                        <div class="modal-kpi-label">💰 Eklenen Kasa</div>
+                        <div class="modal-kpi-val" id="modal-kasa">0,00 ₺</div>
+                    </div>
+                    <div class="modal-kpi-item">
+                        <div class="modal-kpi-label">💸 Toplam Ödenen</div>
+                        <div class="modal-kpi-val" id="modal-odenen">0,00 ₺</div>
+                    </div>
+                    <div class="modal-kpi-item">
+                        <div class="modal-kpi-label">✂️ Kesinti / Komisyon</div>
+                        <div class="modal-kpi-val" id="modal-komisyon">0,00 ₺</div>
+                    </div>
+                </div>
+                <div class="modal-net-box">
+                    <div class="modal-net-label">🏦 GÜNCEL NET KALAN BAKİYE</div>
+                    <div class="modal-net-val" id="modal-kalan">0,00 ₺</div>
+                </div>
+                <div class="modal-actions">
+                    <button class="modal-copy-btn" onclick="copyGroupStatement()">
+                        📋 Cari Ekstresini Kopyala (WhatsApp / Telegram)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const serverToken = '{{DASHBOARD_TOKEN}}';
         const queryToken = new URLSearchParams(window.location.search).get('token') || '';
@@ -8660,12 +9069,42 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         let activeFilter = 'all';
         let selectedDate = '';
         
+        // 3. Çoklu Para Birimi State & Canlı Kur (USDT / TRY)
+        let activeCurrency = localStorage.getItem('cfo_currency') || 'TRY'; // 'TRY' | 'USDT'
+        let usdtRate = 38.50;
+
         // 2. Gizlilik Modu State
         let privacyMode = localStorage.getItem('cfo_privacy') === 'true';
         
         // 3. Sesli Bildirim State & Web Audio API
         let soundEnabled = localStorage.getItem('cfo_sound') !== 'false';
         let audioCtx = null;
+
+        async function fetchExchangeRate() {
+            try {
+                const url = '/api/exchange_rate' + (token ? '?token=' + encodeURIComponent(token) : '');
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data && data.rate && Number(data.rate) > 0) {
+                    usdtRate = Number(data.rate);
+                    const tag = document.getElementById('exchange-rate-tag');
+                    if (tag) {
+                        tag.innerText = '1 USDT = ' + usdtRate.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+                    }
+                }
+            } catch(e) {
+                console.warn('Kur sorgulama hatası:', e);
+            }
+        }
+
+        function toggleCurrency() {
+            activeCurrency = (activeCurrency === 'TRY') ? 'USDT' : 'TRY';
+            localStorage.setItem('cfo_currency', activeCurrency);
+            updateControlButtonsUI();
+            if (currentDashboardData) {
+                renderDashboard(currentDashboardData, false, []);
+            }
+        }
 
         // UI Başlangıç Durumlarını Güncelle
         function updateControlButtonsUI() {
@@ -8693,6 +9132,21 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 sBtn.classList.remove('active');
                 sIcon.innerText = '🔕';
                 sText.innerText = 'Sessiz';
+            }
+
+            const cBtn = document.getElementById('currency-toggle-btn');
+            const cFlag = document.getElementById('currency-flag');
+            const cLabel = document.getElementById('currency-label');
+            if (cBtn && cFlag && cLabel) {
+                if (activeCurrency === 'USDT') {
+                    cBtn.classList.add('active');
+                    cFlag.innerText = '💲';
+                    cLabel.innerText = 'USDT ($)';
+                } else {
+                    cBtn.classList.remove('active');
+                    cFlag.innerText = '💵';
+                    cLabel.innerText = 'TRY (₺)';
+                }
             }
         }
 
@@ -8744,19 +9198,113 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         }
 
         function fmt(n) {
-            if (privacyMode) return '•••••• ₺';
-            const num = Number(n);
+            const sym = (activeCurrency === 'USDT') ? '$' : '₺';
+            if (privacyMode) return '•••••• ' + sym;
+            let num = Number(n) || 0;
+            if (activeCurrency === 'USDT') {
+                num = num / (usdtRate > 0 ? usdtRate : 1);
+            }
             const isNeg = num < 0;
             const formatted = Math.abs(num).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            return (isNeg ? '-' : '') + formatted + ' ₺';
+            return (isNeg ? '-' : '') + formatted + ' ' + sym;
         }
 
         function fmtHtml(n) {
-            if (privacyMode) return '••••••<span class="curr">&nbsp;₺</span>';
-            const num = Number(n);
+            const sym = (activeCurrency === 'USDT') ? '$' : '₺';
+            if (privacyMode) return '••••••<span class="curr">&nbsp;' + sym + '</span>';
+            let num = Number(n) || 0;
+            if (activeCurrency === 'USDT') {
+                num = num / (usdtRate > 0 ? usdtRate : 1);
+            }
             const isNeg = num < 0;
             const formatted = Math.abs(num).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            return (isNeg ? '-' : '') + formatted + '<span class="curr">&nbsp;₺</span>';
+            return (isNeg ? '-' : '') + formatted + '<span class="curr">&nbsp;' + sym + '</span>';
+        }
+
+        // 1. Rapor Dışa Aktarma Fonksiyonları (CSV & Yazdır)
+        function toggleExportMenu(e) {
+            if (e) e.stopPropagation();
+            const m = document.getElementById('export-menu');
+            if (m) m.classList.toggle('show');
+        }
+        window.addEventListener('click', () => {
+            const m = document.getElementById('export-menu');
+            if (m) m.classList.remove('show');
+        });
+        function printReport() {
+            const m = document.getElementById('export-menu');
+            if (m) m.classList.remove('show');
+            window.print();
+        }
+        function exportToCsv() {
+            const m = document.getElementById('export-menu');
+            if (m) m.classList.remove('show');
+            if (!currentDashboardData) return;
+            
+            const d = currentDashboardData;
+            const tarih = d.tarih || 'Guncel';
+            let rows = [];
+            rows.push(["CFO FINANS YONETIM SISTEMI - BILANCO RAPORU"]);
+            rows.push(["Rapor Tarihi:", tarih, "Olusturma Zamani:", new Date().toLocaleString('tr-TR')]);
+            rows.push([]);
+            rows.push(["--- FINANSAL OZET (KPI) ---"]);
+            rows.push(["Metrik", "Tutar (" + activeCurrency + ")"]);
+            
+            const cVal = (v) => {
+                let num = Number(v) || 0;
+                if (activeCurrency === 'USDT') num = num / (usdtRate > 0 ? usdtRate : 1);
+                return num.toFixed(2).replace('.', ',');
+            };
+            
+            const netKar = Number(d.komisyon || 0) - Number(d.toplam_masraf || 0);
+            const karMarji = (Number(d.kasa) > 0) ? ((netKar / Number(d.kasa)) * 100) : 0;
+            
+            rows.push(["Toplam Devir", cVal(d.devir)]);
+            rows.push(["Eklenen Kasa", cVal(d.kasa)]);
+            rows.push(["Toplam Odenen", cVal(d.odenen)]);
+            rows.push(["Toplam Komisyon", cVal(d.komisyon)]);
+            rows.push(["Toplam Masraf", cVal(d.toplam_masraf || 0)]);
+            rows.push(["Net Kalan Kasa", cVal(d.kalan)]);
+            rows.push(["Sirket Net Kari (KPI)", cVal(netKar)]);
+            rows.push(["Net Karlilik Marji (%)", "%" + karMarji.toFixed(2).replace('.', ',')]);
+            rows.push([]);
+            
+            rows.push(["--- CARI VE GRUP DOKUMU ---"]);
+            rows.push(["Sira", "Grup Adi", "Devir", "Eklenen Kasa", "Odenen", "Komisyon", "Kalan Bakiye", "Durum"]);
+            
+            (d.gruplar || []).forEach((g, idx) => {
+                const durum = g.kalan < -0.01 ? "Borclu" : (g.kalan > 0.01 ? "Alacakli" : "Notr");
+                rows.push([
+                    idx + 1,
+                    g.ad,
+                    cVal(g.devir),
+                    cVal(g.kasa),
+                    cVal(g.odenen),
+                    cVal(g.komisyon),
+                    cVal(g.kalan),
+                    durum
+                ]);
+            });
+            
+            if (d.masraflar && d.masraflar.length > 0) {
+                rows.push([]);
+                rows.push(["--- MASRAF KALEMLERI ---"]);
+                rows.push(["Sira", "Masraf Adi", "Tutar (" + activeCurrency + ")"]);
+                d.masraflar.forEach((m, idx) => {
+                    rows.push([idx + 1, m.ad, cVal(m.fiyat)]);
+                });
+            }
+            
+            const csvContent = "\uFEFF" + rows.map(e => e.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(";")).join("\r\n");
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "CFO_Bilanco_" + tarih.replace(/[^a-zA-Z0-9]/g, "_") + ".csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showToast("Rapor İndirildi", tarih + " bilançosu Excel uyumlu CSV olarak kaydedildi.", true);
         }
 
         function showToast(title, message, isHighlight = false) {
@@ -8908,7 +9456,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 const badgeBorder = isNeg ? 'rgba(239, 68, 68, 0.3)' : (isPos ? 'rgba(16, 185, 129, 0.3)' : 'rgba(148, 163, 184, 0.3)');
 
                 return `
-                    <div class="group-card ${isUpdated ? 'glow-updated' : ''}" id="${safeId}">
+                    <div class="group-card ${isUpdated ? 'glow-updated' : ''}" id="${safeId}" onclick="openGroupModal('${gNameUpper}')" title="Detaylı cari ekstresi için tıklayın">
                         <div class="group-header">
                             <div class="group-name">
                                 <span>🔹</span> ${gNameUpper}
@@ -8966,8 +9514,28 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             document.getElementById('toplam-masraf').innerHTML = fmtHtml(d.toplam_masraf || 0);
             document.getElementById('toplam-kalan').innerHTML = fmtHtml(d.kalan);
 
+            // 2. Şirket Net Kârlılık ve Verimlilik Göstergesi (CFO KPI)
+            const netKar = Number(d.komisyon || 0) - Number(d.toplam_masraf || 0);
+            const denomKasa = Number(d.kasa || 0);
+            const denomKom = Number(d.komisyon || 0);
+            const karMarji = (denomKasa > 0) ? ((netKar / denomKasa) * 100) : ((denomKom > 0) ? ((netKar / denomKom) * 100) : 0);
+            
+            const netKarEl = document.getElementById('toplam-net-kar');
+            const karMarjiEl = document.getElementById('kar-marji-badge');
+            if (netKarEl) {
+                netKarEl.innerHTML = fmtHtml(netKar);
+                netKarEl.style.color = (netKar >= 0) ? '#34d399' : '#f87171';
+            }
+            if (karMarjiEl) {
+                karMarjiEl.innerHTML = (netKar >= 0 ? '🟢' : '🔴') + ' Kâr Marjı: %' + Math.abs(karMarji).toFixed(1);
+                karMarjiEl.style.color = (netKar >= 0) ? '#34d399' : '#f87171';
+            }
+
             // Likidite Barını Güncelle
             updateLiquidityBar(d);
+
+            // 6. Gün İçi Nakit Akış Grafiğini Render Et
+            renderTrendChart(d.gruplar || []);
 
             // Grupları Render Et
             renderGroups(d.gruplar || [], updatedGroupsList);
@@ -8986,6 +9554,188 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             }
 
             isFirstLoad = false;
+        }
+
+        // 6. Gün İçi Nakit Akış ve İşlem Hacmi Grafiği (SVG)
+        function renderTrendChart(gruplar) {
+            const container = document.getElementById('trend-chart-container');
+            if (!container) return;
+            if (!gruplar || gruplar.length === 0) {
+                container.innerHTML = '<p style="color:#94a3b8; font-size:12.5px; text-align:center; padding:18px 0;">Henüz işlem hareketi bulunmuyor.</p>';
+                return;
+            }
+
+            const sorted = [...gruplar]
+                .map(g => ({
+                    ad: g.ad,
+                    kasa: Math.max(0, Number(g.kasa || 0)),
+                    odenen: Math.max(0, Number(g.odenen || 0)),
+                    hacim: Math.max(0, Number(g.kasa || 0)) + Math.max(0, Number(g.odenen || 0))
+                }))
+                .filter(g => g.hacim > 0)
+                .sort((a, b) => b.hacim - a.hacim)
+                .slice(0, 7);
+
+            if (sorted.length === 0) {
+                container.innerHTML = '<p style="color:#94a3b8; font-size:12.5px; text-align:center; padding:18px 0;">Grafik için aktif kasa veya ödeme kaydı bulunamadı.</p>';
+                return;
+            }
+
+            const maxVal = Math.max(...sorted.map(g => Math.max(g.kasa, g.odenen)), 1);
+            const svgWidth = 800;
+            const svgHeight = 220;
+            const padLeft = 45;
+            const padRight = 20;
+            const padTop = 25;
+            const padBottom = 40;
+            const chartW = svgWidth - padLeft - padRight;
+            const chartH = svgHeight - padTop - padBottom;
+            
+            const groupWidth = chartW / sorted.length;
+            const barWidth = Math.min(22, (groupWidth - 16) / 2);
+
+            let svg = `<svg class="chart-svg" viewBox="0 0 ${svgWidth} ${svgHeight}" preserveAspectRatio="xMidYMid meet">`;
+            
+            svg += `
+                <defs>
+                    <linearGradient id="gradKasa" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#60a5fa"/>
+                        <stop offset="100%" stop-color="#2563eb"/>
+                    </linearGradient>
+                    <linearGradient id="gradOdenen" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#fbbf24"/>
+                        <stop offset="100%" stop-color="#d97706"/>
+                    </linearGradient>
+                </defs>
+            `;
+
+            // Kılavuz Çizgileri
+            for (let i = 0; i <= 3; i++) {
+                const y = padTop + (chartH / 3) * i;
+                svg += `<line x1="${padLeft}" y1="${y}" x2="${svgWidth - padRight}" y2="${y}" stroke="rgba(255,255,255,0.08)" stroke-dasharray="3,3" />`;
+            }
+
+            // Çubuklar ve İsimler
+            sorted.forEach((g, idx) => {
+                const cx = padLeft + idx * groupWidth + groupWidth / 2;
+                
+                const hKasa = Math.max(3, (g.kasa / maxVal) * chartH);
+                const hOdenen = Math.max(3, (g.odenen / maxVal) * chartH);
+                
+                const xKasa = cx - barWidth - 3;
+                const yKasa = padTop + chartH - (g.kasa > 0 ? hKasa : 0);
+                
+                const xOdenen = cx + 3;
+                const yOdenen = padTop + chartH - (g.odenen > 0 ? hOdenen : 0);
+
+                if (g.kasa > 0) {
+                    svg += `<rect x="${xKasa}" y="${yKasa}" width="${barWidth}" height="${hKasa}" rx="4" fill="url(#gradKasa)">
+                        <title>${g.ad} - Kasa: ${fmt(g.kasa)}</title>
+                    </rect>`;
+                }
+                
+                if (g.odenen > 0) {
+                    svg += `<rect x="${xOdenen}" y="${yOdenen}" width="${barWidth}" height="${hOdenen}" rx="4" fill="url(#gradOdenen)">
+                        <title>${g.ad} - Ödenen: ${fmt(g.odenen)}</title>
+                    </rect>`;
+                }
+
+                let shortName = g.ad;
+                if (shortName.length > 9) shortName = shortName.substring(0, 8) + '…';
+                svg += `<text x="${cx}" y="${svgHeight - 12}" text-anchor="middle" fill="#94a3b8" font-size="11" font-weight="700">${shortName}</text>`;
+            });
+
+            svg += `</svg>`;
+            container.innerHTML = svg;
+        }
+
+        // 4. Modal / Cari Ekstresi Fonksiyonları
+        let activeModalGroup = null;
+
+        function openGroupModal(groupName) {
+            if (!currentDashboardData || !currentDashboardData.gruplar) return;
+            const g = currentDashboardData.gruplar.find(item => item.ad.toUpperCase().trim() === groupName.toUpperCase().trim());
+            if (!g) return;
+            
+            activeModalGroup = g;
+            document.getElementById('modal-group-name').innerText = g.ad.toUpperCase();
+            
+            const isNeg = g.kalan < -0.01;
+            const isPos = g.kalan > 0.01;
+            const statusPill = document.getElementById('modal-group-status');
+            if (isNeg) {
+                statusPill.innerText = '🔴 BORÇLU DURUMDA';
+                statusPill.style.background = 'rgba(239, 68, 68, 0.2)';
+                statusPill.style.color = '#f87171';
+            } else if (isPos) {
+                statusPill.innerText = '🟢 ALACAKLI DURUMDA';
+                statusPill.style.background = 'rgba(16, 185, 129, 0.2)';
+                statusPill.style.color = '#34d399';
+            } else {
+                statusPill.innerText = '⚪ BAKİYE SIFIR / NÖTR';
+                statusPill.style.background = 'rgba(148, 163, 184, 0.2)';
+                statusPill.style.color = '#94a3b8';
+            }
+            
+            document.getElementById('modal-devir').innerText = fmt(g.devir);
+            document.getElementById('modal-kasa').innerText = fmt(g.kasa);
+            document.getElementById('modal-odenen').innerText = fmt(g.odenen);
+            document.getElementById('modal-komisyon').innerText = fmt(g.komisyon);
+            document.getElementById('modal-kalan').innerText = fmt(g.kalan);
+            
+            const modal = document.getElementById('group-modal');
+            if (modal) modal.classList.add('show');
+        }
+
+        function closeGroupModal(e) {
+            const modal = document.getElementById('group-modal');
+            if (modal) modal.classList.remove('show');
+            activeModalGroup = null;
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeGroupModal();
+        });
+
+        function copyGroupStatement() {
+            if (!activeModalGroup) return;
+            const g = activeModalGroup;
+            const tarih = (currentDashboardData && currentDashboardData.tarih) || new Date().toLocaleDateString('tr-TR');
+            const durumText = g.kalan < -0.01 ? "🔴 BORÇLU" : (g.kalan > 0.01 ? "🟢 ALACAKLI" : "⚪ NÖTR");
+            
+            const slipText = 
+`📊 [ ${g.ad.toUpperCase()} ] CARİ HESAP EKSTRESİ
+📅 Tarih: ${tarih}
+━━━━━━━━━━━━━━━━━━
+🔄 Devir: ${fmt(g.devir)}
+💰 Eklenen Kasa: ${fmt(g.kasa)}
+💸 Ödenen: ${fmt(g.odenen)}
+✂️ Kesinti / Masraf: ${fmt(g.komisyon)}
+━━━━━━━━━━━━━━━━━━
+🏦 NET KALAN: ${fmt(g.kalan)}
+📌 Durum: ${durumText}
+━━━━━━━━━━━━━━━━━━
+CFO Canlı Finans Sistemi`;
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(slipText).then(() => {
+                    showToast("Ekstre Kopyalandı", `${g.ad} carisine ait özet panoya kopyalandı!`, true);
+                }).catch(() => {
+                    fallbackCopyText(slipText);
+                });
+            } else {
+                fallbackCopyText(slipText);
+            }
+        }
+
+        function fallbackCopyText(text) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showToast("Ekstre Kopyalandı", "Cari özeti panoya kopyalandı!", true);
         }
 
         // 6. Tarih Listesini Sunucudan Çek ve Menüye Ekle
@@ -9112,6 +9862,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
         // Başlat
         updateControlButtonsUI();
+        fetchExchangeRate();
         fetchSheetsList();
         fetchData(true);
         initSSE();
@@ -9119,6 +9870,28 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 </body>
 </html>
 """
+
+_last_exchange_rate = {"rate": 38.50, "time": 0}
+
+def get_dashboard_exchange_rate() -> float:
+    global _last_exchange_rate
+    now = time.time()
+    if now - _last_exchange_rate["time"] < 60 and _last_exchange_rate["rate"] > 0:
+        return _last_exchange_rate["rate"]
+    try:
+        rates = fetch_all_market_rates_parallel()
+        b = rates.get("binance") or {}
+        if b and b.get("last") and float(b["last"]) > 0:
+            _last_exchange_rate = {"rate": round(float(b["last"]), 2), "time": now}
+            return _last_exchange_rate["rate"]
+        h = rates.get("harem") or {}
+        usd = h.get("usd")
+        if usd and isinstance(usd, (list, tuple)) and len(usd) > 0 and float(usd[0]) > 0:
+            _last_exchange_rate = {"rate": round(float(usd[0]), 2), "time": now}
+            return _last_exchange_rate["rate"]
+    except Exception:
+        pass
+    return _last_exchange_rate["rate"]
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
@@ -9258,6 +10031,23 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 print(f"API sheets_list hatası: {e}")
                 self.wfile.write(json.dumps({"aktif": "", "tarihler": []}).encode("utf-8"))
+            return
+
+        elif parsed.path == "/api/exchange_rate":
+            if not self._check_auth(parsed, DASHBOARD_AUTH_TOKEN):
+                self._send_security_headers(401, "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
+                return
+
+            self._send_security_headers(200, "application/json; charset=utf-8")
+            self.end_headers()
+            rate = get_dashboard_exchange_rate()
+            self.wfile.write(json.dumps({
+                "symbol": "USDTTRY",
+                "rate": rate,
+                "timestamp": time.time()
+            }).encode("utf-8"))
             return
 
         elif parsed.path == "/api/stream":
@@ -9421,8 +10211,24 @@ def run_kapanis_scheduler():
                 try:
                     rapor_metni = gun_sonu_kapanis_raporu_uret()
                     telegramMesajGonder(KURUCU_ID, rapor_metni)
+                    
+                    # 5. Otomatik Gün Sonu Excel (CSV) Yedeğini de Kurucuya İlet
+                    try:
+                        sh = get_spreadsheet()
+                        sayfa = get_active_daily_sheet(sh)
+                        csv_bytes = gun_sonu_excel_yedegi_uret(sayfa.title, get_sheet_values_fast(sayfa))
+                        dosya_adi = f"CFO_GunSonu_Bilanço_{bugun_str.replace('.', '_')}.csv"
+                        caption = (
+                            f"🛡️ <b>Otomatik Gün Sonu Excel Yedeği</b>\n"
+                            f"📅 Tarih: <b>{bugun_str}</b>\n"
+                            f"📊 <i>Excel ile doğrudan açılabilir tam detaylı kapanış bilançosu.</i>"
+                        )
+                        telegram_dosya_gonder(KURUCU_ID, dosya_adi, csv_bytes, caption)
+                    except Exception as ex_err:
+                        print(f"Otomatik gün sonu Excel yedeği gönderme hatası: {ex_err}")
+
                     app_state["SON_KAPANIS_TARIHI"] = bugun_str
-                    sistemeLogYaz("Otomatik Gün Sonu Raporu", f"Kurucuya ({KURUCU_ID}) gün sonu bilançosu iletildi.")
+                    sistemeLogYaz("Otomatik Gün Sonu Raporu", f"Kurucuya ({KURUCU_ID}) gün sonu bilançosu ve Excel yedeği iletildi.")
                 except Exception as e:
                     print(f"Otomatik kapanış raporu gönderme hatası: {e}")
         except Exception as e:
