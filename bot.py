@@ -8209,8 +8209,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>CFO Canlı Finans Paneli</title>
+    <!-- PWA & Mobile App Support -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#070a14">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="CFO Bot">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='25' fill='%231e293b'/%3E%3Ctext y='.9em' font-size='70' x='15'%3E💼%3C/text%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='25' fill='%231e293b'/%3E%3Ctext y='.9em' font-size='70' x='15'%3E💼%3C/text%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family:'Plus Jakarta Sans', sans-serif; }
@@ -8218,7 +8226,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             background: #070a14; 
             color: #f1f5f9; 
             min-height: 100vh; 
-            padding: 24px 20px; 
+            padding: 24px 20px 60px 20px; 
             position: relative;
             overflow-x: hidden;
         }
@@ -8276,19 +8284,74 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             100% { opacity: 0.45; transform: translateY(-4px); }
         }
 
-        .container { max-width: 1220px; margin: 0 auto; }
-        .header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; margin-bottom:25px; padding-bottom:20px; border-bottom:1px solid rgba(255, 255, 255, 0.08); }
+        .container { max-width: 1260px; margin: 0 auto; }
+        
+        /* HEADER & KONTROLLER */
+        .header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:24px; padding-bottom:18px; border-bottom:1px solid rgba(255, 255, 255, 0.08); }
         .logo-area { display:flex; align-items:center; gap:14px; }
-        .logo-icon { width:48px; height:48px; border-radius:14px; background:linear-gradient(135deg, #3b82f6, #8b5cf6); display:flex; align-items:center; justify-content:center; font-size:25px; box-shadow: 0 4px 15px rgba(59,130,246,0.3); }
-        .title h1 { font-size:23px; font-weight:800; background:linear-gradient(to right, #60a5fa, #c084fc, #f472b6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-        .title p { font-size:13px; color:#94a3b8; }
-        .status-badge { background:rgba(34, 197, 94, 0.15); border:1px solid rgba(34, 197, 94, 0.5); color:#4ade80; padding:7px 16px; border-radius:20px; font-size:12px; font-weight:700; display:flex; align-items:center; gap:8px; backdrop-filter:blur(8px); transition:all 0.3s ease; }
-        .status-dot { width:9px; height:9px; border-radius:50%; background:#22c55e; box-shadow:0 0 10px #22c55e; animation:pulse 2s infinite; }
+        .logo-icon { width:50px; height:50px; border-radius:15px; background:linear-gradient(135deg, #3b82f6, #8b5cf6); display:flex; align-items:center; justify-content:center; font-size:26px; box-shadow: 0 6px 20px rgba(59,130,246,0.35); flex-shrink:0; }
+        .title h1 { font-size:22px; font-weight:800; background:linear-gradient(to right, #60a5fa, #c084fc, #f472b6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; letter-spacing:-0.4px; }
+        .title p { font-size:12px; color:#94a3b8; font-weight:500; margin-top:2px; }
+        
+        .header-controls { display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
+        
+        .header-select {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            color: #e2e8f0;
+            padding: 8px 14px;
+            border-radius: 12px;
+            font-size: 12.5px;
+            font-weight: 600;
+            outline: none;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+            transition: all 0.2s;
+        }
+        .header-select:hover { border-color: #60a5fa; }
+
+        .control-btn {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #f1f5f9;
+            padding: 8px 14px;
+            border-radius: 12px;
+            font-size: 12.5px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            backdrop-filter: blur(8px);
+            transition: all 0.2s;
+        }
+        .control-btn:hover { background: rgba(30, 41, 59, 0.9); transform: translateY(-1px); border-color: rgba(255,255,255,0.25); }
+        .control-btn.active { background: rgba(99, 102, 241, 0.25); border-color: #818cf8; color: #a5b4fc; }
+
+        .status-badge { 
+            background:rgba(34, 197, 94, 0.15); 
+            border:1px solid rgba(34, 197, 94, 0.5); 
+            color:#4ade80; 
+            padding:7px 14px; 
+            border-radius:20px; 
+            font-size:12px; 
+            font-weight:700; 
+            display:flex; 
+            align-items:center; 
+            gap:8px; 
+            backdrop-filter:blur(8px); 
+            transition:all 0.3s ease; 
+        }
+        .status-dot { width:8px; height:8px; border-radius:50%; background:#22c55e; box-shadow:0 0 10px #22c55e; animation:pulse 2s infinite; }
+        .status-badge.archive { background:rgba(234, 179, 8, 0.15); border-color:rgba(234, 179, 8, 0.5); color:#facc15; }
+        .status-dot.archive { background:#eab308; box-shadow:0 0 10px #eab308; animation:none; }
+        
         @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
         
-        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(175px, 1fr)); gap:14px; margin-bottom:30px; }
-        .stat-card { background:rgba(15, 23, 42, 0.75); border:1px solid rgba(255, 255, 255, 0.08); backdrop-filter:blur(12px); border-radius:16px; padding:16px 14px; position:relative; overflow:hidden; transition:all 0.3s ease; box-shadow:0 8px 25px rgba(0,0,0,0.3); }
-        .stat-card:hover { transform: translateY(-2px); border-color: rgba(96, 165, 250, 0.3); }
+        /* 6'LI İSTATİSTİK GRID */
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(175px, 1fr)); gap:14px; margin-bottom:20px; }
+        .stat-card { background:rgba(15, 23, 42, 0.78); border:1px solid rgba(255, 255, 255, 0.08); backdrop-filter:blur(14px); border-radius:16px; padding:16px 14px; position:relative; overflow:hidden; transition:all 0.3s ease; box-shadow:0 8px 25px rgba(0,0,0,0.3); }
+        .stat-card:hover { transform: translateY(-2px); border-color: rgba(96, 165, 250, 0.35); }
         .stat-card::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; }
         .stat-devir::before { background:#6366f1; }
         .stat-kasa::before { background:#3b82f6; }
@@ -8299,14 +8362,118 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         .stat-label { font-size:11px; color:#9ca3af; font-weight:700; text-transform:uppercase; margin-bottom:6px; letter-spacing:0.3px; }
         .stat-value { font-size:17px; font-weight:800; color:#ffffff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .stat-value .curr { font-size:14px; font-weight:600; opacity:0.85; }
+
+        /* FİNANSAL DAĞILIM VE LİKİDİTE ÇUBUĞU */
+        .liquidity-box {
+            background: rgba(15, 23, 42, 0.72);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 16px 18px;
+            margin-bottom: 28px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+        }
+        .liquidity-header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px; }
+        .liquidity-title { font-size:12.5px; font-weight:700; color:#cbd5e1; text-transform:uppercase; letter-spacing:0.5px; display:flex; align-items:center; gap:6px; }
+        .liquidity-legend { display:flex; align-items:center; flex-wrap:wrap; gap:14px; font-size:11.5px; font-weight:600; color:#94a3b8; }
+        .leg-item { display:flex; align-items:center; gap:6px; }
+        .leg-dot { width:8px; height:8px; border-radius:50%; }
         
-        .section-title { font-size:18px; font-weight:700; color:#f8fafc; margin-bottom:16px; display:flex; align-items:center; gap:8px; text-shadow:0 2px 10px rgba(0,0,0,0.5); }
+        .progress-track {
+            height: 12px;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 8px;
+            display: flex;
+            overflow: hidden;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .progress-segment {
+            height: 100%;
+            transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+        }
+        .seg-kalan { background: linear-gradient(90deg, #10b981, #34d399); }
+        .seg-odenen { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+        .seg-komisyon { background: linear-gradient(90deg, #ec4899, #f472b6); }
+        .seg-masraf { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+        /* ARAMA VE AKILLI FİLTRELEME ARAÇ ÇUBUĞU */
+        .toolbar {
+            background: rgba(15, 23, 42, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 14px 16px;
+            margin-bottom: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            backdrop-filter: blur(12px);
+        }
+        .search-area {
+            position: relative;
+            flex: 1;
+            min-width: 240px;
+            max-width: 420px;
+        }
+        .search-input {
+            width: 100%;
+            background: rgba(30, 41, 59, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #f8fafc;
+            padding: 10px 36px 10px 38px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 500;
+            outline: none;
+            transition: all 0.2s;
+        }
+        .search-input:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2); }
+        .search-icon-left { position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:14px; opacity:0.6; pointer-events:none; }
+        .search-clear-btn { position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; color:#94a3b8; font-size:14px; cursor:pointer; padding:4px; display:none; }
+        .search-clear-btn:hover { color:#ffffff; }
+
+        .filter-chips { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+        .chip {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #94a3b8;
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .chip:hover { color:#f1f5f9; background:rgba(51, 65, 85, 0.8); }
+        .chip.active { background:rgba(99, 102, 241, 0.25); border-color:#818cf8; color:#ffffff; }
+        .chip.chip-borclular.active { background:rgba(239, 68, 68, 0.2); border-color:#ef4444; color:#f87171; }
+        .chip.chip-alacaklilar.active { background:rgba(16, 185, 129, 0.2); border-color:#10b981; color:#34d399; }
+        
+        .sort-select {
+            background: rgba(30, 41, 59, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #cbd5e1;
+            padding: 9px 14px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            outline: none;
+            cursor: pointer;
+        }
+        
+        .section-title { font-size:17px; font-weight:700; color:#f8fafc; margin-bottom:14px; display:flex; align-items:center; gap:8px; text-shadow:0 2px 10px rgba(0,0,0,0.5); }
         .groups-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px; margin-bottom:32px; }
-        .group-card { background:rgba(19, 29, 49, 0.78); border:1px solid rgba(255, 255, 255, 0.09); backdrop-filter:blur(14px); border-radius:18px; padding:22px; transition:all 0.4s ease; position:relative; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.35); }
+        .group-card { background:rgba(19, 29, 49, 0.78); border:1px solid rgba(255, 255, 255, 0.09); backdrop-filter:blur(14px); border-radius:18px; padding:22px; transition:all 0.3s ease; position:relative; overflow:hidden; box-shadow:0 8px 30px rgba(0,0,0,0.35); }
         .group-card:hover { border-color:rgba(96, 165, 250, 0.35); transform:translateY(-3px); }
         .group-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid rgba(255, 255, 255, 0.08); }
         .group-name { font-size:16px; font-weight:700; color:#60a5fa; display:flex; align-items:center; gap:8px; }
-        .group-kalan-badge { background:rgba(16, 185, 129, 0.15); color:#34d399; padding:5px 12px; border-radius:10px; font-weight:700; font-size:13px; white-space:nowrap; border:1px solid rgba(16, 185, 129, 0.3); }
+        .group-kalan-badge { padding:5px 12px; border-radius:10px; font-weight:700; font-size:13px; white-space:nowrap; border:1px solid rgba(16, 185, 129, 0.3); }
 
         .masraflar-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; margin-bottom:32px; }
         .masraf-card { background:rgba(26, 16, 36, 0.8); border:1px solid rgba(236, 72, 153, 0.25); backdrop-filter:blur(10px); border-radius:14px; padding:16px 18px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 4px 18px rgba(0,0,0,0.3); transition:all 0.3s; }
@@ -8314,6 +8481,17 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         .masraf-name { font-weight:700; color:#f472b6; font-size:14px; display:flex; align-items:center; gap:6px; }
         .masraf-tutar { font-weight:800; color:#f87171; font-size:14px; }
         
+        .empty-alert {
+            grid-column: 1 / -1;
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px dashed rgba(255,255,255,0.15);
+            border-radius: 14px;
+            padding: 36px 20px;
+            text-align: center;
+            color: #94a3b8;
+            font-size: 14px;
+        }
+
         /* GÜNCELLEME ANİMASYONU */
         @keyframes groupPulseGlow {
             0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.9); border-color: #34d399; transform: scale(1.02); }
@@ -8334,15 +8512,17 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         .row-item span:first-child { color:#94a3b8; }
         .row-item span:last-child { font-weight:600; }
         
-        .refresh-btn { background:linear-gradient(135deg, #2563eb, #1d4ed8); color:white; border:none; padding:10px 20px; border-radius:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:8px; transition:all 0.2s; box-shadow:0 4px 15px rgba(37,99,235,0.4); }
-        .refresh-btn:hover { background:linear-gradient(135deg, #1d4ed8, #1e40af); transform:translateY(-1px); }
+        .refresh-btn { background:linear-gradient(135deg, #2563eb, #1d4ed8); color:white; border:none; box-shadow:0 4px 15px rgba(37,99,235,0.4); }
+        .refresh-btn:hover { background:linear-gradient(135deg, #1d4ed8, #1e40af); }
         .footer { text-align:center; color:#64748b; font-size:12px; margin-top:40px; }
     </style>
 </head>
 
 <body>
     <div id="toast-container" style="position:fixed; top:24px; right:24px; z-index:99999; display:flex; flex-direction:column; gap:12px; pointer-events:none;"></div>
+    
     <div class="container">
+        <!-- HEADER -->
         <div class="header">
             <div class="logo-area">
                 <div class="logo-icon">💼</div>
@@ -8351,12 +8531,35 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                     <p id="time-text">Yükleniyor...</p>
                 </div>
             </div>
-            <div style="display:flex; align-items:center; gap:12px;">
-                <button class="refresh-btn" onclick="fetchData(true)">🔄 Manuel Yenile</button>
-                <div class="status-badge" id="live-status-badge"><div class="status-dot"></div> ANLIK CANLI SİSTEM (0s)</div>
+            
+            <div class="header-controls">
+                <!-- 6. TARİH SEÇİCİ -->
+                <select id="date-select" class="header-select" onchange="onDateChanged(this.value)" title="Geçmiş Tarih Seçimi">
+                    <option value="">📅 Güncel Canlı Bilanço</option>
+                </select>
+
+                <!-- 2. GİZLİLİK MODU -->
+                <button id="privacy-btn" class="control-btn" onclick="togglePrivacy()" title="Bakiye Gizliliği">
+                    <span id="privacy-icon">👁️</span> <span id="privacy-text">Gizle</span>
+                </button>
+
+                <!-- 3. SESLİ BİLDİRİM -->
+                <button id="sound-btn" class="control-btn" onclick="toggleSound()" title="İşlem Bildirim Sesi">
+                    <span id="sound-icon">🔔</span> <span id="sound-text">Ses Açık</span>
+                </button>
+
+                <!-- MANUEL YENİLE -->
+                <button class="control-btn refresh-btn" onclick="fetchData(true)">🔄 Yenile</button>
+                
+                <!-- CANLI DURUM ROZETİ -->
+                <div class="status-badge" id="live-status-badge">
+                    <div class="status-dot" id="status-dot-el"></div> 
+                    <span id="status-text-el">ANLIK CANLI SİSTEM (0s)</span>
+                </div>
             </div>
         </div>
 
+        <!-- 6'LI İSTATİSTİK KARTLARI -->
         <div class="stats-grid">
             <div class="stat-card stat-devir">
                 <div class="stat-label">🔄 Toplam Devir</div>
@@ -8384,11 +8587,57 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             </div>
         </div>
 
+        <!-- 4. FİNANSAL DAĞILIM VE LİKİDİTE ÇUBUĞU -->
+        <div class="liquidity-box">
+            <div class="liquidity-header">
+                <div class="liquidity-title">💧 FİNANSAL LİKİDİTE VE DAĞILIM ORANI</div>
+                <div class="liquidity-legend">
+                    <div class="leg-item"><div class="leg-dot" style="background:#10b981;"></div> Net Kalan: <span id="leg-kalan" style="color:#34d399;">%0</span></div>
+                    <div class="leg-item"><div class="leg-dot" style="background:#f59e0b;"></div> Ödenen: <span id="leg-odenen" style="color:#fbbf24;">%0</span></div>
+                    <div class="leg-item"><div class="leg-dot" style="background:#ec4899;"></div> Komisyon: <span id="leg-komisyon" style="color:#f472b6;">%0</span></div>
+                    <div class="leg-item"><div class="leg-dot" style="background:#ef4444;"></div> Masraf: <span id="leg-masraf" style="color:#f87171;">%0</span></div>
+                </div>
+            </div>
+            <div class="progress-track" id="progress-track">
+                <div class="progress-segment seg-kalan" id="seg-kalan" style="width:0%;" title="Net Kalan"></div>
+                <div class="progress-segment seg-odenen" id="seg-odenen" style="width:0%;" title="Ödenen"></div>
+                <div class="progress-segment seg-komisyon" id="seg-komisyon" style="width:0%;" title="Komisyon"></div>
+                <div class="progress-segment seg-masraf" id="seg-masraf" style="width:0%;" title="Masraf"></div>
+            </div>
+        </div>
+
+        <!-- 1. ARAMA VE AKILLI FİLTRELEME ARAÇ ÇUBUĞU -->
+        <div class="toolbar">
+            <div class="search-area">
+                <span class="search-icon-left">🔍</span>
+                <input type="text" id="search-input" class="search-input" placeholder="Cari veya grup adı ara..." oninput="onFilterChanged()">
+                <button id="search-clear-btn" class="search-clear-btn" onclick="clearSearch()">✕</button>
+            </div>
+            
+            <div class="filter-chips">
+                <button class="chip active" data-filter="all" onclick="setFilter('all')">Tümü (<span id="count-all">0</span>)</button>
+                <button class="chip chip-borclular" data-filter="borclular" onclick="setFilter('borclular')">🔴 Borçlular (<span id="count-borclular">0</span>)</button>
+                <button class="chip chip-alacaklilar" data-filter="alacaklilar" onclick="setFilter('alacaklilar')">🟢 Alacaklılar (<span id="count-alacaklilar">0</span>)</button>
+                <button class="chip" data-filter="notr" onclick="setFilter('notr')">⚪ Sıfır / Nötr (<span id="count-notr">0</span>)</button>
+            </div>
+
+            <div>
+                <select id="sort-select" class="sort-select" onchange="onFilterChanged()">
+                    <option value="kalan_desc">↕️ Kalan Bakiye (Yüksek ➜ Düşük)</option>
+                    <option value="kalan_asc">↕️ Kalan Bakiye (Düşük ➜ Yüksek)</option>
+                    <option value="kasa_desc">💰 Eklenen Kasa (En Çok)</option>
+                    <option value="name_asc">🔤 İsim (A ➜ Z)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- GRUPLAR BAŞLIĞI VE GRID -->
         <div class="section-title">📊 Aktif Gruplar ve Kasa Durumları</div>
         <div class="groups-grid" id="groups-container">
             <p style="color:#94a3b8;">Veriler yükleniyor...</p>
         </div>
 
+        <!-- MASRAFLAR BAŞLIĞI VE GRID -->
         <div class="section-title">📉 Günlük Masraf Kalemleri ve Gider Listesi</div>
         <div class="masraflar-grid" id="masraflar-container">
             <p style="color:#94a3b8;">Masraf verileri yükleniyor...</p>
@@ -8397,15 +8646,105 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <div class="footer">
             <p>CFO Finans Yönetim Sistemi © 2026 | Yazılım: @CRYPTOATAKAN</p>
         </div>
-
     </div>
 
     <script>
+        const serverToken = '{{DASHBOARD_TOKEN}}';
+        const queryToken = new URLSearchParams(window.location.search).get('token') || '';
+        const token = queryToken || serverToken || '';
+
+        let currentDashboardData = null;
         let prevGroupsState = {};
         let sseSource = null;
         let isFirstLoad = true;
+        let activeFilter = 'all';
+        let selectedDate = '';
+        
+        // 2. Gizlilik Modu State
+        let privacyMode = localStorage.getItem('cfo_privacy') === 'true';
+        
+        // 3. Sesli Bildirim State & Web Audio API
+        let soundEnabled = localStorage.getItem('cfo_sound') !== 'false';
+        let audioCtx = null;
+
+        // UI Başlangıç Durumlarını Güncelle
+        function updateControlButtonsUI() {
+            const pBtn = document.getElementById('privacy-btn');
+            const pIcon = document.getElementById('privacy-icon');
+            const pText = document.getElementById('privacy-text');
+            if (privacyMode) {
+                pBtn.classList.add('active');
+                pIcon.innerText = '👁️‍🗨️';
+                pText.innerText = 'Göster';
+            } else {
+                pBtn.classList.remove('active');
+                pIcon.innerText = '👁️';
+                pText.innerText = 'Gizle';
+            }
+
+            const sBtn = document.getElementById('sound-btn');
+            const sIcon = document.getElementById('sound-icon');
+            const sText = document.getElementById('sound-text');
+            if (soundEnabled) {
+                sBtn.classList.add('active');
+                sIcon.innerText = '🔔';
+                sText.innerText = 'Ses Açık';
+            } else {
+                sBtn.classList.remove('active');
+                sIcon.innerText = '🔕';
+                sText.innerText = 'Sessiz';
+            }
+        }
+
+        function togglePrivacy() {
+            privacyMode = !privacyMode;
+            localStorage.setItem('cfo_privacy', privacyMode);
+            updateControlButtonsUI();
+            if (currentDashboardData) {
+                renderDashboard(currentDashboardData, false, []);
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            localStorage.setItem('cfo_sound', soundEnabled);
+            updateControlButtonsUI();
+            if (soundEnabled) playFinancialChime();
+        }
+
+        // Web Audio API ile Kristal Netliğinde Finansal Bildirim Sentezleyici
+        function playFinancialChime() {
+            if (!soundEnabled) return;
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const now = audioCtx.currentTime;
+                // C5 (523Hz), E5 (659Hz), G5 (784Hz) Akoru
+                const notes = [523.25, 659.25, 783.99];
+                notes.forEach((freq, i) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + i * 0.08);
+                    gain.gain.setValueAtTime(0.001, now + i * 0.08);
+                    gain.gain.exponentialRampToValueAtTime(0.18, now + i * 0.08 + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.35);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now + i * 0.08);
+                    osc.stop(now + i * 0.08 + 0.4);
+                });
+            } catch (e) {
+                console.warn("Audio chime hatası:", e);
+            }
+        }
 
         function fmt(n) {
+            if (privacyMode) return '•••••• ₺';
             const num = Number(n);
             const isNeg = num < 0;
             const formatted = Math.abs(num).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -8413,6 +8752,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         }
 
         function fmtHtml(n) {
+            if (privacyMode) return '••••••<span class="curr">&nbsp;₺</span>';
             const num = Number(n);
             const isNeg = num < 0;
             const formatted = Math.abs(num).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -8454,12 +8794,171 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             }, 4500);
         }
 
-        function updateDashboardUI(d, isManual = false) {
-            if(d.error) {
-                showToast("Sistem Uyarısı", d.error, false);
+        // 4. Finansal Dağılım ve Likidite Çubuğunu Hesapla & Render Et
+        function updateLiquidityBar(d) {
+            const totalKasa = Math.max(Number(d.kasa || 0), 0);
+            const kalan = Math.max(Number(d.kalan || 0), 0);
+            const odenen = Math.max(Number(d.odenen || 0), 0);
+            const komisyon = Math.max(Number(d.komisyon || 0), 0);
+            const masraf = Math.max(Number(d.toplam_masraf || 0), 0);
+            
+            const denominator = (totalKasa > 0) ? totalKasa : (kalan + odenen + komisyon + masraf);
+
+            let pctKalan = 0, pctOdenen = 0, pctKom = 0, pctMasraf = 0;
+            if (denominator > 0) {
+                pctKalan = Math.round((kalan / denominator) * 100);
+                pctOdenen = Math.round((odenen / denominator) * 100);
+                pctKom = Math.round((komisyon / denominator) * 100);
+                pctMasraf = Math.round((masraf / denominator) * 100);
+            }
+
+            document.getElementById('seg-kalan').style.width = pctKalan + '%';
+            document.getElementById('seg-odenen').style.width = pctOdenen + '%';
+            document.getElementById('seg-komisyon').style.width = pctKom + '%';
+            document.getElementById('seg-masraf').style.width = pctMasraf + '%';
+
+            document.getElementById('leg-kalan').innerText = '%' + pctKalan;
+            document.getElementById('leg-odenen').innerText = '%' + pctOdenen;
+            document.getElementById('leg-komisyon').innerText = '%' + pctKom;
+            document.getElementById('leg-masraf').innerText = '%' + pctMasraf;
+        }
+
+        // 1. Arama & Filtreleme Mantığı
+        function setFilter(filterType) {
+            activeFilter = filterType;
+            document.querySelectorAll('.chip').forEach(c => {
+                if (c.getAttribute('data-filter') === filterType) {
+                    c.classList.add('active');
+                } else {
+                    c.classList.remove('active');
+                }
+            });
+            if (currentDashboardData) {
+                renderGroups(currentDashboardData.gruplar || [], []);
+            }
+        }
+
+        function clearSearch() {
+            document.getElementById('search-input').value = '';
+            document.getElementById('search-clear-btn').style.display = 'none';
+            onFilterChanged();
+        }
+
+        function onFilterChanged() {
+            const val = document.getElementById('search-input').value;
+            document.getElementById('search-clear-btn').style.display = val ? 'block' : 'none';
+            if (currentDashboardData) {
+                renderGroups(currentDashboardData.gruplar || [], []);
+            }
+        }
+
+        function renderGroups(allGroups, updatedGroupsList = []) {
+            const gc = document.getElementById('groups-container');
+            const query = (document.getElementById('search-input').value || '').trim().toLocaleLowerCase('tr');
+            const sortBy = document.getElementById('sort-select').value;
+
+            // Filtre Sayaçlarını Hesapla
+            let countAll = 0, countBorc = 0, countAlacak = 0, countNotr = 0;
+            allGroups.forEach(g => {
+                countAll++;
+                if (g.kalan < -0.01) countBorc++;
+                else if (g.kalan > 0.01) countAlacak++;
+                else countNotr++;
+            });
+            document.getElementById('count-all').innerText = countAll;
+            document.getElementById('count-borclular').innerText = countBorc;
+            document.getElementById('count-alacaklilar').innerText = countAlacak;
+            document.getElementById('count-notr').innerText = countNotr;
+
+            // Filtrele
+            let filtered = allGroups.filter(g => {
+                const name = String(g.ad || '').toLocaleLowerCase('tr');
+                if (query && !name.includes(query)) return false;
+
+                if (activeFilter === 'borclular') return g.kalan < -0.01;
+                if (activeFilter === 'alacaklilar') return g.kalan > 0.01;
+                if (activeFilter === 'notr') return Math.abs(g.kalan) <= 0.01;
+                return true;
+            });
+
+            // Sırala
+            filtered.sort((a, b) => {
+                if (sortBy === 'kalan_desc') return b.kalan - a.kalan;
+                if (sortBy === 'kalan_asc') return a.kalan - b.kalan;
+                if (sortBy === 'kasa_desc') return b.kasa - a.kasa;
+                if (sortBy === 'name_asc') return String(a.ad).localeCompare(String(b.ad), 'tr');
+                return 0;
+            });
+
+            if (filtered.length === 0) {
+                gc.innerHTML = '<div class="empty-alert">🔍 Kriterlerinize uygun grup veya bakiye kaydı bulunamadı.</div>';
                 return;
             }
-            document.getElementById('time-text').innerText = 'Tarih: ' + d.tarih + ' | Son Güncelleme: ' + new Date().toLocaleTimeString('tr-TR');
+
+            const updatedSet = new Set(updatedGroupsList.map(g => String(g).toUpperCase().trim()));
+
+            gc.innerHTML = filtered.map(g => {
+                const gNameUpper = g.ad.toUpperCase().trim();
+                const isUpdated = updatedSet.has(gNameUpper);
+                const safeId = 'card-group-' + gNameUpper.replace(/[^A-Z0-9]/gi, '_');
+                const isNeg = g.kalan < -0.01;
+                const isPos = g.kalan > 0.01;
+                const badgeBg = isNeg ? 'rgba(239, 68, 68, 0.15)' : (isPos ? 'rgba(16, 185, 129, 0.15)' : 'rgba(148, 163, 184, 0.15)');
+                const badgeColor = isNeg ? '#f87171' : (isPos ? '#34d399' : '#94a3b8');
+                const badgeBorder = isNeg ? 'rgba(239, 68, 68, 0.3)' : (isPos ? 'rgba(16, 185, 129, 0.3)' : 'rgba(148, 163, 184, 0.3)');
+
+                return `
+                    <div class="group-card ${isUpdated ? 'glow-updated' : ''}" id="${safeId}">
+                        <div class="group-header">
+                            <div class="group-name">
+                                <span>🔹</span> ${gNameUpper}
+                            </div>
+                            <div class="group-kalan-badge" style="background:${badgeBg}; color:${badgeColor}; border-color:${badgeBorder};">
+                                ${fmt(g.kalan)}
+                            </div>
+                        </div>
+                        <div class="row-item">
+                            <span>🔄 Devir:</span>
+                            <span>${fmt(g.devir)}</span>
+                        </div>
+                        <div class="row-item">
+                            <span>💰 Eklenen Kasa:</span>
+                            <span>${fmt(g.kasa)}</span>
+                        </div>
+                        <div class="row-item">
+                            <span>💸 Ödenen:</span>
+                            <span>${fmt(g.odenen)}</span>
+                        </div>
+                        <div class="row-item">
+                            <span>✂️ Kesinti/Masraf:</span>
+                            <span>${fmt(g.komisyon)}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderDashboard(d, isManual = false, updatedGroupsList = []) {
+            currentDashboardData = d;
+            
+            const isArchive = !!d.is_archive;
+            const statusBadge = document.getElementById('live-status-badge');
+            const statusDot = document.getElementById('status-dot-el');
+            const statusText = document.getElementById('status-text-el');
+
+            if (isArchive) {
+                statusBadge.classList.add('archive');
+                statusDot.classList.add('archive');
+                statusText.innerText = '📁 ARŞİV BİLANÇOSU (' + d.tarih + ')';
+            } else {
+                statusBadge.classList.remove('archive');
+                statusDot.classList.remove('archive');
+                statusText.innerText = 'ANLIK CANLI SİSTEM (0s)';
+            }
+
+            document.getElementById('time-text').innerText = (isArchive ? 'Tarih: ' + d.tarih + ' (Arşiv Verisi)' : 'Tarih: ' + d.tarih + ' | Son Güncelleme: ' + new Date().toLocaleTimeString('tr-TR'));
+            
+            // Üst Sayaçları Güncelle
             document.getElementById('toplam-devir').innerHTML = fmtHtml(d.devir);
             document.getElementById('toplam-kasa').innerHTML = fmtHtml(d.kasa);
             document.getElementById('toplam-odenen').innerHTML = fmtHtml(d.odenen);
@@ -8467,91 +8966,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             document.getElementById('toplam-masraf').innerHTML = fmtHtml(d.toplam_masraf || 0);
             document.getElementById('toplam-kalan').innerHTML = fmtHtml(d.kalan);
 
-            // Render Gruplar
-            const gc = document.getElementById('groups-container');
-            if(!d.gruplar || d.gruplar.length === 0) {
-                gc.innerHTML = '<p style="color:#94a3b8;">Henüz işlem görmüş aktif grup bulunmuyor.</p>';
-            } else {
-                const updatedSet = new Set();
+            // Likidite Barını Güncelle
+            updateLiquidityBar(d);
 
-                if (!isFirstLoad && !isManual) {
-                    if (d.updated_groups && Array.isArray(d.updated_groups)) {
-                        d.updated_groups.forEach(g => {
-                            if (g) updatedSet.add(String(g).toUpperCase().trim());
-                        });
-                    }
-                }
+            // Grupları Render Et
+            renderGroups(d.gruplar || [], updatedGroupsList);
 
-                // Mevcut değerleri hafızaya yaz
-                d.gruplar.forEach(g => {
-                    const gNameUpper = g.ad.toUpperCase().trim();
-                    prevGroupsState[gNameUpper] = `${g.devir}_${g.kasa}_${g.odenen}_${g.komisyon}_${g.kalan}`;
-                });
-
-                gc.innerHTML = d.gruplar.map(g => {
-                    const gNameUpper = g.ad.toUpperCase().trim();
-                    const isUpdated = updatedSet.has(gNameUpper);
-                    const safeId = 'card-group-' + gNameUpper.replace(/[^A-Z0-9]/gi, '_');
-                    return `
-                        <div class="group-card ${isUpdated ? 'glow-updated' : ''}" id="${safeId}">
-                            <div class="group-header">
-                                <div class="group-name">
-                                    <span>🔹</span> ${gNameUpper}
-                                </div>
-                                <div class="group-kalan-badge" style="background:${g.kalan < 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)'}; color:${g.kalan < 0 ? '#f87171' : '#34d399'};">${fmt(g.kalan)}</div>
-                            </div>
-                            <div class="row-item">
-                                <span>🔄 Devir:</span>
-                                <span>${fmt(g.devir)}</span>
-                            </div>
-                            <div class="row-item">
-                                <span>💰 Eklenen Kasa:</span>
-                                <span>${fmt(g.kasa)}</span>
-                            </div>
-                            <div class="row-item">
-                                <span>💸 Ödenen:</span>
-                                <span>${fmt(g.odenen)}</span>
-                            </div>
-                            <div class="row-item">
-                                <span>✂️ Kesinti/Masraf:</span>
-                                <span>${fmt(g.komisyon)}</span>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-
-                // Profesyonel Bildirim Gösterimi (Tekil İşlem Bazlı)
-                if (!isManual && !isFirstLoad) {
-                    if (d.group_changes && Array.isArray(d.group_changes) && d.group_changes.length > 0) {
-                        d.group_changes.forEach(change => {
-                            if (change && change.message) {
-                                showToast("Finansal İşlem Bildirimi", change.message, true);
-                            }
-                        });
-                    } else if (updatedSet.size > 0) {
-                        updatedSet.forEach(gNameUpper => {
-                            showToast("Finansal İşlem Bildirimi", `📊 <b>${gNameUpper}</b> grubu finansal bakiyesi güncellendi.`, true);
-                        });
-                    }
-
-                    setTimeout(() => {
-                        updatedSet.forEach(gNameUpper => {
-                            const safeId = 'card-group-' + gNameUpper.replace(/[^A-Z0-9]/gi, '_');
-                            const cardEl = document.getElementById(safeId);
-                            if (cardEl) {
-                                cardEl.classList.remove('glow-updated');
-                            }
-                        });
-                    }, 5000);
-                }
-            }
-
-            isFirstLoad = false;
-
-            // Render Masraflar
+            // Masrafları Render Et
             const mc = document.getElementById('masraflar-container');
             if(!d.masraflar || d.masraflar.length === 0) {
-                mc.innerHTML = '<p style="color:#94a3b8;">Bugün için kaydedilmiş bir masraf / gider bulunmuyor.</p>';
+                mc.innerHTML = '<p style="color:#94a3b8; grid-column:1/-1;">Kayıtlı bir masraf / gider bulunmuyor.</p>';
             } else {
                 mc.innerHTML = d.masraflar.map(m => `
                     <div class="masraf-card">
@@ -8560,33 +8984,77 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                     </div>
                 `).join('');
             }
+
+            isFirstLoad = false;
         }
 
-        const serverToken = '{{DASHBOARD_TOKEN}}';
-        const queryToken = new URLSearchParams(window.location.search).get('token') || '';
-        const token = queryToken || serverToken || '';
+        // 6. Tarih Listesini Sunucudan Çek ve Menüye Ekle
+        async function fetchSheetsList() {
+            try {
+                const url = '/api/sheets_list' + (token ? '?token=' + encodeURIComponent(token) : '');
+                const res = await fetch(url);
+                const data = await res.json();
+                const sel = document.getElementById('date-select');
+                sel.innerHTML = '<option value="">📅 Güncel Canlı Bilanço (' + (data.aktif || 'Bugün') + ')</option>';
+                if (data.tarihler && Array.isArray(data.tarihler)) {
+                    data.tarihler.forEach(t => {
+                        if (t !== data.aktif) {
+                            const opt = document.createElement('option');
+                            opt.value = t;
+                            opt.innerText = '📁 ' + t + ' (Kapanış)';
+                            sel.appendChild(opt);
+                        }
+                    });
+                }
+            } catch(e) {
+                console.warn('Sheets listesi yüklenemedi:', e);
+            }
+        }
+
+        function onDateChanged(dateVal) {
+            selectedDate = dateVal;
+            if (selectedDate) {
+                // Arşiv seçildiğinde SSE'yi durdur
+                if (sseSource) sseSource.close();
+                fetchData(true);
+            } else {
+                // Güncele dönüldüğünde SSE'yi yeniden başlat
+                fetchData(true);
+                initSSE();
+            }
+        }
 
         async function fetchData(isManual = false) {
             try {
-                const url = '/api/dashboard' + (token ? '?token=' + encodeURIComponent(token) : '');
+                let url = '/api/dashboard?';
+                if (token) url += 'token=' + encodeURIComponent(token) + '&';
+                if (selectedDate) url += 'tarih=' + encodeURIComponent(selectedDate) + '&';
+                
                 const res = await fetch(url);
                 const d = await res.json();
-                updateDashboardUI(d, isManual);
-                if(isManual) showToast("Finansal Yenileme", "Finans paneli güncellendi.", false);
+                if(d.error) {
+                    showToast("Sistem Uyarısı", d.error, false);
+                    return;
+                }
+                renderDashboard(d, isManual, []);
+                if(isManual) showToast("Finansal Yenileme", selectedDate ? d.tarih + " arşiv bilançosu yüklendi." : "Finans paneli güncellendi.", false);
             } catch(e) {
-                console.error(e);
+                console.error("Fetch hatası:", e);
             }
         }
 
         function initSSE() {
+            if (selectedDate) return; // Arşiv modunda canlı yayın dinlenmez
             if (sseSource) sseSource.close();
-            const streamUrl = '/api/stream' + (token ? '?token=' + encodeURIComponent(token) : '');
             
+            const streamUrl = '/api/stream' + (token ? '?token=' + encodeURIComponent(token) : '');
             sseSource = new EventSource(streamUrl);
             
             sseSource.onopen = function() {
                 const badge = document.getElementById('live-status-badge');
-                badge.innerHTML = '<div class="status-dot"></div> ANLIK CANLI SİSTEM (0s)';
+                badge.classList.remove('archive');
+                document.getElementById('status-dot-el').classList.remove('archive');
+                document.getElementById('status-text-el').innerText = 'ANLIK CANLI SİSTEM (0s)';
                 badge.style.borderColor = '#22c55e';
                 badge.style.color = '#4ade80';
             };
@@ -8594,7 +9062,40 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             sseSource.onmessage = function(event) {
                 try {
                     const d = JSON.parse(event.data);
-                    updateDashboardUI(d, false);
+                    const updatedList = d.updated_groups || [];
+                    
+                    renderDashboard(d, false, updatedList);
+
+                    // Bildirimler ve Sesli Chime
+                    if (!isFirstLoad) {
+                        let hasChange = false;
+                        if (d.group_changes && Array.isArray(d.group_changes) && d.group_changes.length > 0) {
+                            hasChange = true;
+                            d.group_changes.forEach(change => {
+                                if (change && change.message) {
+                                    showToast("Finansal İşlem Bildirimi", change.message, true);
+                                }
+                            });
+                        } else if (updatedList.length > 0) {
+                            hasChange = true;
+                            updatedList.forEach(gNameUpper => {
+                                showToast("Finansal İşlem Bildirimi", `📊 <b>${gNameUpper}</b> grubu bakiyesi güncellendi.`, true);
+                            });
+                        }
+
+                        if (hasChange) {
+                            playFinancialChime();
+                        }
+
+                        // Parlama animasyonunu 5 sn sonra temizle
+                        setTimeout(() => {
+                            updatedList.forEach(gNameUpper => {
+                                const safeId = 'card-group-' + gNameUpper.replace(/[^A-Z0-9]/gi, '_');
+                                const cardEl = document.getElementById(safeId);
+                                if (cardEl) cardEl.classList.remove('glow-updated');
+                            });
+                        }, 5000);
+                    }
                 } catch(e) {
                     console.error("SSE parse error:", e);
                 }
@@ -8602,13 +9103,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             
             sseSource.onerror = function() {
                 const badge = document.getElementById('live-status-badge');
-                badge.innerHTML = '<div class="status-dot" style="background:#f59e0b;"></div> BAĞLANTI YENİLENİYOR...';
+                document.getElementById('status-text-el').innerText = 'BAĞLANTI YENİLENİYOR...';
                 badge.style.borderColor = '#f59e0b';
                 badge.style.color = '#fbbf24';
                 setTimeout(fetchData, 8000);
             };
         }
 
+        // Başlat
+        updateControlButtonsUI();
+        fetchSheetsList();
         fetchData(true);
         initSSE();
     </script>
@@ -8698,7 +9202,65 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         
-        if parsed.path == "/api/stream":
+        if parsed.path == "/manifest.json":
+            self._send_security_headers(200, "application/manifest+json; charset=utf-8")
+            self.end_headers()
+            manifest_data = {
+                "name": "CFO Canlı Finans Paneli",
+                "short_name": "CFO Bot",
+                "start_url": "/",
+                "display": "standalone",
+                "background_color": "#070a14",
+                "theme_color": "#070a14",
+                "icons": [
+                    {
+                        "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='25' fill='%231e293b'/%3E%3Ctext y='.9em' font-size='70' x='15'%3E💼%3C/text%3E%3C/svg%3E",
+                        "sizes": "192x192 512x512",
+                        "type": "image/svg+xml",
+                        "purpose": "any maskable"
+                    }
+                ]
+            }
+            self.wfile.write(json.dumps(manifest_data).encode("utf-8"))
+            return
+
+        elif parsed.path == "/api/sheets_list":
+            if not self._check_auth(parsed, DASHBOARD_AUTH_TOKEN):
+                self._send_security_headers(401, "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
+                return
+
+            self._send_security_headers(200, "application/json; charset=utf-8")
+            self.end_headers()
+            try:
+                sh = get_spreadsheet()
+                tum_ws = sh.worksheets()
+                aktif_ws = get_active_daily_sheet(sh)
+                tarih_sayfalari = []
+                for ws in tum_ws:
+                    title = getattr(ws, "title", str(ws)).strip()
+                    if is_valid_daily_sheet(ws) and re.match(r'^\d{2}\.\d{2}\.\d{4}$', title):
+                        try:
+                            t_obj = datetime.datetime.strptime(title, "%d.%m.%Y")
+                            tarih_sayfalari.append((t_obj, title))
+                        except Exception:
+                            pass
+                tarih_sayfalari.sort(key=lambda x: x[0], reverse=True)
+                sirali_tarihler = [t[1] for t in tarih_sayfalari]
+                aktif_title = getattr(aktif_ws, "title", "")
+                if aktif_title and aktif_title not in sirali_tarihler:
+                    sirali_tarihler.insert(0, aktif_title)
+                self.wfile.write(json.dumps({
+                    "aktif": aktif_title,
+                    "tarihler": sirali_tarihler
+                }).encode("utf-8"))
+            except Exception as e:
+                print(f"API sheets_list hatası: {e}")
+                self.wfile.write(json.dumps({"aktif": "", "tarihler": []}).encode("utf-8"))
+            return
+
+        elif parsed.path == "/api/stream":
             if not self._check_auth(parsed, DASHBOARD_AUTH_TOKEN):
                 self._send_security_headers(401, "application/json; charset=utf-8")
                 self.end_headers()
@@ -8724,6 +9286,7 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                 finans = tablodan_finans_ozeti_hesapla(veriler)
                 initial_data = {
                     "tarih": sayfa.title,
+                    "is_archive": False,
                     "devir": finans["devir"],
                     "kasa": finans["kasa"],
                     "odenen": finans["odenen"],
@@ -8766,12 +9329,27 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
             self._send_security_headers(200, "application/json; charset=utf-8")
             self.end_headers()
             try:
+                query_params = urllib.parse.parse_qs(parsed.query)
+                req_tarih = query_params.get("tarih", [""])[0].strip()
+                
                 sh = get_spreadsheet()
-                sayfa = get_active_daily_sheet(sh)
-                veriler = get_sheet_values_fast(sayfa, max_age_seconds=2.0)
+                aktif_sayfa = get_active_daily_sheet(sh)
+                is_archive = False
+                
+                if req_tarih and req_tarih != getattr(aktif_sayfa, "title", ""):
+                    try:
+                        sayfa = sh.worksheet(req_tarih)
+                        is_archive = True
+                    except Exception:
+                        sayfa = aktif_sayfa
+                else:
+                    sayfa = aktif_sayfa
+
+                veriler = get_sheet_values_fast(sayfa, max_age_seconds=(0.0 if is_archive else 2.0))
                 finans = tablodan_finans_ozeti_hesapla(veriler)
                 data = {
                     "tarih": sayfa.title,
+                    "is_archive": is_archive,
                     "devir": finans["devir"],
                     "kasa": finans["kasa"],
                     "odenen": finans["odenen"],
