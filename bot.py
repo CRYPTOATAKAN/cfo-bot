@@ -9771,7 +9771,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 });
             }
             
-            const csvContent = "\uFEFF" + rows.map(e => e.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(";")).join("\r\n");
+            const csvContent = "\uFEFF" + rows.map(e => e.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(";")).join(String.fromCharCode(13, 10));
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             const url = URL.createObjectURL(blob);
