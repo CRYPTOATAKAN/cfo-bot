@@ -8823,11 +8823,167 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         }
         .modal-copy-btn:hover { background: linear-gradient(135deg, #1d4ed8, #1e40af); transform: translateY(-1px); }
 
+        /* SEKME GEZİNTİ ÇUBUĞU */
+        .nav-tabs {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 22px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 12px;
+        }
+        .nav-tab-btn {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #94a3b8;
+            padding: 10px 18px;
+            border-radius: 12px;
+            font-size: 13.5px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.25s ease;
+        }
+        .nav-tab-btn:hover {
+            color: #f8fafc;
+            background: rgba(30, 41, 59, 0.8);
+            border-color: rgba(96, 165, 250, 0.4);
+        }
+        .nav-tab-btn.active {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.25), rgba(139, 92, 246, 0.25));
+            border-color: #60a5fa;
+            color: #ffffff;
+            box-shadow: 0 4px 18px rgba(37, 99, 235, 0.25);
+        }
+        .tab-content {
+            display: none;
+            animation: fadeInTab 0.3s ease;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fadeInTab {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* PİYASA KURLARI EKRANI STİLLERİ */
+        .market-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .market-card {
+            background: rgba(15, 23, 42, 0.78);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            backdrop-filter: blur(14px);
+            border-radius: 18px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+            transition: all 0.3s ease;
+        }
+        .market-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(96, 165, 250, 0.4);
+            box-shadow: 0 12px 35px rgba(0,0,0,0.5);
+        }
+        .market-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .market-card-title {
+            font-size: 13.5px;
+            font-weight: 700;
+            color: #cbd5e1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .market-price-big {
+            font-size: 26px;
+            font-weight: 900;
+            color: #ffffff;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+        .market-change-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 8px;
+        }
+        .change-up { background: rgba(16, 185, 129, 0.18); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); }
+        .change-down { background: rgba(239, 68, 68, 0.18); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35); }
+        .change-neutral { background: rgba(148, 163, 184, 0.18); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); }
+
+        .market-sub-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
+        }
+        .market-sub-item {
+            font-size: 11.5px;
+        }
+        .market-sub-item .label { color: #94a3b8; margin-bottom: 2px; }
+        .market-sub-item .val { font-weight: 700; color: #e2e8f0; }
+
+        /* BORSA ARBİTRAJ VE KARŞILAŞTIRMA TABLOSU */
+        .rates-table-wrapper {
+            background: rgba(15, 23, 42, 0.75);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 18px;
+            padding: 20px;
+            margin-bottom: 24px;
+            backdrop-filter: blur(12px);
+            overflow-x: auto;
+        }
+        .rates-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 13px;
+        }
+        .rates-table th {
+            padding: 12px 16px;
+            color: #94a3b8;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .rates-table td {
+            padding: 14px 16px;
+            color: #f1f5f9;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .rates-table tr:last-child td { border-bottom: none; }
+        .rates-table tr:hover td { background: rgba(30, 41, 59, 0.4); }
+        .exchange-name-cell {
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
         /* YAZDIRMA & PDF ŞABLONU */
         @media print {
             body { background: #ffffff !important; color: #000000 !important; padding: 10px !important; }
             body::before, body::after { display: none !important; }
-            .header-controls, .toolbar, .refresh-btn, .search-area, .filter-chips, #toast-container, .modal-backdrop, .status-badge { display: none !important; }
+            .header-controls, .toolbar, .refresh-btn, .search-area, .filter-chips, #toast-container, .modal-backdrop, .status-badge, .nav-tabs { display: none !important; }
             .stat-card { background: #ffffff !important; border: 1px solid #cccccc !important; color: #000000 !important; box-shadow: none !important; }
             .stat-value { color: #000000 !important; }
             .group-card { background: #ffffff !important; border: 1px solid #cccccc !important; color: #000000 !important; box-shadow: none !important; page-break-inside: avoid; }
@@ -8865,7 +9021,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                     <button id="currency-toggle-btn" class="control-btn" onclick="toggleCurrency()" title="Para Birimi Değiştir">
                         <span id="currency-flag">💵</span> <span id="currency-label">TRY (₺)</span>
                     </button>
-                    <span id="exchange-rate-tag" class="rate-badge">1 USDT = 38,50 ₺</span>
+                    <span id="exchange-rate-tag" class="rate-badge" onclick="switchTab('rates')" style="cursor:pointer;" title="Canlı piyasa ve borsa kurlarını görüntüle">💱 1 USDT = <span id="header-usdt-rate">{{USDT_RATE}}</span> ₺</span>
                 </div>
 
                 <!-- 1. RAPOR DIŞA AKTARMA (CSV & PRINT PDF) -->
@@ -8904,108 +9060,264 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             </div>
         </div>
 
-        <!-- 7'Lİ İSTATİSTİK KARTLARI (CFO KPI) -->
-        <div class="stats-grid">
-            <div class="stat-card stat-devir">
-                <div class="stat-label">🔄 Toplam Devir</div>
-                <div class="stat-value" id="toplam-devir">0,00 ₺</div>
-            </div>
-            <div class="stat-card stat-kasa">
-                <div class="stat-label">💰 Eklenen Kasa</div>
-                <div class="stat-value" id="toplam-kasa">0,00 ₺</div>
-            </div>
-            <div class="stat-card stat-odenen">
-                <div class="stat-label">💸 Toplam Ödeme</div>
-                <div class="stat-value" id="toplam-odenen">0,00 ₺</div>
-            </div>
-            <div class="stat-card stat-komisyon">
-                <div class="stat-label">✂️ Toplam Komisyon</div>
-                <div class="stat-value" id="toplam-komisyon" style="color:#f472b6;">0,00 ₺</div>
-            </div>
-            <div class="stat-card stat-masraf">
-                <div class="stat-label">📉 TOPLAM MASRAF</div>
-                <div class="stat-value" id="toplam-masraf" style="color:#f87171;">0,00 ₺</div>
-            </div>
-            <div class="stat-card stat-kalan">
-                <div class="stat-label">🏦 NET KALAN KASA</div>
-                <div class="stat-value" id="toplam-kalan" style="color:#34d399;">0,00 ₺</div>
-            </div>
-            <div class="stat-card stat-kar" id="card-stat-kar">
-                <div class="stat-label">💎 ŞİRKET NET KÂRI (KPI)</div>
-                <div class="stat-value" id="toplam-net-kar" style="color:#10b981;">0,00 ₺</div>
-                <div class="stat-sub" id="kar-marji-badge">Kâr Marjı: %0.00</div>
-            </div>
+        <!-- NAV TABS -->
+        <div class="nav-tabs">
+            <button id="tab-btn-finance" class="nav-tab-btn active" onclick="switchTab('finance')">
+                <span>📊</span> Kasa & Finans Paneli
+            </button>
+            <button id="tab-btn-rates" class="nav-tab-btn" onclick="switchTab('rates')">
+                <span>💱</span> Canlı Piyasa & Kurlar <span class="rate-badge" style="margin-left:4px; font-size:10px; padding:2px 6px; background:rgba(16,185,129,0.2); border-color:#10b981; color:#34d399;">CANLI</span>
+            </button>
         </div>
 
-        <!-- 4. FİNANSAL DAĞILIM VE LİKİDİTE ÇUBUĞU -->
-        <div class="liquidity-box">
-            <div class="liquidity-header">
-                <div class="liquidity-title">💧 FİNANSAL LİKİDİTE VE DAĞILIM ORANI</div>
-                <div class="liquidity-legend">
-                    <div class="leg-item"><div class="leg-dot" style="background:#10b981;"></div> Net Kalan: <span id="leg-kalan" style="color:#34d399;">%0</span></div>
-                    <div class="leg-item"><div class="leg-dot" style="background:#f59e0b;"></div> Ödenen: <span id="leg-odenen" style="color:#fbbf24;">%0</span></div>
-                    <div class="leg-item"><div class="leg-dot" style="background:#ec4899;"></div> Komisyon: <span id="leg-komisyon" style="color:#f472b6;">%0</span></div>
-                    <div class="leg-item"><div class="leg-dot" style="background:#ef4444;"></div> Masraf: <span id="leg-masraf" style="color:#f87171;">%0</span></div>
+        <!-- TAB 1: KASA & FİNANS PANELİ -->
+        <div id="tab-finance" class="tab-content active">
+            <!-- 7'Lİ İSTATİSTİK KARTLARI (CFO KPI) -->
+            <div class="stats-grid">
+                <div class="stat-card stat-devir">
+                    <div class="stat-label">🔄 Toplam Devir</div>
+                    <div class="stat-value" id="toplam-devir">0,00 ₺</div>
+                </div>
+                <div class="stat-card stat-kasa">
+                    <div class="stat-label">💰 Eklenen Kasa</div>
+                    <div class="stat-value" id="toplam-kasa">0,00 ₺</div>
+                </div>
+                <div class="stat-card stat-odenen">
+                    <div class="stat-label">💸 Toplam Ödeme</div>
+                    <div class="stat-value" id="toplam-odenen">0,00 ₺</div>
+                </div>
+                <div class="stat-card stat-komisyon">
+                    <div class="stat-label">✂️ Toplam Komisyon</div>
+                    <div class="stat-value" id="toplam-komisyon" style="color:#f472b6;">0,00 ₺</div>
+                </div>
+                <div class="stat-card stat-masraf">
+                    <div class="stat-label">📉 TOPLAM MASRAF</div>
+                    <div class="stat-value" id="toplam-masraf" style="color:#f87171;">0,00 ₺</div>
+                </div>
+                <div class="stat-card stat-kalan">
+                    <div class="stat-label">🏦 NET KALAN KASA</div>
+                    <div class="stat-value" id="toplam-kalan" style="color:#34d399;">0,00 ₺</div>
+                </div>
+                <div class="stat-card stat-kar" id="card-stat-kar">
+                    <div class="stat-label">💎 ŞİRKET NET KÂRI (KPI)</div>
+                    <div class="stat-value" id="toplam-net-kar" style="color:#10b981;">0,00 ₺</div>
+                    <div class="stat-sub" id="kar-marji-badge">Kâr Marjı: %0.00</div>
                 </div>
             </div>
-            <div class="progress-track" id="progress-track">
-                <div class="progress-segment seg-kalan" id="seg-kalan" style="width:0%;" title="Net Kalan"></div>
-                <div class="progress-segment seg-odenen" id="seg-odenen" style="width:0%;" title="Ödenen"></div>
-                <div class="progress-segment seg-komisyon" id="seg-komisyon" style="width:0%;" title="Komisyon"></div>
-                <div class="progress-segment seg-masraf" id="seg-masraf" style="width:0%;" title="Masraf"></div>
-            </div>
-        </div>
 
-        <!-- 6. GÜN İÇİ NAKİT AKIŞ VE CARİ HACİM GRAFİĞİ -->
-        <div class="trend-chart-box" id="trend-chart-box">
-            <div class="trend-header">
-                <div class="trend-title">📈 GÜN İÇİ CARİ NAKİT AKIŞI VE İŞLEM HACMİ</div>
-                <div class="chart-legend">
-                    <div class="leg-item"><div class="leg-dot" style="background:#3b82f6;"></div> Kasa Girişi</div>
-                    <div class="leg-item"><div class="leg-dot" style="background:#f59e0b;"></div> Yapılan Ödeme</div>
+            <!-- 4. FİNANSAL DAĞILIM VE LİKİDİTE ÇUBUĞU -->
+            <div class="liquidity-box">
+                <div class="liquidity-header">
+                    <div class="liquidity-title">💧 FİNANSAL LİKİDİTE VE DAĞILIM ORANI</div>
+                    <div class="liquidity-legend">
+                        <div class="leg-item"><div class="leg-dot" style="background:#10b981;"></div> Net Kalan: <span id="leg-kalan" style="color:#34d399;">%0</span></div>
+                        <div class="leg-item"><div class="leg-dot" style="background:#f59e0b;"></div> Ödenen: <span id="leg-odenen" style="color:#fbbf24;">%0</span></div>
+                        <div class="leg-item"><div class="leg-dot" style="background:#ec4899;"></div> Komisyon: <span id="leg-komisyon" style="color:#f472b6;">%0</span></div>
+                        <div class="leg-item"><div class="leg-dot" style="background:#ef4444;"></div> Masraf: <span id="leg-masraf" style="color:#f87171;">%0</span></div>
+                    </div>
+                </div>
+                <div class="progress-track" id="progress-track">
+                    <div class="progress-segment seg-kalan" id="seg-kalan" style="width:0%;" title="Net Kalan"></div>
+                    <div class="progress-segment seg-odenen" id="seg-odenen" style="width:0%;" title="Ödenen"></div>
+                    <div class="progress-segment seg-komisyon" id="seg-komisyon" style="width:0%;" title="Komisyon"></div>
+                    <div class="progress-segment seg-masraf" id="seg-masraf" style="width:0%;" title="Masraf"></div>
                 </div>
             </div>
-            <div class="chart-canvas-wrapper" id="trend-chart-container">
-                <p style="color:#94a3b8; font-size:12px; text-align:center; padding:15px 0;">Grafik verisi yükleniyor...</p>
-            </div>
-        </div>
 
-        <!-- 1. ARAMA VE AKILLI FİLTRELEME ARAÇ ÇUBUĞU -->
-        <div class="toolbar">
-            <div class="search-area">
-                <span class="search-icon-left">🔍</span>
-                <input type="text" id="search-input" class="search-input" placeholder="Cari veya grup adı ara..." oninput="onFilterChanged()">
-                <button id="search-clear-btn" class="search-clear-btn" onclick="clearSearch()">✕</button>
-            </div>
-            
-            <div class="filter-chips">
-                <button class="chip active" data-filter="all" onclick="setFilter('all')">Tümü (<span id="count-all">0</span>)</button>
-                <button class="chip chip-borclular" data-filter="borclular" onclick="setFilter('borclular')">🔴 Borçlular (<span id="count-borclular">0</span>)</button>
-                <button class="chip chip-alacaklilar" data-filter="alacaklilar" onclick="setFilter('alacaklilar')">🟢 Alacaklılar (<span id="count-alacaklilar">0</span>)</button>
-                <button class="chip" data-filter="notr" onclick="setFilter('notr')">⚪ Sıfır / Nötr (<span id="count-notr">0</span>)</button>
+            <!-- 6. GÜN İÇİ NAKİT AKIŞ VE CARİ HACİM GRAFİĞİ -->
+            <div class="trend-chart-box" id="trend-chart-box">
+                <div class="trend-header">
+                    <div class="trend-title">📈 GÜN İÇİ CARİ NAKİT AKIŞI VE İŞLEM HACMİ</div>
+                    <div class="chart-legend">
+                        <div class="leg-item"><div class="leg-dot" style="background:#3b82f6;"></div> Kasa Girişi</div>
+                        <div class="leg-item"><div class="leg-dot" style="background:#f59e0b;"></div> Yapılan Ödeme</div>
+                    </div>
+                </div>
+                <div class="chart-canvas-wrapper" id="trend-chart-container">
+                    <p style="color:#94a3b8; font-size:12px; text-align:center; padding:15px 0;">Grafik verisi yükleniyor...</p>
+                </div>
             </div>
 
-            <div>
-                <select id="sort-select" class="sort-select" onchange="onFilterChanged()">
-                    <option value="kalan_desc">↕️ Kalan Bakiye (Yüksek ➜ Düşük)</option>
-                    <option value="kalan_asc">↕️ Kalan Bakiye (Düşük ➜ Yüksek)</option>
-                    <option value="kasa_desc">💰 Eklenen Kasa (En Çok)</option>
-                    <option value="name_asc">🔤 İsim (A ➜ Z)</option>
-                </select>
+            <!-- 1. ARAMA VE AKILLI FİLTRELEME ARAÇ ÇUBUĞU -->
+            <div class="toolbar">
+                <div class="search-area">
+                    <span class="search-icon-left">🔍</span>
+                    <input type="text" id="search-input" class="search-input" placeholder="Cari veya grup adı ara..." oninput="onFilterChanged()">
+                    <button id="search-clear-btn" class="search-clear-btn" onclick="clearSearch()">✕</button>
+                </div>
+                
+                <div class="filter-chips">
+                    <button class="chip active" data-filter="all" onclick="setFilter('all')">Tümü (<span id="count-all">0</span>)</button>
+                    <button class="chip chip-borclular" data-filter="borclular" onclick="setFilter('borclular')">🔴 Borçlular (<span id="count-borclular">0</span>)</button>
+                    <button class="chip chip-alacaklilar" data-filter="alacaklilar" onclick="setFilter('alacaklilar')">🟢 Alacaklılar (<span id="count-alacaklilar">0</span>)</button>
+                    <button class="chip" data-filter="notr" onclick="setFilter('notr')">⚪ Sıfır / Nötr (<span id="count-notr">0</span>)</button>
+                </div>
+
+                <div>
+                    <select id="sort-select" class="sort-select" onchange="onFilterChanged()">
+                        <option value="kalan_desc">↕️ Kalan Bakiye (Yüksek ➜ Düşük)</option>
+                        <option value="kalan_asc">↕️ Kalan Bakiye (Düşük ➜ Yüksek)</option>
+                        <option value="kasa_desc">💰 Eklenen Kasa (En Çok)</option>
+                        <option value="name_asc">🔤 İsim (A ➜ Z)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- GRUPLAR BAŞLIĞI VE GRID -->
+            <div class="section-title">📊 Aktif Gruplar ve Kasa Durumları</div>
+            <div class="groups-grid" id="groups-container">
+                <p style="color:#94a3b8;">Veriler yükleniyor...</p>
+            </div>
+
+            <!-- MASRAFLAR BAŞLIĞI VE GRID -->
+            <div class="section-title">📉 Günlük Masraf Kalemleri ve Gider Listesi</div>
+            <div class="masraflar-grid" id="masraflar-container">
+                <p style="color:#94a3b8;">Masraf verileri yükleniyor...</p>
             </div>
         </div>
+        <!-- /TAB 1: KASA & FİNANS PANELİ -->
 
-        <!-- GRUPLAR BAŞLIĞI VE GRID -->
-        <div class="section-title">📊 Aktif Gruplar ve Kasa Durumları</div>
-        <div class="groups-grid" id="groups-container">
-            <p style="color:#94a3b8;">Veriler yükleniyor...</p>
-        </div>
+        <!-- TAB 2: CANLI PİYASA & BORSA KURLARI -->
+        <div id="tab-rates" class="tab-content">
+            <!-- PİYASA BAŞLIK VE YENİLEME ÇUBUĞU -->
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px; padding:16px 20px; background:rgba(15,23,42,0.7); border:1px solid rgba(255,255,255,0.08); border-radius:16px; backdrop-filter:blur(12px);">
+                <div>
+                    <h2 style="font-size:18px; font-weight:800; color:#ffffff; display:flex; align-items:center; gap:8px;">
+                        <span>💱</span> CANLI PİYASA VE DÖVİZ KURLARI
+                    </h2>
+                    <p style="font-size:12px; color:#94a3b8; margin-top:2px;">
+                        Kapalıçarşı Harem Serbest Piyasa Doları, Altın, Binance ve Kripto Borsaları Anlık Fiyat Tahtası
+                    </p>
+                </div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span id="rates-time-text" style="font-size:12px; color:#94a3b8; font-weight:600;">Son Güncelleme: --:--:--</span>
+                    <button class="control-btn refresh-btn" onclick="fetchMarketRates(true)" style="padding:8px 16px;">🔄 Kurları Yenile</button>
+                </div>
+            </div>
 
-        <!-- MASRAFLAR BAŞLIĞI VE GRID -->
-        <div class="section-title">📉 Günlük Masraf Kalemleri ve Gider Listesi</div>
-        <div class="masraflar-grid" id="masraflar-container">
-            <p style="color:#94a3b8;">Masraf verileri yükleniyor...</p>
+            <!-- SPOTLIGHT KUR KARTLARI -->
+            <div class="market-cards-grid">
+                <!-- 1. BİNANCE USDT/TRY -->
+                <div class="market-card" style="border-color:rgba(234,179,8,0.3);">
+                    <div class="market-card-header">
+                        <div class="market-card-title"><span>🟡</span> BİNANCE USDT/TRY</div>
+                        <span id="rate-binance-change" class="market-change-badge change-neutral">%0.00</span>
+                    </div>
+                    <div class="market-price-big"><span id="rate-binance-last">0,00</span> <span style="font-size:16px; font-weight:600; opacity:0.85;">₺</span></div>
+                    <div class="market-sub-grid">
+                        <div class="market-sub-item">
+                            <div class="label">🔺 24s En Yüksek</div>
+                            <div class="val" id="rate-binance-high">0,00 ₺</div>
+                        </div>
+                        <div class="market-sub-item">
+                            <div class="label">🔻 24s En Düşük</div>
+                            <div class="val" id="rate-binance-low">0,00 ₺</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. HAREM KAPALIÇARŞI DOLARI -->
+                <div class="market-card" style="border-color:rgba(59,130,246,0.3);">
+                    <div class="market-card-header">
+                        <div class="market-card-title"><span>🏛️</span> HAREM (Kapalıçarşı Doları)</div>
+                        <span class="market-change-badge change-neutral" style="font-size:11px;">USD / TRY</span>
+                    </div>
+                    <div class="market-price-big"><span id="rate-harem-usd-satis">0,00</span> <span style="font-size:16px; font-weight:600; opacity:0.85;">₺</span></div>
+                    <div class="market-sub-grid">
+                        <div class="market-sub-item">
+                            <div class="label">💵 Alış Fiyatı</div>
+                            <div class="val" id="rate-harem-usd-alis">0,00 ₺</div>
+                        </div>
+                        <div class="market-sub-item">
+                            <div class="label">↔️ Alış-Satış Makası</div>
+                            <div class="val" id="rate-harem-usd-makas" style="color:#60a5fa;">0,00 ₺</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. HAREM KAPALIÇARŞI EUROSU -->
+                <div class="market-card" style="border-color:rgba(139,92,246,0.3);">
+                    <div class="market-card-header">
+                        <div class="market-card-title"><span>💶</span> HAREM (Kapalıçarşı Eurosu)</div>
+                        <span class="market-change-badge change-neutral" style="font-size:11px;">EUR / TRY</span>
+                    </div>
+                    <div class="market-price-big"><span id="rate-harem-eur-satis">0,00</span> <span style="font-size:16px; font-weight:600; opacity:0.85;">₺</span></div>
+                    <div class="market-sub-grid">
+                        <div class="market-sub-item">
+                            <div class="label">💶 Alış Fiyatı</div>
+                            <div class="val" id="rate-harem-eur-alis">0,00 ₺</div>
+                        </div>
+                        <div class="market-sub-item">
+                            <div class="label">↔️ Alış-Satış Makası</div>
+                            <div class="val" id="rate-harem-eur-makas" style="color:#c084fc;">0,00 ₺</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. KAPALIÇARŞI ALTIN & EMTİA -->
+                <div class="market-card" style="border-color:rgba(245,158,11,0.3);">
+                    <div class="market-card-header">
+                        <div class="market-card-title"><span>🥇</span> KAPALIÇARŞI ALTIN & EMTİA</div>
+                        <span class="market-change-badge change-neutral" style="font-size:11px;">Harem Altın</span>
+                    </div>
+                    <div class="market-price-big"><span id="rate-gold-gram">0</span> <span style="font-size:16px; font-weight:600; opacity:0.85;">₺ (Gram)</span></div>
+                    <div class="market-sub-grid">
+                        <div class="market-sub-item">
+                            <div class="label">👑 Ons Altın</div>
+                            <div class="val" id="rate-gold-ons">$0</div>
+                        </div>
+                        <div class="market-sub-item">
+                            <div class="label">🥈 Gümüş (Gram)</div>
+                            <div class="val" id="rate-silver">0,00 ₺</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ARBİTRAJ VE BORSA KARŞILAŞTIRMA TABLOSU -->
+            <div class="rates-table-wrapper">
+                <div style="font-size:15px; font-weight:700; color:#f8fafc; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span>🏦</span> KRİPTO BORSALARI USDT/TRY FİYAT VE ARBİTRAJ TAHTASI
+                    </div>
+                    <div style="font-size:11.5px; color:#94a3b8; font-weight:500;">
+                        Binance, Paribu, BtcTurk, OKX ve WhiteBit Canlı Fiyat Akışı
+                    </div>
+                </div>
+                <table class="rates-table">
+                    <thead>
+                        <tr>
+                            <th>Borsa</th>
+                            <th>Anlık USDT Kuru</th>
+                            <th>24s En Yüksek</th>
+                            <th>24s En Düşük</th>
+                            <th>Binance Farkı (Arbitraj)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rates-table-body">
+                        <tr><td colspan="5" style="text-align:center; color:#94a3b8; padding:20px;">Borsa verileri yükleniyor...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- SERBEST PİYASA TCMB / DÖVİZ KURLARI -->
+            <div class="section-title">🌍 Serbest Piyasa & Merkez Bankası Kurları</div>
+            <div class="market-cards-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+                <div class="market-card">
+                    <div class="market-card-title"><span>🇺🇸</span> SERBEST PİYASA USD</div>
+                    <div class="market-price-big" id="rate-fiat-usd" style="font-size:22px; margin-top:8px;">0,00 ₺</div>
+                </div>
+                <div class="market-card">
+                    <div class="market-card-title"><span>🇪🇺</span> SERBEST PİYASA EUR</div>
+                    <div class="market-price-big" id="rate-fiat-eur" style="font-size:22px; margin-top:8px;">0,00 ₺</div>
+                </div>
+                <div class="market-card">
+                    <div class="market-card-title"><span>🇬🇧</span> SERBEST PİYASA GBP (Sterlin)</div>
+                    <div class="market-price-big" id="rate-fiat-gbp" style="font-size:22px; margin-top:8px;">0,00 ₺</div>
+                </div>
+            </div>
         </div>
+        <!-- /TAB 2: CANLI PİYASA & BORSA KURLARI -->
 
         <div class="footer">
             <p>CFO Finans Yönetim Sistemi © 2026 | Yazılım: @CRYPTOATAKAN</p>
@@ -9071,7 +9383,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         
         // 3. Çoklu Para Birimi State & Canlı Kur (USDT / TRY)
         let activeCurrency = localStorage.getItem('cfo_currency') || 'TRY'; // 'TRY' | 'USDT'
-        let usdtRate = 38.50;
+        let usdtRate = 0;
+        let activeTab = 'finance';
 
         // 2. Gizlilik Modu State
         let privacyMode = localStorage.getItem('cfo_privacy') === 'true';
@@ -9080,6 +9393,167 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         let soundEnabled = localStorage.getItem('cfo_sound') !== 'false';
         let audioCtx = null;
 
+        function switchTab(tabName) {
+            activeTab = tabName;
+            const btnFinance = document.getElementById('tab-btn-finance');
+            const btnRates = document.getElementById('tab-btn-rates');
+            const tabFinance = document.getElementById('tab-finance');
+            const tabRates = document.getElementById('tab-rates');
+            
+            if (tabName === 'rates') {
+                if (btnFinance) btnFinance.classList.remove('active');
+                if (btnRates) btnRates.classList.add('active');
+                if (tabFinance) tabFinance.classList.remove('active');
+                if (tabRates) tabRates.classList.add('active');
+                fetchMarketRates(false);
+            } else {
+                if (btnRates) btnRates.classList.remove('active');
+                if (btnFinance) btnFinance.classList.add('active');
+                if (tabRates) tabRates.classList.remove('active');
+                if (tabFinance) tabFinance.classList.add('active');
+            }
+        }
+
+        async function fetchMarketRates(isManual = false) {
+            try {
+                const url = '/api/rates' + (token ? '?token=' + encodeURIComponent(token) : '');
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data && !data.error) {
+                    renderMarketRates(data);
+                    if (isManual) showToast("Piyasa Kurları", "Borsa ve Kapalıçarşı kurları güncellendi.", false);
+                }
+            } catch(e) {
+                console.warn('Canlı kurlar çekilemedi:', e);
+            }
+        }
+
+        function renderMarketRates(data) {
+            if (!data) return;
+            
+            // Binance
+            const b = data.binance || {};
+            if (b && b.last) {
+                const bLast = Number(b.last) || 0;
+                const elLast = document.getElementById('rate-binance-last');
+                if (elLast) elLast.innerText = bLast.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const elHigh = document.getElementById('rate-binance-high');
+                if (elHigh) elHigh.innerText = Number(b.high || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+                const elLow = document.getElementById('rate-binance-low');
+                if (elLow) elLow.innerText = Number(b.low || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+                
+                const ch = Number(b.change || 0);
+                const chBadge = document.getElementById('rate-binance-change');
+                if (chBadge) {
+                    chBadge.innerText = (ch >= 0 ? '+' : '') + ch.toFixed(2) + '%';
+                    chBadge.className = 'market-change-badge ' + (ch > 0 ? 'change-up' : (ch < 0 ? 'change-down' : 'change-neutral'));
+                }
+                
+                if (bLast > 0) {
+                    usdtRate = bLast;
+                    const tag = document.getElementById('header-usdt-rate');
+                    if (tag) tag.innerText = usdtRate.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                }
+            }
+
+            // Harem Dolar
+            const h = data.harem || {};
+            const usd = h.usd || [0, 0];
+            const uAlis = Number(usd[0]) || 0;
+            const uSatis = Number(usd[1]) || 0;
+            const uMakas = Math.abs(uSatis - uAlis);
+            const elUsdSatis = document.getElementById('rate-harem-usd-satis');
+            if (elUsdSatis) elUsdSatis.innerText = uSatis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const elUsdAlis = document.getElementById('rate-harem-usd-alis');
+            if (elUsdAlis) elUsdAlis.innerText = uAlis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+            const elUsdMakas = document.getElementById('rate-harem-usd-makas');
+            if (elUsdMakas) elUsdMakas.innerText = uMakas.toFixed(2).replace('.', ',') + ' ₺';
+
+            // Harem Euro
+            const eur = h.eur || [0, 0];
+            const eAlis = Number(eur[0]) || 0;
+            const eSatis = Number(eur[1]) || 0;
+            const eMakas = Math.abs(eSatis - eAlis);
+            const elEurSatis = document.getElementById('rate-harem-eur-satis');
+            if (elEurSatis) elEurSatis.innerText = eSatis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const elEurAlis = document.getElementById('rate-harem-eur-alis');
+            if (elEurAlis) elEurAlis.innerText = eAlis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+            const elEurMakas = document.getElementById('rate-harem-eur-makas');
+            if (elEurMakas) elEurMakas.innerText = eMakas.toFixed(2).replace('.', ',') + ' ₺';
+
+            // Altın & Emtia
+            const gold = h.gold || {};
+            const elGoldGram = document.getElementById('rate-gold-gram');
+            if (elGoldGram) elGoldGram.innerText = Number(gold.gram || 0).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+            const elGoldOns = document.getElementById('rate-gold-ons');
+            if (elGoldOns) elGoldOns.innerText = '$' + Number(gold.ons || 0).toLocaleString('tr-TR', { minimumFractionDigits: 0, maximumFractionDigits: 1 });
+            const elSilver = document.getElementById('rate-silver');
+            if (elSilver) elSilver.innerText = Number(gold.gumus || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+
+            // Arbitraj Tablosu
+            const exchanges = [
+                { name: 'Binance', icon: '🟡', data: data.binance },
+                { name: 'Paribu', icon: '🔵', data: data.paribu },
+                { name: 'BtcTurk', icon: '🟢', data: data.btcturk },
+                { name: 'OKX', icon: '⚫', data: data.okx },
+                { name: 'WhiteBit', icon: '⚪', data: data.whitebit }
+            ];
+
+            const tbody = document.getElementById('rates-table-body');
+            if (tbody) {
+                const baseBinance = Number((data.binance && data.binance.last) || 0);
+                tbody.innerHTML = exchanges.map(ex => {
+                    const d = ex.data || {};
+                    const last = Number(d.last || 0);
+                    const high = Number(d.high || 0);
+                    const low = Number(d.low || 0);
+                    
+                    let diffBadge = '<span style="color:#94a3b8;">-</span>';
+                    if (last > 0 && baseBinance > 0) {
+                        const diff = last - baseBinance;
+                        if (Math.abs(diff) < 0.005) {
+                            diffBadge = '<span class="market-change-badge change-neutral">Referans</span>';
+                        } else if (diff > 0) {
+                            diffBadge = `<span class="market-change-badge change-up">+${diff.toFixed(2)} ₺</span>`;
+                        } else {
+                            diffBadge = `<span class="market-change-badge change-down">${diff.toFixed(2)} ₺</span>`;
+                        }
+                    }
+
+                    return `
+                        <tr>
+                            <td class="exchange-name-cell"><span>${ex.icon}</span> <b>${ex.name}</b></td>
+                            <td style="font-weight:800; color:#ffffff; font-size:14px;">${last > 0 ? last.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺' : '<span style="color:#64748b;">Veri bekleniyor</span>'}</td>
+                            <td style="color:#cbd5e1;">${high > 0 ? high.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺' : '-'}</td>
+                            <td style="color:#cbd5e1;">${low > 0 ? low.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺' : '-'}</td>
+                            <td>${diffBadge}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            // Serbest Piyasa TCMB / Fiat
+            const fiat = data.fiat || {};
+            const elFiatUsd = document.getElementById('rate-fiat-usd');
+            if (elFiatUsd) {
+                elFiatUsd.innerText = (Number(fiat.TRY) || uSatis || 0).toFixed(2).replace('.', ',') + ' ₺';
+            }
+            const elFiatEur = document.getElementById('rate-fiat-eur');
+            if (elFiatEur) {
+                const eurTry = (fiat.TRY && fiat.EUR) ? (Number(fiat.TRY) / Number(fiat.EUR)) : eSatis;
+                elFiatEur.innerText = (eurTry || 0).toFixed(2).replace('.', ',') + ' ₺';
+            }
+            const elFiatGbp = document.getElementById('rate-fiat-gbp');
+            if (elFiatGbp) {
+                const gbpTry = (fiat.TRY && fiat.GBP) ? (Number(fiat.TRY) / Number(fiat.GBP)) : ((uSatis || 0) * 1.28);
+                elFiatGbp.innerText = (gbpTry || 0).toFixed(2).replace('.', ',') + ' ₺';
+            }
+
+            if (data.time_str && document.getElementById('rates-time-text')) {
+                document.getElementById('rates-time-text').innerText = 'Son Güncelleme: ' + data.time_str;
+            }
+        }
+
         async function fetchExchangeRate() {
             try {
                 const url = '/api/exchange_rate' + (token ? '?token=' + encodeURIComponent(token) : '');
@@ -9087,9 +9561,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 const data = await res.json();
                 if (data && data.rate && Number(data.rate) > 0) {
                     usdtRate = Number(data.rate);
-                    const tag = document.getElementById('exchange-rate-tag');
+                    const tag = document.getElementById('header-usdt-rate');
                     if (tag) {
-                        tag.innerText = '1 USDT = ' + usdtRate.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+                        tag.innerText = usdtRate.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     }
                 }
             } catch(e) {
@@ -9487,6 +9961,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         }
 
         function renderDashboard(d, isManual = false, updatedGroupsList = []) {
+            if (!d) return;
             currentDashboardData = d;
             
             const isArchive = !!d.is_archive;
@@ -9494,25 +9969,36 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             const statusDot = document.getElementById('status-dot-el');
             const statusText = document.getElementById('status-text-el');
 
-            if (isArchive) {
-                statusBadge.classList.add('archive');
-                statusDot.classList.add('archive');
-                statusText.innerText = '📁 ARŞİV BİLANÇOSU (' + d.tarih + ')';
-            } else {
-                statusBadge.classList.remove('archive');
-                statusDot.classList.remove('archive');
-                statusText.innerText = 'ANLIK CANLI SİSTEM (0s)';
+            if (statusBadge && statusDot && statusText) {
+                if (isArchive) {
+                    statusBadge.classList.add('archive');
+                    statusDot.classList.add('archive');
+                    statusText.innerText = '📁 ARŞİV BİLANÇOSU (' + (d.tarih || '') + ')';
+                } else {
+                    statusBadge.classList.remove('archive');
+                    statusDot.classList.remove('archive');
+                    statusText.innerText = 'ANLIK CANLI SİSTEM (0s)';
+                }
             }
 
-            document.getElementById('time-text').innerText = (isArchive ? 'Tarih: ' + d.tarih + ' (Arşiv Verisi)' : 'Tarih: ' + d.tarih + ' | Son Güncelleme: ' + new Date().toLocaleTimeString('tr-TR'));
+            const timeEl = document.getElementById('time-text');
+            if (timeEl) {
+                timeEl.innerText = (isArchive ? 'Tarih: ' + (d.tarih || '') + ' (Arşiv Verisi)' : 'Tarih: ' + (d.tarih || 'Bugün') + ' | Son Güncelleme: ' + new Date().toLocaleTimeString('tr-TR'));
+            }
             
             // Üst Sayaçları Güncelle
-            document.getElementById('toplam-devir').innerHTML = fmtHtml(d.devir);
-            document.getElementById('toplam-kasa').innerHTML = fmtHtml(d.kasa);
-            document.getElementById('toplam-odenen').innerHTML = fmtHtml(d.odenen);
-            document.getElementById('toplam-komisyon').innerHTML = fmtHtml(d.komisyon);
-            document.getElementById('toplam-masraf').innerHTML = fmtHtml(d.toplam_masraf || 0);
-            document.getElementById('toplam-kalan').innerHTML = fmtHtml(d.kalan);
+            const elDevir = document.getElementById('toplam-devir');
+            if (elDevir) elDevir.innerHTML = fmtHtml(d.devir || 0);
+            const elKasa = document.getElementById('toplam-kasa');
+            if (elKasa) elKasa.innerHTML = fmtHtml(d.kasa || 0);
+            const elOdenen = document.getElementById('toplam-odenen');
+            if (elOdenen) elOdenen.innerHTML = fmtHtml(d.odenen || 0);
+            const elKom = document.getElementById('toplam-komisyon');
+            if (elKom) elKom.innerHTML = fmtHtml(d.komisyon || 0);
+            const elMasraf = document.getElementById('toplam-masraf');
+            if (elMasraf) elMasraf.innerHTML = fmtHtml(d.toplam_masraf || 0);
+            const elKalan = document.getElementById('toplam-kalan');
+            if (elKalan) elKalan.innerHTML = fmtHtml(d.kalan || 0);
 
             // 2. Şirket Net Kârlılık ve Verimlilik Göstergesi (CFO KPI)
             const netKar = Number(d.komisyon || 0) - Number(d.toplam_masraf || 0);
@@ -9542,15 +10028,17 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
             // Masrafları Render Et
             const mc = document.getElementById('masraflar-container');
-            if(!d.masraflar || d.masraflar.length === 0) {
-                mc.innerHTML = '<p style="color:#94a3b8; grid-column:1/-1;">Kayıtlı bir masraf / gider bulunmuyor.</p>';
-            } else {
-                mc.innerHTML = d.masraflar.map(m => `
-                    <div class="masraf-card">
-                        <div class="masraf-name"><span>📌</span> ${m.ad.toUpperCase()}</div>
-                        <div class="masraf-tutar">${fmt(m.fiyat)}</div>
-                    </div>
-                `).join('');
+            if (mc) {
+                if(!d.masraflar || d.masraflar.length === 0) {
+                    mc.innerHTML = '<p style="color:#94a3b8; grid-column:1/-1;">Kayıtlı bir masraf / gider bulunmuyor.</p>';
+                } else {
+                    mc.innerHTML = d.masraflar.map(m => `
+                        <div class="masraf-card">
+                            <div class="masraf-name"><span>📌</span> ${(m.ad || '').toUpperCase()}</div>
+                            <div class="masraf-tutar">${fmt(m.fiyat || 0)}</div>
+                        </div>
+                    `).join('');
+                }
             }
 
             isFirstLoad = false;
@@ -9780,7 +10268,21 @@ CFO Canlı Finans Sistemi`;
                 if (token) url += 'token=' + encodeURIComponent(token) + '&';
                 if (selectedDate) url += 'tarih=' + encodeURIComponent(selectedDate) + '&';
                 
-                const res = await fetch(url);
+                let controller = null;
+                let timeoutId = null;
+                if (window.AbortController) {
+                    controller = new AbortController();
+                    timeoutId = setTimeout(() => controller.abort(), 8000);
+                }
+                
+                const res = await fetch(url, controller ? { signal: controller.signal } : {});
+                if (timeoutId) clearTimeout(timeoutId);
+                
+                if (!res.ok) {
+                    console.warn("Fetch HTTP durumu:", res.status);
+                    if (isFirstLoad) setTimeout(() => fetchData(false), 3000);
+                    return;
+                }
                 const d = await res.json();
                 if(d.error) {
                     showToast("Sistem Uyarısı", d.error, false);
@@ -9790,6 +10292,9 @@ CFO Canlı Finans Sistemi`;
                 if(isManual) showToast("Finansal Yenileme", selectedDate ? d.tarih + " arşiv bilançosu yüklendi." : "Finans paneli güncellendi.", false);
             } catch(e) {
                 console.error("Fetch hatası:", e);
+                if (isFirstLoad) {
+                    setTimeout(() => fetchData(false), 3000);
+                }
             }
         }
 
@@ -9866,40 +10371,78 @@ CFO Canlı Finans Sistemi`;
         fetchSheetsList();
         fetchData(true);
         initSSE();
+        fetchMarketRates(false);
+
+        // Kurları arka planda 15 saniyede bir güncelle
+        setInterval(() => {
+            if (activeTab === 'rates') {
+                fetchMarketRates(false);
+            } else {
+                fetchExchangeRate();
+            }
+        }, 15000);
     </script>
 </body>
 </html>
 """
 
-_last_exchange_rate = {"rate": 38.50, "time": 0}
+_last_exchange_rate = {"rate": 0.0, "time": 0.0}
 
-def get_dashboard_exchange_rate() -> float:
+def get_dashboard_market_rates_summary() -> dict:
+    """Tüm canlı borsa (Binance, Paribu, BtcTurk, OKX, WhiteBit) ve Kapalıçarşı Harem kurlarını özetler."""
     global _last_exchange_rate
     now = time.time()
-    if now - _last_exchange_rate["time"] < 60 and _last_exchange_rate["rate"] > 0:
-        return _last_exchange_rate["rate"]
-    try:
-        rates = fetch_all_market_rates_parallel()
-        b = rates.get("binance") or {}
-        if b and b.get("last") and float(b["last"]) > 0:
-            _last_exchange_rate = {"rate": round(float(b["last"]), 2), "time": now}
-            return _last_exchange_rate["rate"]
-        h = rates.get("harem") or {}
-        usd = h.get("usd")
-        if usd and isinstance(usd, (list, tuple)) and len(usd) > 0 and float(usd[0]) > 0:
-            _last_exchange_rate = {"rate": round(float(usd[0]), 2), "time": now}
-            return _last_exchange_rate["rate"]
-    except Exception:
-        pass
-    return _last_exchange_rate["rate"]
+    rates = fetch_all_market_rates_parallel()
+    b = rates.get("binance") or {}
+    p = rates.get("paribu") or {}
+    bt = rates.get("btcturk") or {}
+    h = rates.get("harem") or {}
+
+    usdt_rate = 0.0
+    if b.get("last") and float(b["last"]) > 0:
+        usdt_rate = round(float(b["last"]), 2)
+    elif p.get("last") and float(p["last"]) > 0:
+        usdt_rate = round(float(p["last"]), 2)
+    elif bt.get("last") and float(bt["last"]) > 0:
+        usdt_rate = round(float(bt["last"]), 2)
+    else:
+        usd_tup = h.get("usd")
+        if usd_tup and len(usd_tup) > 1 and float(usd_tup[1]) > 0:
+            usdt_rate = round(float(usd_tup[1]), 2)
+        elif usd_tup and len(usd_tup) > 0 and float(usd_tup[0]) > 0:
+            usdt_rate = round(float(usd_tup[0]), 2)
+        elif _last_exchange_rate["rate"] > 0:
+            usdt_rate = _last_exchange_rate["rate"]
+        else:
+            usdt_rate = 39.50
+
+    _last_exchange_rate = {"rate": usdt_rate, "time": now}
+
+    return {
+        "usdt_try": usdt_rate,
+        "binance": rates.get("binance") or {},
+        "harem": rates.get("harem") or {},
+        "paribu": rates.get("paribu") or {},
+        "btcturk": rates.get("btcturk") or {},
+        "okx": rates.get("okx") or {},
+        "whitebit": rates.get("whitebit") or {},
+        "fiat": rates.get("fiat") or {},
+        "timestamp": now,
+        "time_str": suankiZamaniAl().strftime("%H:%M:%S")
+    }
+
+def get_dashboard_exchange_rate() -> float:
+    summary = get_dashboard_market_rates_summary()
+    return summary["usdt_try"]
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
 
 class LiveDashboardHandler(BaseHTTPRequestHandler):
-    def _send_security_headers(self, status=200, content_type="application/json; charset=utf-8"):
+    def _send_response_data(self, status=200, content_type="application/json; charset=utf-8", data_bytes=b"", extra_headers=None):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data_bytes)))
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
@@ -9907,6 +10450,12 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", os.environ.get("ALLOWED_ORIGIN", "*"))
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Webhook-Token, X-Dashboard-Token")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        if extra_headers:
+            for k, v in extra_headers.items():
+                self.send_header(k, v)
+        self.end_headers()
+        if data_bytes:
+            self.wfile.write(data_bytes)
 
     def _check_auth(self, parsed_url, token_secret=None):
         if token_secret is None:
@@ -9931,17 +10480,14 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
         return hmac.compare_digest(req_token, token_secret) if (req_token and token_secret) else False
 
     def do_OPTIONS(self):
-        self._send_security_headers(200, "text/plain")
-        self.end_headers()
+        self._send_response_data(200, "text/plain", b"")
 
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path in ["/api/webhook", "/webhook/sheets", "/webhook"]:
             secret = WEBHOOK_SECRET or DASHBOARD_AUTH_TOKEN
             if not self._check_auth(parsed, secret):
-                self._send_security_headers(401, "application/json; charset=utf-8")
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": "Yetkisiz webhook erişimi"}).encode("utf-8"))
+                self._send_response_data(401, "application/json; charset=utf-8", json.dumps({"error": "Yetkisiz webhook erişimi"}).encode("utf-8"))
                 return
 
             content_length = int(self.headers.get('Content-Length', 0))
@@ -9963,21 +10509,14 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
 
             # Webhook geldiğinde canlı yayını tetikle
             _update_executor.submit(broadcast_dashboard_update, updated_groups, group_changes)
-            
-            self._send_security_headers(200, "application/json; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(json.dumps({"status": "ok", "message": "Anlık canlı güncelleme tetiklendi."}).encode("utf-8"))
+            self._send_response_data(200, "application/json; charset=utf-8", json.dumps({"status": "ok", "message": "Anlık canlı güncelleme tetiklendi."}).encode("utf-8"))
         else:
-            self._send_security_headers(404, "application/json; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": "Endpoint bulunamadı"}).encode("utf-8"))
+            self._send_response_data(404, "application/json; charset=utf-8", json.dumps({"error": "Endpoint bulunamadı"}).encode("utf-8"))
 
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         
         if parsed.path == "/manifest.json":
-            self._send_security_headers(200, "application/manifest+json; charset=utf-8")
-            self.end_headers()
             manifest_data = {
                 "name": "CFO Canlı Finans Paneli",
                 "short_name": "CFO Bot",
@@ -9994,18 +10533,14 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                     }
                 ]
             }
-            self.wfile.write(json.dumps(manifest_data).encode("utf-8"))
+            self._send_response_data(200, "application/manifest+json; charset=utf-8", json.dumps(manifest_data).encode("utf-8"))
             return
 
         elif parsed.path == "/api/sheets_list":
             if not self._check_auth(parsed, DASHBOARD_AUTH_TOKEN):
-                self._send_security_headers(401, "application/json; charset=utf-8")
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
+                self._send_response_data(401, "application/json; charset=utf-8", json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
                 return
 
-            self._send_security_headers(200, "application/json; charset=utf-8")
-            self.end_headers()
             try:
                 sh = get_spreadsheet()
                 tum_ws = sh.worksheets()
@@ -10024,37 +10559,43 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                 aktif_title = getattr(aktif_ws, "title", "")
                 if aktif_title and aktif_title not in sirali_tarihler:
                     sirali_tarihler.insert(0, aktif_title)
-                self.wfile.write(json.dumps({
+                res_bytes = json.dumps({
                     "aktif": aktif_title,
                     "tarihler": sirali_tarihler
-                }).encode("utf-8"))
+                }).encode("utf-8")
+                self._send_response_data(200, "application/json; charset=utf-8", res_bytes)
             except Exception as e:
                 print(f"API sheets_list hatası: {e}")
-                self.wfile.write(json.dumps({"aktif": "", "tarihler": []}).encode("utf-8"))
+                self._send_response_data(200, "application/json; charset=utf-8", json.dumps({"aktif": "", "tarihler": []}).encode("utf-8"))
             return
 
         elif parsed.path == "/api/exchange_rate":
             if not self._check_auth(parsed, DASHBOARD_AUTH_TOKEN):
-                self._send_security_headers(401, "application/json; charset=utf-8")
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
+                self._send_response_data(401, "application/json; charset=utf-8", json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
                 return
 
-            self._send_security_headers(200, "application/json; charset=utf-8")
-            self.end_headers()
             rate = get_dashboard_exchange_rate()
-            self.wfile.write(json.dumps({
+            res_bytes = json.dumps({
                 "symbol": "USDTTRY",
                 "rate": rate,
                 "timestamp": time.time()
-            }).encode("utf-8"))
+            }).encode("utf-8")
+            self._send_response_data(200, "application/json; charset=utf-8", res_bytes)
+            return
+
+        elif parsed.path == "/api/rates":
+            if not self._check_auth(parsed, DASHBOARD_AUTH_TOKEN):
+                self._send_response_data(401, "application/json; charset=utf-8", json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
+                return
+
+            rates_summary = get_dashboard_market_rates_summary()
+            res_bytes = json.dumps(rates_summary).encode("utf-8")
+            self._send_response_data(200, "application/json; charset=utf-8", res_bytes)
             return
 
         elif parsed.path == "/api/stream":
             if not self._check_auth(parsed, DASHBOARD_AUTH_TOKEN):
-                self._send_security_headers(401, "application/json; charset=utf-8")
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
+                self._send_response_data(401, "application/json; charset=utf-8", json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
                 return
 
             self.send_response(200)
@@ -10069,28 +10610,31 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                 _sse_clients.add(client_q)
 
             try:
-                # İlk açılışta anlık veriyi gönder
-                sh = get_spreadsheet()
-                sayfa = get_active_daily_sheet(sh)
-                veriler = get_sheet_values_fast(sayfa, max_age_seconds=2.0)
-                finans = tablodan_finans_ozeti_hesapla(veriler)
-                initial_data = {
-                    "tarih": sayfa.title,
-                    "is_archive": False,
-                    "devir": finans["devir"],
-                    "kasa": finans["kasa"],
-                    "odenen": finans["odenen"],
-                    "komisyon": finans["komisyon"],
-                    "kalan": finans["kalan"],
-                    "toplam_masraf": finans.get("toplam_masraf", 0.0),
-                    "masraflar": finans.get("masraflar", []),
-                    "gruplar": finans["aktif_gruplar"],
-                    "updated_groups": [],
-                    "group_changes": [],
-                    "timestamp": time.time()
-                }
-                self.wfile.write(f"data: {json.dumps(initial_data)}\n\n".encode("utf-8"))
-                self.wfile.flush()
+                # İlk açılışta anlık veriyi güvenli gönder
+                try:
+                    sh = get_spreadsheet()
+                    sayfa = get_active_daily_sheet(sh)
+                    veriler = get_sheet_values_fast(sayfa, max_age_seconds=2.0)
+                    finans = tablodan_finans_ozeti_hesapla(veriler)
+                    initial_data = {
+                        "tarih": getattr(sayfa, "title", "Canlı"),
+                        "is_archive": False,
+                        "devir": finans["devir"],
+                        "kasa": finans["kasa"],
+                        "odenen": finans["odenen"],
+                        "komisyon": finans["komisyon"],
+                        "kalan": finans["kalan"],
+                        "toplam_masraf": finans.get("toplam_masraf", 0.0),
+                        "masraflar": finans.get("masraflar", []),
+                        "gruplar": finans["aktif_gruplar"],
+                        "updated_groups": [],
+                        "group_changes": [],
+                        "timestamp": time.time()
+                    }
+                    self.wfile.write(f"data: {json.dumps(initial_data)}\n\n".encode("utf-8"))
+                    self.wfile.flush()
+                except Exception as ex_init:
+                    print(f"SSE başlangıç verisi hatası: {ex_init}")
 
                 last_ping = time.time()
                 while True:
@@ -10111,13 +10655,9 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
 
         elif parsed.path == "/api/dashboard":
             if not self._check_auth(parsed, DASHBOARD_AUTH_TOKEN):
-                self._send_security_headers(401, "application/json; charset=utf-8")
-                self.end_headers()
-                self.wfile.write(json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
+                self._send_response_data(401, "application/json; charset=utf-8", json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
                 return
 
-            self._send_security_headers(200, "application/json; charset=utf-8")
-            self.end_headers()
             try:
                 query_params = urllib.parse.parse_qs(parsed.query)
                 req_tarih = query_params.get("tarih", [""])[0].strip()
@@ -10138,7 +10678,7 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                 veriler = get_sheet_values_fast(sayfa, max_age_seconds=(0.0 if is_archive else 2.0))
                 finans = tablodan_finans_ozeti_hesapla(veriler)
                 data = {
-                    "tarih": sayfa.title,
+                    "tarih": getattr(sayfa, "title", "Bilinmiyor"),
                     "is_archive": is_archive,
                     "devir": finans["devir"],
                     "kasa": finans["kasa"],
@@ -10149,14 +10689,13 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                     "masraflar": finans.get("masraflar", []),
                     "gruplar": finans["aktif_gruplar"]
                 }
-                self.wfile.write(json.dumps(data).encode("utf-8"))
+                self._send_response_data(200, "application/json; charset=utf-8", json.dumps(data).encode("utf-8"))
             except Exception as e:
                 print(f"API Dashboard sunucu hatası: {e}")
-                self.wfile.write(json.dumps({"error": "Veriler yüklenirken sunucu hatası oluştu."}).encode("utf-8"))
+                err_data = json.dumps({"error": "Veriler yüklenirken sunucu hatası oluştu."}).encode("utf-8")
+                self._send_response_data(500, "application/json; charset=utf-8", err_data)
         else:
             if DASHBOARD_AUTH_TOKEN and not self._check_auth(parsed, DASHBOARD_AUTH_TOKEN):
-                self._send_security_headers(401, "text/html; charset=utf-8")
-                self.end_headers()
                 unauth_html = """<!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -10181,15 +10720,14 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
     </div>
 </body>
 </html>"""
-                self.wfile.write(unauth_html.encode("utf-8"))
+                self._send_response_data(401, "text/html; charset=utf-8", unauth_html.encode("utf-8"))
                 return
 
-            self._send_security_headers(200, "text/html; charset=utf-8")
-            if DASHBOARD_AUTH_TOKEN:
-                self.send_header("Set-Cookie", f"dashboard_token={DASHBOARD_AUTH_TOKEN}; Path=/; SameSite=Lax; Max-Age=31536000; HttpOnly")
-            self.end_headers()
-            html_to_send = DASHBOARD_HTML.replace("{{DASHBOARD_TOKEN}}", DASHBOARD_AUTH_TOKEN or "")
-            self.wfile.write(html_to_send.encode("utf-8"))
+            current_rate = get_dashboard_exchange_rate()
+            rate_str = f"{current_rate:.2f}".replace(".", ",")
+            html_to_send = DASHBOARD_HTML.replace("{{DASHBOARD_TOKEN}}", DASHBOARD_AUTH_TOKEN or "").replace("{{USDT_RATE}}", rate_str)
+            extra_h = {"Set-Cookie": f"dashboard_token={DASHBOARD_AUTH_TOKEN}; Path=/; SameSite=Lax; Max-Age=31536000; HttpOnly"} if DASHBOARD_AUTH_TOKEN else None
+            self._send_response_data(200, "text/html; charset=utf-8", html_to_send.encode("utf-8"), extra_headers=extra_h)
 
     def log_message(self, format, *args): pass
 
