@@ -9371,6 +9371,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
     <script>
         const serverToken = '{{DASHBOARD_TOKEN}}';
+        const serverInitialData = (function(){ try { return {{INITIAL_DATA}}; } catch(e){ return null; } })();
+        const serverInitialRates = (function(){ try { return {{INITIAL_RATES}}; } catch(e){ return null; } })();
         const queryToken = new URLSearchParams(window.location.search).get('token') || '';
         const token = queryToken || serverToken || '';
 
@@ -9416,7 +9418,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
         async function fetchMarketRates(isManual = false) {
             try {
-                const url = '/api/rates' + (token ? '?token=' + encodeURIComponent(token) : '');
+                const url = '/api/rates?' + (token ? 'token=' + encodeURIComponent(token) + '&' : '') + '_t=' + Date.now();
                 const res = await fetch(url);
                 const data = await res.json();
                 if (data && !data.error) {
@@ -9556,7 +9558,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
         async function fetchExchangeRate() {
             try {
-                const url = '/api/exchange_rate' + (token ? '?token=' + encodeURIComponent(token) : '');
+                const url = '/api/exchange_rate?' + (token ? 'token=' + encodeURIComponent(token) + '&' : '') + '_t=' + Date.now();
                 const res = await fetch(url);
                 const data = await res.json();
                 if (data && data.rate && Number(data.rate) > 0) {
@@ -10229,7 +10231,7 @@ CFO Canlı Finans Sistemi`;
         // 6. Tarih Listesini Sunucudan Çek ve Menüye Ekle
         async function fetchSheetsList() {
             try {
-                const url = '/api/sheets_list' + (token ? '?token=' + encodeURIComponent(token) : '');
+                const url = '/api/sheets_list?' + (token ? 'token=' + encodeURIComponent(token) + '&' : '') + '_t=' + Date.now();
                 const res = await fetch(url);
                 const data = await res.json();
                 const sel = document.getElementById('date-select');
@@ -10267,12 +10269,13 @@ CFO Canlı Finans Sistemi`;
                 let url = '/api/dashboard?';
                 if (token) url += 'token=' + encodeURIComponent(token) + '&';
                 if (selectedDate) url += 'tarih=' + encodeURIComponent(selectedDate) + '&';
+                url += '_t=' + Date.now();
                 
                 let controller = null;
                 let timeoutId = null;
                 if (window.AbortController) {
                     controller = new AbortController();
-                    timeoutId = setTimeout(() => controller.abort(), 8000);
+                    timeoutId = setTimeout(() => controller.abort(), 25000);
                 }
                 
                 const res = await fetch(url, controller ? { signal: controller.signal } : {});
@@ -10280,7 +10283,7 @@ CFO Canlı Finans Sistemi`;
                 
                 if (!res.ok) {
                     console.warn("Fetch HTTP durumu:", res.status);
-                    if (isFirstLoad) setTimeout(() => fetchData(false), 3000);
+                    if (isFirstLoad) setTimeout(() => fetchData(false), 5000);
                     return;
                 }
                 const d = await res.json();
@@ -10293,7 +10296,7 @@ CFO Canlı Finans Sistemi`;
             } catch(e) {
                 console.error("Fetch hatası:", e);
                 if (isFirstLoad) {
-                    setTimeout(() => fetchData(false), 3000);
+                    setTimeout(() => fetchData(false), 5000);
                 }
             }
         }
@@ -10367,9 +10370,26 @@ CFO Canlı Finans Sistemi`;
 
         // Başlat
         updateControlButtonsUI();
+
+        // 1. Sunucu Tarafı İlk Veri Varsa ANINDA Render Et (0 Gecikme)
+        if (serverInitialData && serverInitialData.tarih) {
+            try {
+                renderDashboard(serverInitialData, false, []);
+            } catch(e) {
+                console.warn("Sunucu ilk veri render uyarısı:", e);
+            }
+        }
+        if (serverInitialRates) {
+            try {
+                renderMarketRates(serverInitialRates);
+            } catch(e) {
+                console.warn("Sunucu ilk kurlar render uyarısı:", e);
+            }
+        }
+
         fetchExchangeRate();
         fetchSheetsList();
-        fetchData(true);
+        fetchData(false);
         initSSE();
         fetchMarketRates(false);
 
@@ -10443,10 +10463,13 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data_bytes)))
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
-        self.send_header("Content-Security-Policy", "default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com;")
+        self.send_header("Content-Security-Policy", "default-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; img-src 'self' data: https:;")
         self.send_header("Access-Control-Allow-Origin", os.environ.get("ALLOWED_ORIGIN", "*"))
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Webhook-Token, X-Dashboard-Token")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -10600,10 +10623,18 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
 
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream; charset=utf-8")
-            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Cache-Control", "no-cache, no-transform")
             self.send_header("Connection", "keep-alive")
+            self.send_header("X-Accel-Buffering", "no")
             self.send_header("Access-Control-Allow-Origin", os.environ.get("ALLOWED_ORIGIN", "*"))
             self.end_headers()
+
+            # Reverse proxy buffer unblock
+            try:
+                self.wfile.write(b": connected\n\n")
+                self.wfile.flush()
+            except Exception:
+                pass
 
             client_q = queue.Queue(maxsize=50)
             with _sse_clients_lock:
@@ -10725,8 +10756,51 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
 
             current_rate = get_dashboard_exchange_rate()
             rate_str = f"{current_rate:.2f}".replace(".", ",")
-            html_to_send = DASHBOARD_HTML.replace("{{DASHBOARD_TOKEN}}", DASHBOARD_AUTH_TOKEN or "").replace("{{USDT_RATE}}", rate_str)
-            extra_h = {"Set-Cookie": f"dashboard_token={DASHBOARD_AUTH_TOKEN}; Path=/; SameSite=Lax; Max-Age=31536000; HttpOnly"} if DASHBOARD_AUTH_TOKEN else None
+
+            # İlk canlı verileri sunucu tarafında anında derle ve HTML içine enjekte et (0ms bekleme)
+            initial_data_json = "{}"
+            try:
+                sh = get_spreadsheet()
+                aktif_sayfa = get_active_daily_sheet(sh)
+                veriler = get_sheet_values_fast(aktif_sayfa, max_age_seconds=5.0)
+                finans = tablodan_finans_ozeti_hesapla(veriler)
+                d_obj = {
+                    "tarih": getattr(aktif_sayfa, "title", "Canlı"),
+                    "is_archive": False,
+                    "devir": finans["devir"],
+                    "kasa": finans["kasa"],
+                    "odenen": finans["odenen"],
+                    "komisyon": finans["komisyon"],
+                    "kalan": finans["kalan"],
+                    "toplam_masraf": finans.get("toplam_masraf", 0.0),
+                    "masraflar": finans.get("masraflar", []),
+                    "gruplar": finans["aktif_gruplar"]
+                }
+                initial_data_json = json.dumps(d_obj)
+            except Exception as e_init:
+                print(f"Sunucu tarafı ilk veri hazırlama uyarısı: {e_init}")
+
+            initial_rates_json = "{}"
+            try:
+                rates_summary = get_dashboard_market_rates_summary()
+                initial_rates_json = json.dumps(rates_summary)
+            except Exception as e_rates:
+                print(f"Sunucu tarafı ilk kur hazırlama uyarısı: {e_rates}")
+
+            html_to_send = DASHBOARD_HTML \
+                .replace("{{DASHBOARD_TOKEN}}", DASHBOARD_AUTH_TOKEN or "") \
+                .replace("{{USDT_RATE}}", rate_str) \
+                .replace("{{INITIAL_DATA}}", initial_data_json) \
+                .replace("{{INITIAL_RATES}}", initial_rates_json)
+
+            extra_h = {
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+            if DASHBOARD_AUTH_TOKEN:
+                extra_h["Set-Cookie"] = f"dashboard_token={DASHBOARD_AUTH_TOKEN}; Path=/; SameSite=Lax; Max-Age=31536000; HttpOnly"
+
             self._send_response_data(200, "text/html; charset=utf-8", html_to_send.encode("utf-8"), extra_headers=extra_h)
 
     def log_message(self, format, *args): pass
