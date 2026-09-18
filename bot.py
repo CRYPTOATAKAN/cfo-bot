@@ -8923,6 +8923,47 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             margin-bottom: 8px;
             letter-spacing: -0.5px;
         }
+        .harem-duo-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .harem-duo-box {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            transition: all 0.2s ease;
+        }
+        .harem-duo-box.alis {
+            border-color: rgba(52, 211, 153, 0.35);
+            background: rgba(16, 185, 129, 0.08);
+        }
+        .harem-duo-box.satis {
+            border-color: rgba(96, 165, 250, 0.35);
+            background: rgba(59, 130, 246, 0.08);
+        }
+        .harem-box-label {
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .harem-duo-box.alis .harem-box-label { color: #34d399; }
+        .harem-duo-box.satis .harem-box-label { color: #60a5fa; }
+        .harem-box-price {
+            font-size: 20px;
+            font-weight: 900;
+            color: #ffffff;
+            letter-spacing: -0.3px;
+        }
         .market-change-badge {
             display: inline-flex;
             align-items: center;
@@ -9399,13 +9440,24 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                         <div class="market-card-title"><span>🏬</span> HAREM KAPALIÇARŞI DOLARI</div>
                         <span class="market-change-badge change-neutral" style="font-size:11px;">USD / TRY</span>
                     </div>
-                    <div class="market-price-big"><span id="rate-harem-usd-satis">0,00</span> <span style="font-size:16px; opacity:0.85;">₺</span></div>
-                    <div class="spread-row">
-                        <span>Alış Fiyatı: <b id="rate-harem-usd-alis">0,00 ₺</b></span>
-                        <span style="color:#60a5fa;">Makas: <b id="rate-harem-usd-makas">0,00 ₺</b></span>
+                    <div class="harem-duo-grid">
+                        <div class="harem-duo-box alis">
+                            <div class="harem-box-label">
+                                <span>🟢 ALIŞ</span>
+                                <span style="font-size:9.5px; opacity:0.8; font-weight:600;">(Bozdurma)</span>
+                            </div>
+                            <div class="harem-box-price"><span id="rate-harem-usd-alis">0,00</span> <span style="font-size:13px; opacity:0.85;">₺</span></div>
+                        </div>
+                        <div class="harem-duo-box satis">
+                            <div class="harem-box-label">
+                                <span>🔵 SATIŞ</span>
+                                <span style="font-size:9.5px; opacity:0.8; font-weight:600;">(Alma)</span>
+                            </div>
+                            <div class="harem-box-price"><span id="rate-harem-usd-satis">0,00</span> <span style="font-size:13px; opacity:0.85;">₺</span></div>
+                        </div>
                     </div>
-                    <div class="spread-row" style="margin-top:6px;">
-                        <span>⚡ USDT vs Nakit Primi:</span>
+                    <div class="spread-row">
+                        <span>Makas Farkı: <b id="rate-harem-usd-makas">0,00 ₺</b></span>
                         <span id="rate-usdt-nakit-makas" style="color:#34d399; font-weight:800;">%0.00</span>
                     </div>
                 </div>
@@ -9416,10 +9468,25 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                         <div class="market-card-title"><span>💶</span> HAREM KAPALIÇARŞI EUROSU</div>
                         <span class="market-change-badge change-neutral" style="font-size:11px;">EUR / TRY</span>
                     </div>
-                    <div class="market-price-big"><span id="rate-harem-eur-satis">0,00</span> <span style="font-size:16px; opacity:0.85;">₺</span></div>
+                    <div class="harem-duo-grid">
+                        <div class="harem-duo-box alis">
+                            <div class="harem-box-label">
+                                <span>🟢 ALIŞ</span>
+                                <span style="font-size:9.5px; opacity:0.8; font-weight:600;">(Bozdurma)</span>
+                            </div>
+                            <div class="harem-box-price"><span id="rate-harem-eur-alis">0,00</span> <span style="font-size:13px; opacity:0.85;">₺</span></div>
+                        </div>
+                        <div class="harem-duo-box satis">
+                            <div class="harem-box-label">
+                                <span>🔵 SATIŞ</span>
+                                <span style="font-size:9.5px; opacity:0.8; font-weight:600;">(Alma)</span>
+                            </div>
+                            <div class="harem-box-price"><span id="rate-harem-eur-satis">0,00</span> <span style="font-size:13px; opacity:0.85;">₺</span></div>
+                        </div>
+                    </div>
                     <div class="spread-row">
-                        <span>Alış Fiyatı: <b id="rate-harem-eur-alis">0,00 ₺</b></span>
-                        <span style="color:#c084fc;">Makas: <b id="rate-harem-eur-makas">0,00 ₺</b></span>
+                        <span>Makas Farkı: <b id="rate-harem-eur-makas">0,00 ₺</b></span>
+                        <span style="color:#94a3b8; font-size:11.5px;">Serbest Piyasa</span>
                     </div>
                 </div>
 
@@ -9665,16 +9732,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             const uMakas = Math.abs(uSatis - uAlis);
             const bUsdt = Number((data.binance && data.binance.last) || data.usdt_try || 0);
 
+            const elUsdAlis = document.getElementById('rate-harem-usd-alis');
+            if (elUsdAlis) elUsdAlis.innerText = uAlis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             const elUsdSatis = document.getElementById('rate-harem-usd-satis');
             if (elUsdSatis) elUsdSatis.innerText = uSatis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const elUsdAlis = document.getElementById('rate-harem-usd-alis');
-            if (elUsdAlis) elUsdAlis.innerText = uAlis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
             const elUsdMakas = document.getElementById('rate-harem-usd-makas');
             if (elUsdMakas) elUsdMakas.innerText = uMakas.toFixed(2).replace('.', ',') + ' ₺';
 
             const elNakitMakas = document.getElementById('rate-usdt-nakit-makas');
-            if (elNakitMakas && uSatis > 0 && bUsdt > 0) {
-                const nakitPrim = ((bUsdt - uSatis) / uSatis) * 100;
+            if (elNakitMakas && uAlis > 0 && bUsdt > 0) {
+                const nakitPrim = ((bUsdt - uAlis) / uAlis) * 100;
                 if (nakitPrim >= 0) {
                     elNakitMakas.innerText = `+%${nakitPrim.toFixed(2)} (USDT Primi)`;
                     elNakitMakas.style.color = '#34d399';
@@ -9688,10 +9755,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             const eAlis = Number(eur[0]) || 0;
             const eSatis = Number(eur[1]) || 0;
             const eMakas = Math.abs(eSatis - eAlis);
+            const elEurAlis = document.getElementById('rate-harem-eur-alis');
+            if (elEurAlis) elEurAlis.innerText = eAlis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             const elEurSatis = document.getElementById('rate-harem-eur-satis');
             if (elEurSatis) elEurSatis.innerText = eSatis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            const elEurAlis = document.getElementById('rate-harem-eur-alis');
-            if (elEurAlis) elEurAlis.innerText = eAlis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
             const elEurMakas = document.getElementById('rate-harem-eur-makas');
             if (elEurMakas) elEurMakas.innerText = eMakas.toFixed(2).replace('.', ',') + ' ₺';
 
