@@ -8501,6 +8501,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <link rel="apple-touch-icon" href="/cfo_emblem.jpg">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg-overlay-opacity: 0.60;
+            --bg-blur: 0px;
+        }
         * { margin:0; padding:0; box-sizing:border-box; font-family:'Plus Jakarta Sans', sans-serif; }
         body { 
             background: #070a14; 
@@ -8509,6 +8513,39 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             padding: 24px 20px 60px 20px; 
             position: relative;
             overflow-x: hidden;
+            transition: background 0.4s ease;
+        }
+
+        /* DİNAMİK ARKA PLAN KATMANLARI */
+        .cfo-custom-bg {
+            position: fixed;
+            top: -15px; left: -15px; right: -15px; bottom: -15px;
+            background-size: cover;
+            background-position: center center;
+            background-repeat: no-repeat;
+            z-index: -4;
+            opacity: 0;
+            transition: opacity 0.4s ease, filter 0.3s ease;
+            pointer-events: none;
+            will-change: transform, opacity, filter;
+        }
+        .cfo-bg-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(7, 10, 20, var(--bg-overlay-opacity, 0.60));
+            z-index: -3;
+            opacity: 0;
+            transition: opacity 0.4s ease, background 0.3s ease;
+            pointer-events: none;
+        }
+        body.has-custom-bg .cfo-custom-bg,
+        body.has-custom-bg .cfo-bg-overlay {
+            opacity: 1;
+        }
+        body.has-custom-bg::before,
+        body.has-custom-bg::after {
+            opacity: 0 !important;
+            animation: none !important;
         }
 
         /* DİNAMİK GÖKYÜZÜ / AURORA VE YILDIZ ELEMANLARI */
@@ -9006,6 +9043,282 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         }
         .modal-copy-btn:hover { background: linear-gradient(135deg, #1d4ed8, #1e40af); transform: translateY(-1px); }
 
+        /* TEMA & ARKA PLAN AYARLARI MODAL */
+        .theme-modal-card {
+            max-width: 680px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .theme-modal-body {
+            padding: 20px 24px;
+            overflow-y: auto;
+            max-height: calc(90vh - 140px);
+        }
+        .theme-section-title {
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: #94a3b8;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .theme-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 22px;
+        }
+        @media (max-width: 640px) {
+            .theme-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        .theme-item {
+            background: rgba(15, 23, 42, 0.6);
+            border: 2px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.22s ease;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            text-align: left;
+        }
+        .theme-item:hover {
+            border-color: rgba(96, 165, 250, 0.5);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+        }
+        .theme-item.active {
+            border-color: #3b82f6;
+            background: rgba(59, 130, 246, 0.14);
+            box-shadow: 0 0 16px rgba(59, 130, 246, 0.35);
+        }
+        .theme-preview-box {
+            width: 100%;
+            height: 72px;
+            border-radius: 9px;
+            background-size: cover;
+            background-position: center;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .theme-active-badge {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            background: #2563eb;
+            color: #ffffff;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 7px;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+            display: none;
+        }
+        .theme-item.active .theme-active-badge {
+            display: block;
+        }
+        .theme-item-info {
+            padding: 2px 4px 4px 4px;
+        }
+        .theme-item-name {
+            font-size: 12px;
+            font-weight: 700;
+            color: #f1f5f9;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .theme-item-desc {
+            font-size: 10.5px;
+            color: #94a3b8;
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        /* ÖZEL GÖRSEL YÜKLEME VE URL */
+        .custom-upload-box {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px dashed rgba(255, 255, 255, 0.18);
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .custom-upload-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .upload-file-btn {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.25), rgba(99, 102, 241, 0.25));
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            color: #93c5fd;
+            padding: 9px 16px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        .upload-file-btn:hover {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.4), rgba(99, 102, 241, 0.4));
+            color: #ffffff;
+            border-color: #60a5fa;
+        }
+        .theme-url-input {
+            flex: 1;
+            min-width: 200px;
+            background: rgba(8, 13, 27, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            color: #e2e8f0;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 12px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .theme-url-input:focus {
+            border-color: #60a5fa;
+        }
+        .theme-url-btn {
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #e2e8f0;
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .theme-url-btn:hover {
+            background: #2563eb;
+            color: #ffffff;
+            border-color: #3b82f6;
+        }
+
+        /* SLIDERS */
+        .theme-controls-box {
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            padding: 14px 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+        .slider-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+        .slider-label {
+            font-size: 12.5px;
+            font-weight: 600;
+            color: #cbd5e1;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 175px;
+        }
+        .slider-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .theme-slider {
+            flex: 1;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.15);
+            outline: none;
+            cursor: pointer;
+        }
+        .theme-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #3b82f6;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(59, 130, 246, 0.6);
+            transition: transform 0.15s;
+        }
+        .theme-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        .slider-val-badge {
+            font-size: 11.5px;
+            font-weight: 700;
+            color: #93c5fd;
+            min-width: 42px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .theme-footer-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 14px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            gap: 12px;
+        }
+        .reset-theme-btn {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            color: #fca5a5;
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .reset-theme-btn:hover {
+            background: rgba(239, 68, 68, 0.3);
+            color: #ffffff;
+            border-color: #ef4444;
+        }
+        .close-theme-btn {
+            background: #2563eb;
+            border: 1px solid #3b82f6;
+            color: #ffffff;
+            padding: 8px 18px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .close-theme-btn:hover {
+            background: #1d4ed8;
+            box-shadow: 0 0 15px rgba(37, 99, 235, 0.4);
+        }
+
         /* SEKME GEZİNTİ ÇUBUĞU */
         .nav-tabs {
             display: flex;
@@ -9317,6 +9630,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 </head>
 
 <body>
+    <!-- DİNAMİK ARKA PLAN KATMANLARI -->
+    <div id="cfo-custom-bg" class="cfo-custom-bg"></div>
+    <div id="cfo-bg-overlay" class="cfo-bg-overlay"></div>
+
     <div id="toast-container" style="position:fixed; top:24px; right:24px; z-index:99999; display:flex; flex-direction:column; gap:12px; pointer-events:none;"></div>
     
     <div class="container">
@@ -9361,6 +9678,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 <!-- 3. SESLİ BİLDİRİM -->
                 <button id="sound-btn" class="control-btn" onclick="toggleSound()" title="İşlem Bildirim Sesi">
                     <span id="sound-icon">🔔</span> <span id="sound-text">Ses Açık</span>
+                </button>
+
+                <!-- 4. ARKA PLAN & TEMA AYARI -->
+                <button id="theme-btn" class="control-btn" onclick="openThemeModal()" title="Arka Plan Görseli & Tema Ayarları">
+                    <span>🎨</span> <span>Tema</span>
                 </button>
 
                 <!-- MANUEL YENİLE -->
@@ -9748,6 +10070,74 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 <div class="modal-actions">
                     <button class="modal-copy-btn" onclick="copyGroupStatement()">
                         📋 Cari Ekstresini Kopyala (WhatsApp / Telegram)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. TEMA & ARKA PLAN AYARLARI PENCERESİ (MODAL) -->
+    <div id="theme-modal" class="modal-backdrop" onclick="closeThemeModal(event)">
+        <div class="modal-card theme-modal-card" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title-box">
+                    <div class="modal-icon" style="background: linear-gradient(135deg, #ec4899, #8b5cf6);">🎨</div>
+                    <div>
+                        <h2 style="font-size:17px; font-weight:800; color:#f8fafc; margin:0;">TEMA & ARKA PLAN AYARLARI</h2>
+                        <span class="modal-status-pill" style="background:rgba(236,72,153,0.2); color:#f472b6; border:1px solid rgba(244,114,182,0.3);">Kişiselleştirme</span>
+                    </div>
+                </div>
+                <button class="modal-close-btn" onclick="closeThemeModal()">✕</button>
+            </div>
+            <div class="theme-modal-body">
+                <!-- HAZIR TEMALAR -->
+                <div class="theme-section-title"><span>🌟</span> Küratörlü Finansal Temalar</div>
+                <div class="theme-grid" id="theme-presets-grid">
+                    <!-- Javascript ile doldurulacak -->
+                </div>
+
+                <!-- ÖZEL GÖRSEL YÜKLEME VE URL -->
+                <div class="theme-section-title"><span>🖼️</span> Kendi Görselinizi Kullanın</div>
+                <div class="custom-upload-box">
+                    <div class="custom-upload-row">
+                        <input type="file" id="theme-file-input" accept="image/*" onchange="handleCustomFileUpload(event)" style="display:none;">
+                        <button type="button" class="upload-file-btn" onclick="document.getElementById('theme-file-input').click()">
+                            <span>📁</span> Cihazdan Fotoğraf Seç (Yükle)
+                        </button>
+                        <span style="font-size:11px; color:#94a3b8;">PNG, JPG, WebP (Otomatik optimize edilir)</span>
+                    </div>
+                    <div class="custom-upload-row">
+                        <input type="url" id="theme-url-input" placeholder="veya Görsel URL'si yapıştırın (https://...)" class="theme-url-input">
+                        <button type="button" class="theme-url-btn" onclick="applyCustomUrl()">Bağlantıyı Uygula</button>
+                    </div>
+                </div>
+
+                <!-- OKUNABİLİRLİK VE KONTRAST KONTROLLERİ -->
+                <div class="theme-section-title"><span>🎚️</span> Okunabilirlik & Kontrast Ayarları</div>
+                <div class="theme-controls-box">
+                    <div class="slider-row">
+                        <div class="slider-label"><span>🌑</span> Karartma Oranı (Overlay):</div>
+                        <div class="slider-wrapper">
+                            <input type="range" id="theme-opacity-slider" class="theme-slider" min="20" max="90" step="5" value="60" oninput="onOpacitySliderChange(this.value)">
+                            <span id="theme-opacity-val" class="slider-val-badge">%60</span>
+                        </div>
+                    </div>
+                    <div class="slider-row">
+                        <div class="slider-label"><span>🌫️</span> Arka Plan Bulanıklığı:</div>
+                        <div class="slider-wrapper">
+                            <input type="range" id="theme-blur-slider" class="theme-slider" min="0" max="15" step="1" value="0" oninput="onBlurSliderChange(this.value)">
+                            <span id="theme-blur-val" class="slider-val-badge">0 px</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MODAL ALT EYLEMLER -->
+                <div class="theme-footer-actions">
+                    <button type="button" class="reset-theme-btn" onclick="resetThemeToDefault()">
+                        <span>🔄</span> Varsayılana Sıfırla (Aurora)
+                    </button>
+                    <button type="button" class="close-theme-btn" onclick="closeThemeModal()">
+                        Tamam
                     </button>
                 </div>
             </div>
@@ -10565,7 +10955,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         }
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closeGroupModal();
+            if (e.key === 'Escape') {
+                closeGroupModal();
+                closeThemeModal();
+            }
         });
 
         function copyGroupStatement() {
@@ -10749,7 +11142,269 @@ CFO Canlı Finans Sistemi`;
             };
         }
 
+        // ==========================================
+        // 🎨 TEMA & ARKA PLAN YÖNETİM MOTORU
+        // ==========================================
+        const THEME_PRESETS = [
+            {
+                id: 'aurora',
+                name: '🌌 Aurora Kozmos',
+                desc: 'Animasyonlu Gökyüzü',
+                type: 'css',
+                previewBg: 'linear-gradient(135deg, #1e1b4b, #312e81, #0f172a)'
+            },
+            {
+                id: 'wallstreet',
+                name: '🏛️ Wall Street & Borsa',
+                desc: 'Piyasa & Grafik Atmosferi',
+                type: 'image',
+                url: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?q=80&w=1920&auto=format&fit=crop',
+                thumb: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?q=60&w=360&auto=format&fit=crop'
+            },
+            {
+                id: 'skyline',
+                name: '🏙️ Finans Merkezi Gece',
+                desc: 'Gökdelenler & Metropol',
+                type: 'image',
+                url: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=1920&auto=format&fit=crop',
+                thumb: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=60&w=360&auto=format&fit=crop'
+            },
+            {
+                id: 'gold_carbon',
+                name: '💎 Lüks Karbon & Altın',
+                desc: 'Obsidyen & Altın Işıltısı',
+                type: 'image',
+                url: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1920&auto=format&fit=crop',
+                thumb: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=60&w=360&auto=format&fit=crop'
+            },
+            {
+                id: 'crypto_grid',
+                name: '🌐 Kripto & Ağ Matrix',
+                desc: 'Blokzincir Düğüm Ağı',
+                type: 'image',
+                url: 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?q=80&w=1920&auto=format&fit=crop',
+                thumb: 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?q=60&w=360&auto=format&fit=crop'
+            },
+            {
+                id: 'oled_black',
+                name: '🌑 Minimal Derin Siyah',
+                desc: 'Ultra Saf OLED Koyu Mod',
+                type: 'color',
+                color: '#050811',
+                previewBg: '#050811'
+            }
+        ];
+
+        let activeThemeId = localStorage.getItem('cfo_bg_theme') || 'aurora';
+        let customBgData = localStorage.getItem('cfo_bg_custom_data') || '';
+        let bgOverlayOpacity = parseFloat(localStorage.getItem('cfo_bg_opacity') || '0.60');
+        let bgBlurPx = parseInt(localStorage.getItem('cfo_bg_blur') || '0', 10);
+
+        function initBackgroundTheme() {
+            renderThemePresetsGrid();
+            applyTheme(activeThemeId, false);
+            updateThemeSlidersUI();
+        }
+
+        function renderThemePresetsGrid() {
+            const grid = document.getElementById('theme-presets-grid');
+            if (!grid) return;
+            
+            let html = '';
+            THEME_PRESETS.forEach(item => {
+                const isActive = (item.id === activeThemeId);
+                const bgStyle = item.thumb ? `background-image:url('${item.thumb}');` : `background:${item.previewBg};`;
+                html += `
+                    <div class="theme-item ${isActive ? 'active' : ''}" onclick="selectPresetTheme('${item.id}')" id="theme-card-${item.id}">
+                        <div class="theme-preview-box" style="${bgStyle}">
+                            <span class="theme-active-badge">✓ Aktif</span>
+                        </div>
+                        <div class="theme-item-info">
+                            <div class="theme-item-name">${item.name}</div>
+                            <div class="theme-item-desc">${item.desc}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            grid.innerHTML = html;
+        }
+
+        function openThemeModal() {
+            renderThemePresetsGrid();
+            updateThemeSlidersUI();
+            const urlInput = document.getElementById('theme-url-input');
+            if (urlInput && activeThemeId === 'custom_url') {
+                urlInput.value = customBgData;
+            }
+            const modal = document.getElementById('theme-modal');
+            if (modal) {
+                modal.classList.add('show');
+            }
+        }
+
+        function closeThemeModal(event) {
+            if (event && event.target && event.target.id !== 'theme-modal') return;
+            const modal = document.getElementById('theme-modal');
+            if (modal) {
+                modal.classList.remove('show');
+            }
+        }
+
+        function selectPresetTheme(themeId) {
+            activeThemeId = themeId;
+            localStorage.setItem('cfo_bg_theme', themeId);
+            applyTheme(themeId, true);
+            renderThemePresetsGrid();
+            showToast('Tema başarıyla değiştirildi.', 'info');
+        }
+
+        function applyTheme(themeId, animate) {
+            const bgEl = document.getElementById('cfo-custom-bg');
+            const overlayEl = document.getElementById('cfo-bg-overlay');
+            if (!bgEl || !overlayEl) return;
+
+            document.documentElement.style.setProperty('--bg-overlay-opacity', bgOverlayOpacity);
+            document.documentElement.style.setProperty('--bg-blur', bgBlurPx + 'px');
+
+            if (themeId === 'aurora') {
+                document.body.classList.remove('has-custom-bg');
+                document.body.style.background = '#070a14';
+                bgEl.style.backgroundImage = 'none';
+                return;
+            }
+
+            if (themeId === 'oled_black') {
+                document.body.classList.add('has-custom-bg');
+                document.body.style.background = '#050811';
+                bgEl.style.backgroundImage = 'none';
+                return;
+            }
+
+            let imageUrl = '';
+            if (themeId === 'custom_file' || themeId === 'custom_url') {
+                imageUrl = customBgData;
+            } else {
+                const preset = THEME_PRESETS.find(p => p.id === themeId);
+                if (preset && preset.url) {
+                    imageUrl = preset.url;
+                }
+            }
+
+            if (imageUrl) {
+                document.body.classList.add('has-custom-bg');
+                bgEl.style.backgroundImage = `url('${imageUrl}')`;
+            } else {
+                document.body.classList.remove('has-custom-bg');
+            }
+        }
+
+        function onOpacitySliderChange(val) {
+            bgOverlayOpacity = (parseInt(val, 10) / 100).toFixed(2);
+            localStorage.setItem('cfo_bg_opacity', bgOverlayOpacity);
+            const valBadge = document.getElementById('theme-opacity-val');
+            if (valBadge) valBadge.textContent = `%${val}`;
+            document.documentElement.style.setProperty('--bg-overlay-opacity', bgOverlayOpacity);
+        }
+
+        function onBlurSliderChange(val) {
+            bgBlurPx = parseInt(val, 10);
+            localStorage.setItem('cfo_bg_blur', bgBlurPx);
+            const valBadge = document.getElementById('theme-blur-val');
+            if (valBadge) valBadge.textContent = `${bgBlurPx} px`;
+            document.documentElement.style.setProperty('--bg-blur', bgBlurPx + 'px');
+        }
+
+        function updateThemeSlidersUI() {
+            const opSlider = document.getElementById('theme-opacity-slider');
+            const opBadge = document.getElementById('theme-opacity-val');
+            if (opSlider) opSlider.value = Math.round(bgOverlayOpacity * 100);
+            if (opBadge) opBadge.textContent = `%${Math.round(bgOverlayOpacity * 100)}`;
+
+            const blurSlider = document.getElementById('theme-blur-slider');
+            const blurBadge = document.getElementById('theme-blur-val');
+            if (blurSlider) blurSlider.value = bgBlurPx;
+            if (blurBadge) blurBadge.textContent = `${bgBlurPx} px`;
+        }
+
+        function handleCustomFileUpload(event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) {
+                showToast('Lütfen geçerli bir resim dosyası seçin.', 'warning');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    let width = img.width;
+                    let height = img.height;
+                    const maxW = 1920;
+                    const maxH = 1080;
+                    if (width > maxW || height > maxH) {
+                        const ratio = Math.min(maxW / width, maxH / height);
+                        width = Math.round(width * ratio);
+                        height = Math.round(height * ratio);
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    try {
+                        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+                        activeThemeId = 'custom_file';
+                        customBgData = compressedDataUrl;
+                        localStorage.setItem('cfo_bg_theme', 'custom_file');
+                        localStorage.setItem('cfo_bg_custom_data', compressedDataUrl);
+                        applyTheme('custom_file', true);
+                        renderThemePresetsGrid();
+                        showToast('Özel arka plan yüklendi ve uygulandı!', 'success');
+                    } catch (err) {
+                        console.error('Storage error:', err);
+                        showToast('Görsel kaydedilemedi (Tarayıcı hafıza sınırı aşıldı).', 'warning');
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function applyCustomUrl() {
+            const input = document.getElementById('theme-url-input');
+            const url = (input ? input.value : '').trim();
+            if (!url) {
+                showToast('Lütfen geçerli bir görsel bağlantısı (URL) girin.', 'warning');
+                return;
+            }
+            activeThemeId = 'custom_url';
+            customBgData = url;
+            localStorage.setItem('cfo_bg_theme', 'custom_url');
+            localStorage.setItem('cfo_bg_custom_data', url);
+            applyTheme('custom_url', true);
+            renderThemePresetsGrid();
+            showToast('Özel görsel URL uygulandı!', 'success');
+        }
+
+        function resetThemeToDefault() {
+            activeThemeId = 'aurora';
+            customBgData = '';
+            bgOverlayOpacity = 0.60;
+            bgBlurPx = 0;
+            localStorage.removeItem('cfo_bg_theme');
+            localStorage.removeItem('cfo_bg_custom_data');
+            localStorage.removeItem('cfo_bg_opacity');
+            localStorage.removeItem('cfo_bg_blur');
+            applyTheme('aurora', true);
+            updateThemeSlidersUI();
+            renderThemePresetsGrid();
+            const urlInput = document.getElementById('theme-url-input');
+            if (urlInput) urlInput.value = '';
+            showToast('Varsayılan Aurora temasına dönüldü.', 'info');
+        }
+
         // Başlat
+        initBackgroundTheme();
         updateControlButtonsUI();
 
         // 1. Sunucu Tarafı İlk Veri Varsa ANINDA Render Et (0 Gecikme)
