@@ -11303,6 +11303,30 @@ def run_sheets_autosync_loop():
             print(f"[AutoSync Hatası]: {err}")
         time.sleep(3)
 
+def fetch_telegram_updates(offset: int, timeout: int = 20) -> dict:
+    """Telegram getUpdates uzun yoklama (long polling) isteğini uygun soket zaman aşımıyla gerçekleştirir."""
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates?offset={offset}&timeout={timeout}"
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "CFO-BOT/1.0",
+        "Accept": "application/json"
+    })
+    try:
+        # Soket zaman aşımı, Telegram'ın long-poll bekleme süresinden (20s) daha uzun olmalıdır (örn: 35s)
+        with urllib.request.urlopen(req, timeout=timeout + 15) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as he:
+        if he.code == 409:
+            print("[Telegram getUpdates Hatası]: 409 Conflict - Webhook veya başka bir bot örneği aktif. Webhook otomatik temizleniyor...")
+            telegram_api("deleteWebhook", {"drop_pending_updates": False})
+        else:
+            print(f"[Telegram getUpdates HTTP Hatası]: {he.code} - {he.reason}")
+        return {"ok": False, "error": str(he)}
+    except Exception as e:
+        err_str = str(e).lower()
+        if "timed out" not in err_str and "timeout" not in err_str:
+            print(f"[Telegram getUpdates Bağlantı Hatası]: {e}")
+        return {"ok": False, "error": str(e)}
+
 # --- MAIN LOOP (LONG POLLING WITH THREAD POOL) ---
 if __name__ == "__main__":
     threading.Thread(target=run_dashboard_server, daemon=True).start()
@@ -11310,16 +11334,27 @@ if __name__ == "__main__":
     threading.Thread(target=run_sheets_autosync_loop, daemon=True).start()
     print(f"CFO Bot & Canlı Dashboard Başlatıldı (7/24 Kesintisiz - Otomatik Kapanış Saati: {app_state.get('KAPANIS_SAATI', '23:45')})...")
     
+    # 1. Başlangıçta olası eski/bozuk webhook'ları kaldırarak Long-Polling'i garantile
+    try:
+        del_wh = telegram_api("deleteWebhook", {"drop_pending_updates": False})
+        if del_wh.get("ok"):
+            print("Telegram Webhook kontrol edildi ve temizlendi (Long-Polling hazır).")
+    except Exception as wh_err:
+        print(f"Telegram deleteWebhook uyarısı: {wh_err}")
+
     offset = 0
     while True:
         try:
-            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates?offset={offset}&timeout=25"
-            res = http_get_json(url)
+            res = fetch_telegram_updates(offset=offset, timeout=20)
             if res.get("ok"):
                 for upd in res.get("result", []):
                     offset = upd["update_id"] + 1
                     _update_executor.submit(process_telegram_update, upd)
+            else:
+                time.sleep(1)
         except Exception as e:
+            print(f"[Ana Döngü Hatası]: {e}")
             time.sleep(1)
+
 
 
