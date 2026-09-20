@@ -120,7 +120,22 @@ def http_get_json(url: str, headers: dict = None, **kwargs) -> dict:
     with urllib.request.urlopen(req, timeout=timeout) as response:
         return json.loads(response.read().decode("utf-8"))
 
-def http_get_text(url: str, headers: dict = None) -> str:
+def http_get_text(url: str, headers: dict = None, **kwargs) -> str:
+    timeout = kwargs.get("timeout", 5.0)
+    # 1. Hızlı IPv4 curl (macOS / Linux TLS handshake ve IPv6 sorunlarını baypas eder)
+    try:
+        t_sec = max(1, int(timeout))
+        cmd = ['curl', '-4', '-s', '-m', str(t_sec),
+               '-H', 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+               '-H', 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+               url]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 0.5)
+        if proc.returncode == 0 and proc.stdout.strip():
+            return proc.stdout
+    except Exception:
+        pass
+
+    # 2. Standart urllib fallback
     default_headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
@@ -128,10 +143,11 @@ def http_get_text(url: str, headers: dict = None) -> str:
     if headers:
         default_headers.update(headers)
     req = urllib.request.Request(url, headers=default_headers)
-    with urllib.request.urlopen(req, timeout=10) as response:
+    with urllib.request.urlopen(req, timeout=timeout) as response:
         return response.read().decode("utf-8", errors="ignore")
 
 _tg_thread_local = threading.local()
+
 
 def _get_telegram_conn():
     conn = getattr(_tg_thread_local, "conn", None)
@@ -2951,6 +2967,11 @@ _last_paribu_cache = None
 _last_btcturk_cache = None
 _last_whitebit_cache = {"last": 48.67, "high": 48.70, "low": 48.00}
 _last_okx_cache = None
+_last_harem_cache = {
+    "usd": (48.60, 48.73),
+    "eur": (56.00, 56.11),
+    "gold": {"gram": 6865.89, "ons": 4378.66, "gumus": 103.93}
+}
 
 def fetch_all_market_rates_parallel(force_refresh: bool = False, max_age: float = 15.0) -> dict:
     """Tüm borsa ve Kapalıçarşı döviz/USDT kurlarını eşzamanlı/paralel çeker ve 15s önbelleğe alır."""
@@ -2961,8 +2982,10 @@ def fetch_all_market_rates_parallel(force_refresh: bool = False, max_age: float 
             return dict(_rates_cache)
 
     def fetch_harem():
+        global _last_harem_cache
         def _parse_kur(val):
             s = str(val or "").strip()
+            s = s.replace("$", "").replace("€", "").replace("₺", "").strip()
             if "," in s and "." in s:
                 s = s.replace(".", "").replace(",", ".")
             elif "," in s:
@@ -2972,72 +2995,102 @@ def fetch_all_market_rates_parallel(force_refresh: bool = False, max_age: float 
             except Exception:
                 return 0.0
 
-        gold_data = {"gram": 7350.0, "ons": 2850.0, "gumus": 85.20}
-        try:
-            d_gold = http_get_json("https://finans.truncgil.com/v3/today.json")
-            if isinstance(d_gold, dict):
-                g_a = _parse_kur((d_gold.get("gram-altin") or {}).get("Selling"))
-                o_a = _parse_kur((d_gold.get("ons") or {}).get("Selling"))
-                g_g = _parse_kur((d_gold.get("gumus") or {}).get("Selling"))
-                if g_a > 0: gold_data["gram"] = g_a
-                if o_a > 0: gold_data["ons"] = o_a
-                if g_g > 0: gold_data["gumus"] = g_g
-        except Exception:
-            pass
+        def _extract_socket_val(text, key, attr):
+            if not text:
+                return 0.0
+            p1 = rf'data-socket-key="{key}"[^>]*data-socket-attr="{attr}"[^>]*>([\s\S]*?)<'
+            m = re.search(p1, text)
+            if not m:
+                p2 = rf'data-socket-attr="{attr}"[^>]*data-socket-key="{key}"[^>]*>([\s\S]*?)<'
+                m = re.search(p2, text)
+            if m:
+                return _parse_kur(m.group(1))
+            return 0.0
 
-        # 1. Canlı Kaynak: doviz.com Kapalıçarşı (20-USD) & Harem (23-USD)
+        u_alis, u_satis = 0.0, 0.0
+        e_alis, e_satis = 0.0, 0.0
+        gold_data = dict(_last_harem_cache.get("gold") or {"gram": 6865.89, "ons": 4378.66, "gumus": 103.93})
+
+        # 1. Tier 1: Doviz.com Kapalıçarşı / Harem (Hızlı IPv4 curl veya test mock'u)
         for url in ["https://kur.doviz.com/kapalicarsi/amerikan-dolari", "https://kur.doviz.com/harem/amerikan-dolari"]:
             try:
-                html = http_get_text(url)
-                u_alis, u_satis = 0.0, 0.0
-                
-                # Öncelik 1: 20-USD (Kapalıçarşı Serbest Piyasa)
-                m_20_bid = re.search(r'data-socket-key="20-USD"[^>]*data-socket-attr="bid"[^>]*>([\s\S]*?)<', html)
-                m_20_ask = re.search(r'data-socket-key="20-USD"[^>]*data-socket-attr="(?:ask|s)"[^>]*>([\s\S]*?)<', html)
-                if m_20_bid and m_20_ask:
-                    u_alis = _parse_kur(m_20_bid.group(1))
-                    u_satis = _parse_kur(m_20_ask.group(1))
+                html = http_get_text(url, timeout=1.8)
+                if html:
+                    h_bid = _extract_socket_val(html, "23-USD", "bid") or _extract_socket_val(html, "20-USD", "bid")
+                    h_ask = _extract_socket_val(html, "23-USD", "ask") or _extract_socket_val(html, "20-USD", "ask") or _extract_socket_val(html, "20-USD", "s")
+                    if h_bid > 30 and h_ask > 30:
+                        u_alis, u_satis = h_bid, h_ask
 
-                # Öncelik 2: 23-USD (Harem Altın Tahtası)
-                if u_alis == 0 or u_satis == 0:
-                    m_23_bid = re.search(r'data-socket-key="23-USD"[^>]*data-socket-attr="bid"[^>]*>([\s\S]*?)<', html)
-                    m_23_ask = re.search(r'data-socket-key="23-USD"[^>]*data-socket-attr="(?:ask|s)"[^>]*>([\s\S]*?)<', html)
-                    if m_23_bid and m_23_ask:
-                        u_alis = _parse_kur(m_23_bid.group(1))
-                        u_satis = _parse_kur(m_23_ask.group(1))
-
-                e_alis, e_satis = 0.0, 0.0
-                m_e_bid = re.search(r'data-socket-key="(?:20-EUR|23-EUR)"[^>]*data-socket-attr="bid"[^>]*>([\s\S]*?)<', html)
-                m_e_ask = re.search(r'data-socket-key="(?:20-EUR|23-EUR)"[^>]*data-socket-attr="(?:ask|s)"[^>]*>([\s\S]*?)<', html)
-                if m_e_bid and m_e_ask:
-                    e_alis = _parse_kur(m_e_bid.group(1))
-                    e_satis = _parse_kur(m_e_ask.group(1))
-
-                if u_alis > 0 and u_satis > 0:
-                    return {
-                        "usd": (u_alis, u_satis),
-                        "eur": (e_alis, e_satis) if (e_alis > 0 and e_satis > 0) else (55.60, 55.85),
-                        "gold": gold_data
-                    }
+                    e_bid = _extract_socket_val(html, "23-EUR", "bid") or _extract_socket_val(html, "20-EUR", "bid")
+                    e_ask = _extract_socket_val(html, "23-EUR", "ask") or _extract_socket_val(html, "20-EUR", "ask")
+                    if e_bid > 30 and e_ask > 30:
+                        e_alis, e_satis = e_bid, e_ask
+                    if u_alis > 0 and u_satis > 0:
+                        break
             except Exception:
                 pass
 
-        # 2. İkincil Yedek Kaynak: Truncgil
-        try:
-            d = http_get_json("https://finans.truncgil.com/v3/today.json")
-            u = d.get("USD", {})
-            u_alis = _parse_kur(u.get("Buying"))
-            u_satis = _parse_kur(u.get("Selling"))
-            e = d.get("EUR", {})
-            e_alis = _parse_kur(e.get("Buying"))
-            e_satis = _parse_kur(e.get("Selling"))
-            return {
-                "usd": (u_alis, u_satis) if u_alis > 0 and u_satis > 0 else (48.25, 48.26),
-                "eur": (e_alis, e_satis) if e_alis > 0 and e_satis > 0 else (55.60, 55.85),
-                "gold": gold_data
-            }
-        except Exception:
-            return {"usd": (48.25, 48.26), "eur": (55.60, 55.85), "gold": gold_data}
+        # 2. Tier 2: Truncgil Hızlı Finans JSON API (~150ms)
+        for t_url in ["https://finans.truncgil.com/today.json", "https://finans.truncgil.com/v3/today.json"]:
+            try:
+                d = http_get_json(t_url, timeout=1.8)
+                if isinstance(d, dict):
+                    if u_alis == 0 or u_satis == 0:
+                        usd_item = d.get("USD") or {}
+                        ua = _parse_kur(usd_item.get("Alış") or usd_item.get("Buying"))
+                        us = _parse_kur(usd_item.get("Satış") or usd_item.get("Selling"))
+                        if ua > 30 and us > 30:
+                            u_alis, u_satis = ua, us
+
+                    if e_alis == 0 or e_satis == 0:
+                        eur_item = d.get("EUR") or {}
+                        ea = _parse_kur(eur_item.get("Alış") or eur_item.get("Buying"))
+                        es = _parse_kur(eur_item.get("Satış") or eur_item.get("Selling"))
+                        if ea > 30 and es > 30:
+                            e_alis, e_satis = ea, es
+
+                    ga = _parse_kur((d.get("gram-altin") or {}).get("Satış") or (d.get("gram-altin") or {}).get("Selling"))
+                    oa = _parse_kur((d.get("ons") or {}).get("Satış") or (d.get("ons") or {}).get("Selling"))
+                    gu = _parse_kur((d.get("gumus") or {}).get("Satış") or (d.get("gumus") or {}).get("Selling"))
+                    if ga > 0: gold_data["gram"] = ga
+                    if oa > 0: gold_data["ons"] = oa
+                    if gu > 0: gold_data["gumus"] = gu
+
+                    if u_alis > 0 and u_satis > 0:
+                        break
+            except Exception:
+                pass
+
+        # 3. Tier 3: ExchangeRate API Çapraz Kur Yedekleme
+        if u_alis == 0 or u_satis == 0:
+            try:
+                d_fx = http_get_json("https://api.exchangerate-api.com/v4/latest/USD", timeout=1.5)
+                try_val = float((d_fx.get("rates") or {}).get("TRY", 0.0))
+                if try_val > 30:
+                    u_alis = round(try_val - 0.02, 4)
+                    u_satis = round(try_val + 0.02, 4)
+                    eur_val = float((d_fx.get("rates") or {}).get("EUR", 0.92))
+                    if eur_val > 0:
+                        e_try = try_val / eur_val
+                        e_alis = round(e_try - 0.05, 4)
+                        e_satis = round(e_try + 0.05, 4)
+            except Exception:
+                pass
+
+        # 4. Tier 4: Kalıcı Bellek Önbelleği (Asla boş ve 0 dönemez!)
+        prev = dict(_last_harem_cache)
+        final_usd = (u_alis, u_satis) if (u_alis > 0 and u_satis > 0) else prev.get("usd", (48.60, 48.73))
+        final_eur = (e_alis, e_satis) if (e_alis > 0 and e_satis > 0) else prev.get("eur", (56.00, 56.11))
+        final_gold = gold_data if gold_data.get("gram", 0) > 0 else prev.get("gold", {"gram": 6865.89, "ons": 4378.66, "gumus": 103.93})
+
+        res_harem = {
+            "usd": (round(float(final_usd[0]), 4), round(float(final_usd[1]), 4)),
+            "eur": (round(float(final_eur[0]), 4), round(float(final_eur[1]), 4)),
+            "gold": final_gold
+        }
+        _last_harem_cache.update(res_harem)
+        return res_harem
+
 
     def fetch_fiat():
         try:
@@ -3157,10 +3210,17 @@ def fetch_all_market_rates_parallel(force_refresh: bool = False, max_age: float 
     results = {}
     for k, fut in futures.items():
         try:
-            res = fut.result(timeout=3.5)
+            res = fut.result(timeout=4.0)
             results[k] = res if res is not None else {}
         except Exception:
-            results[k] = {}
+            if k == "harem":
+                results[k] = dict(_last_harem_cache)
+            elif k == "crypto":
+                results[k] = dict(_last_crypto_tickers_cache)
+            elif k == "binance":
+                results[k] = dict(_last_binance_cache) if _last_binance_cache else {"last": 48.65, "high": 48.65, "low": 48.04}
+            else:
+                results[k] = {}
 
     with _rates_lock:
         _rates_cache = dict(results)
@@ -6481,7 +6541,7 @@ def cache_temizle_impl() -> str:
     global _cached_gc, _cached_spreadsheet, _cached_sh_time, _cached_iban_sheet, _cached_iban_sheet_time
     global _cached_active_sheet, _cached_active_sheet_time, _cached_sheet_matrix, _cached_sheet_matrix_title, _cached_sheet_matrix_time, _cached_sheet_matrices
     global _rates_cache, _rates_cache_time
-    global _last_binance_cache, _last_paribu_cache, _last_btcturk_cache, _last_whitebit_cache, _last_okx_cache
+    global _last_binance_cache, _last_paribu_cache, _last_btcturk_cache, _last_whitebit_cache, _last_okx_cache, _last_harem_cache
     with _sh_lock:
         _cached_gc = None
         _cached_spreadsheet = None
@@ -6505,6 +6565,11 @@ def cache_temizle_impl() -> str:
         _last_btcturk_cache = None
         _last_whitebit_cache = None
         _last_okx_cache = None
+        _last_harem_cache = {
+            "usd": (48.60, 48.73),
+            "eur": (56.00, 56.11),
+            "gold": {"gram": 6865.89, "ons": 4378.66, "gumus": 103.93}
+        }
     app_state["ADMIN_CACHE_TIME"] = 0
     app_state["BAGLANTI_CACHE_TIME"] = 0
     sistemeLogYaz("Önbellek Temizlendi", "Google Sheets ve yetki önbellekleri tazeledi.")
@@ -9072,6 +9137,14 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             color: #ffffff;
             letter-spacing: -0.3px;
         }
+        .harem-sub-desc {
+            font-size: 10.5px;
+            font-weight: 700;
+            opacity: 0.85;
+            margin-top: 2px;
+        }
+        .harem-duo-box.alis .harem-sub-desc { color: #6ee7b7; }
+        .harem-duo-box.satis .harem-sub-desc { color: #93c5fd; }
         .market-change-badge {
             display: inline-flex;
             align-items: center;
@@ -9551,21 +9624,21 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                     <div class="harem-duo-grid">
                         <div class="harem-duo-box alis">
                             <div class="harem-box-label">
-                                <span>🟢 ALIŞ</span>
-                                <span style="font-size:9.5px; opacity:0.8; font-weight:600;">(Bozdurma)</span>
+                                <span>🟢 ALIM (ALIŞ)</span>
                             </div>
-                            <div class="harem-box-price"><span id="rate-harem-usd-alis">0,00</span> <span style="font-size:13px; opacity:0.85;">₺</span></div>
+                            <div class="harem-box-price"><span id="rate-harem-usd-alis">48,60</span> <span style="font-size:13px; opacity:0.85;">₺</span></div>
+                            <div class="harem-sub-desc">Dolar Bozdurma Fiyatı</div>
                         </div>
                         <div class="harem-duo-box satis">
                             <div class="harem-box-label">
-                                <span>🔵 SATIŞ</span>
-                                <span style="font-size:9.5px; opacity:0.8; font-weight:600;">(Alma)</span>
+                                <span>🔵 SATIM (SATIŞ)</span>
                             </div>
-                            <div class="harem-box-price"><span id="rate-harem-usd-satis">0,00</span> <span style="font-size:13px; opacity:0.85;">₺</span></div>
+                            <div class="harem-box-price"><span id="rate-harem-usd-satis">48,73</span> <span style="font-size:13px; opacity:0.85;">₺</span></div>
+                            <div class="harem-sub-desc">Dolar Satın Alma Fiyatı</div>
                         </div>
                     </div>
                     <div class="spread-row">
-                        <span>Makas Farkı: <b id="rate-harem-usd-makas">0,00 ₺</b></span>
+                        <span>Makas Farkı: <b id="rate-harem-usd-makas">0,13 ₺</b></span>
                         <span id="rate-usdt-nakit-makas" style="color:#34d399; font-weight:800;">%0.00</span>
                     </div>
                 </div>
@@ -9579,21 +9652,21 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                     <div class="harem-duo-grid">
                         <div class="harem-duo-box alis">
                             <div class="harem-box-label">
-                                <span>🟢 ALIŞ</span>
-                                <span style="font-size:9.5px; opacity:0.8; font-weight:600;">(Bozdurma)</span>
+                                <span>🟢 ALIM (ALIŞ)</span>
                             </div>
-                            <div class="harem-box-price"><span id="rate-harem-eur-alis">0,00</span> <span style="font-size:13px; opacity:0.85;">₺</span></div>
+                            <div class="harem-box-price"><span id="rate-harem-eur-alis">56,00</span> <span style="font-size:13px; opacity:0.85;">₺</span></div>
+                            <div class="harem-sub-desc">Euro Bozdurma Fiyatı</div>
                         </div>
                         <div class="harem-duo-box satis">
                             <div class="harem-box-label">
-                                <span>🔵 SATIŞ</span>
-                                <span style="font-size:9.5px; opacity:0.8; font-weight:600;">(Alma)</span>
+                                <span>🔵 SATIM (SATIŞ)</span>
                             </div>
-                            <div class="harem-box-price"><span id="rate-harem-eur-satis">0,00</span> <span style="font-size:13px; opacity:0.85;">₺</span></div>
+                            <div class="harem-box-price"><span id="rate-harem-eur-satis">56,11</span> <span style="font-size:13px; opacity:0.85;">₺</span></div>
+                            <div class="harem-sub-desc">Euro Satın Alma Fiyatı</div>
                         </div>
                     </div>
                     <div class="spread-row">
-                        <span>Makas Farkı: <b id="rate-harem-eur-makas">0,00 ₺</b></span>
+                        <span>Makas Farkı: <b id="rate-harem-eur-makas">0,11 ₺</b></span>
                         <span style="color:#94a3b8; font-size:11.5px;">Serbest Piyasa</span>
                     </div>
                 </div>
@@ -9604,10 +9677,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                         <div class="market-card-title"><span>🥇</span> KAPALIÇARŞI ALTIN & EMTİA</div>
                         <span class="market-change-badge change-neutral" style="font-size:11px;">Harem Altın</span>
                     </div>
-                    <div class="market-price-big"><span id="rate-gold-gram">0</span> <span style="font-size:16px; opacity:0.85;">₺ (Gram)</span></div>
+                    <div class="market-price-big"><span id="rate-gold-gram">6.865,89</span> <span style="font-size:16px; opacity:0.85;">₺ (Gram)</span></div>
                     <div class="spread-row">
-                        <span>👑 ONS Altın: <b id="rate-gold-ons">$0</b></span>
-                        <span>🥈 Gümüş: <b id="rate-silver">0,00 ₺</b></span>
+                        <span>👑 ONS Altın: <b id="rate-gold-ons">$4.378,66</b></span>
+                        <span>🥈 Gümüş: <b id="rate-silver">103,93 ₺</b></span>
                     </div>
                 </div>
 
@@ -9834,11 +9907,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
             // 3. Kapalıçarşı Harem Döviz & Altın
             const harem = data.harem || {};
-            const usd = harem.usd || [0, 0];
-            const uAlis = Number(usd[0]) || 0;
-            const uSatis = Number(usd[1]) || 0;
+            const usd = (harem.usd && Number(harem.usd[0]) > 0 && Number(harem.usd[1]) > 0) ? harem.usd : [48.60, 48.73];
+            const uAlis = Number(usd[0]) || 48.60;
+            const uSatis = Number(usd[1]) || 48.73;
             const uMakas = Math.abs(uSatis - uAlis);
-            const bUsdt = Number((data.binance && data.binance.last) || data.usdt_try || 0);
+            const bUsdt = Number((data.binance && data.binance.last) || data.usdt_try || 48.64);
 
             const elUsdAlis = document.getElementById('rate-harem-usd-alis');
             if (elUsdAlis) elUsdAlis.innerText = uAlis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -9859,9 +9932,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 }
             }
 
-            const eur = harem.eur || [0, 0];
-            const eAlis = Number(eur[0]) || 0;
-            const eSatis = Number(eur[1]) || 0;
+            const eur = (harem.eur && Number(harem.eur[0]) > 0 && Number(harem.eur[1]) > 0) ? harem.eur : [56.00, 56.11];
+            const eAlis = Number(eur[0]) || 56.00;
+            const eSatis = Number(eur[1]) || 56.11;
             const eMakas = Math.abs(eSatis - eAlis);
             const elEurAlis = document.getElementById('rate-harem-eur-alis');
             if (elEurAlis) elEurAlis.innerText = eAlis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -9871,12 +9944,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             if (elEurMakas) elEurMakas.innerText = eMakas.toFixed(2).replace('.', ',') + ' ₺';
 
             const gold = harem.gold || {};
+            const goldGram = Number(gold.gram) > 0 ? Number(gold.gram) : 6865.89;
+            const goldOns = Number(gold.ons) > 0 ? Number(gold.ons) : 4378.66;
+            const goldGumus = Number(gold.gumus) > 0 ? Number(gold.gumus) : 103.93;
+
             const elGoldGram = document.getElementById('rate-gold-gram');
-            if (elGoldGram) elGoldGram.innerText = Number(gold.gram || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if (elGoldGram) elGoldGram.innerText = goldGram.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             const elGoldOns = document.getElementById('rate-gold-ons');
-            if (elGoldOns) elGoldOns.innerText = '$' + Number(gold.ons || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            if (elGoldOns) elGoldOns.innerText = '$' + goldOns.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
             const elSilver = document.getElementById('rate-silver');
-            if (elSilver) elSilver.innerText = Number(gold.gumus || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
+            if (elSilver) elSilver.innerText = goldGumus.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₺';
 
             // 4. Dünya Döviz Pariteleri
             const fiat = data.fiat || {};
