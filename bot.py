@@ -238,10 +238,27 @@ def telegramMesajSil(chat_id, message_id):
 def telegramMesajDuzenle(chat_id, message_id, metin: str, reply_markup=None, kapat_butonu_ekle: bool = True):
     if reply_markup is not None and kapat_butonu_ekle:
         reply_markup = _append_close_button_if_needed(reply_markup)
+    
+    # 1. Telegram 4096 karakter sınırına karşı koruma
+    if len(metin) > 4096:
+        metin = metin[:4080] + "\n..."
+
     payload = {"chat_id": chat_id, "message_id": message_id, "text": metin, "parse_mode": "HTML"}
     if reply_markup is not None:
         payload["reply_markup"] = reply_markup
-    return telegram_api("editMessageText", payload)
+    res = telegram_api("editMessageText", payload)
+
+    if not res.get("ok"):
+        desc = str(res.get("description", "")).lower()
+        err = str(res.get("error", "")).lower()
+        # "message is not modified" durumunda işlem başarılı sayılır (kullanıcı aynı butona tekrar bastı)
+        if "message is not modified" in desc or "message is not modified" in err:
+            return {"ok": True, "result": True}
+        # HTML parse hatası veya Bad Request durumunda parse_mode olmadan düz metin olarak tekrar dene
+        if "can't parse entities" in desc or "can't parse entities" in err or "bad request" in desc or "bad request" in err:
+            payload.pop("parse_mode", None)
+            return telegram_api("editMessageText", payload)
+    return res
 
 def telegramChatAction(chat_id, action: str = "typing"):
     return telegram_api("sendChatAction", {"chat_id": chat_id, "action": action})
@@ -2030,9 +2047,9 @@ def rehber_kategori_metni(kategori: str) -> str:
         )
     elif kategori == "admin":
         return (
-            "🛡️ <b>YÖNETİCİ & DEVOPS KONTROLLERİ</b>\n"
+            "🛡️ <b>YÖNETİCİ &amp; DEVOPS KONTROLLERİ</b>\n"
             "━━━━━━━━━━━━━━━\n\n"
-            "👨💻 <b>GELİŞTİRİCİ & SİSTEM ARAÇLARI:</b>\n"
+            "👨💻 <b>GELİŞTİRİCİ &amp; SİSTEM ARAÇLARI:</b>\n"
             "• <code>/id</code> veya <code>/myid</code> : 🆔 <i>Sohbet ve kullanıcı Telegram ID numaranızı gösterir.</i>\n"
             "• <code>/panellink</code> veya <code>/panel</code> : 🌐 <i>Web Yönetim Paneli doğrudan giriş bağlantısı.</i>\n"
             "• <code>/kuyruk</code> : ⚡ <i>Arka plan Google Sheets FIFO kuyruğu ve RAM gecikme metrikleri.</i>\n"
@@ -2082,29 +2099,29 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/masrafekle [Kalem] [Tutar]</code> : Sonraki boş satıra masraf işler.\n"
             "• <code>/masrafsil [Kalem] [Tutar]</code> : Masraf siler/düşer.\n"
             "• <code>/masraf</code> : Günlük masraf listesini döker.\n"
-            "• <code>/gerial</code> : En son yapılan işlemleri sırayla geri alır (Stack Undo).\n"
+            "• <code>/gerial</code> : En son işlemleri geri alır (Stack Undo).\n"
             "• <code>/not [Metin]</code> : Şirket hafızasına not kaydeder.\n"
             "• <code>/notlar</code> : Kaydedilmiş son notları listeler.\n\n"
             "👥 <b>GRUP VE CARİ EŞLEŞTİRME</b>\n"
-            "• <code>/grupbagla [Grup Adı]</code> : Grubu Excel satırına bağlar.\n"
+            "• <code>/grupbagla [Grup]</code> : Grubu Excel satırına bağlar.\n"
             "• <code>/grupkopar</code> : Grubun Excel bağlantısını kaldırır.\n"
             "• <code>/gruplar</code> : Bağlı grupları listeler.\n"
-            "• <code>/senkron</code> veya <code>/grupguncelle</code> : 🔄 Excel'de değiştirilen isimleri eşitle.\n"
+            "• <code>/senkron</code> / <code>/grupguncelle</code> : 🔄 Excel isimlerini eşitle.\n"
             "• <code>/duyuru [Metin]</code> : 📢 Bağlı cari gruplarına duyuru geçer.\n\n"
-            "👨💻 <b>GELİŞTİRİCİ & DEVOPS ARAÇLARI</b>\n"
+            "👨💻 <b>GELİŞTİRİCİ &amp; DEVOPS ARAÇLARI</b>\n"
             "• <code>/id</code> / <code>/myid</code> : 🆔 Telegram ID görüntüleme.\n"
             "• <code>/panel</code> / <code>/panellink</code> : 🌐 CFO Web Dashboard linki.\n"
-            "• <code>/kuyruk</code> : ⚡ Arka plan Google Sheets FIFO kuyruğu ve RAM gecikmesi.\n"
-            "• <code>/kurtar</code> : 🛡️ Google Sheets hata kurtarma (DLQ) kuyruğundaki işlemleri zorlar.\n"
-            "• <code>/apidurum</code> / <code>/health</code> : 🩺 Telegram, Sheets, Tron TRC-20, Kur API sağlık testi.\n"
+            "• <code>/kuyruk</code> : ⚡ Google Sheets FIFO kuyruğu ve RAM gecikmesi.\n"
+            "• <code>/kurtar</code> : 🛡️ Sheets kurtarma (DLQ) işlemlerini zorlar.\n"
+            "• <code>/apidurum</code> / <code>/health</code> : 🩺 API sağlık testi.\n"
             "• <code>/cache</code> / <code>/flush</code> : 🧹 Önbellek tazeleme.\n"
             "• <code>/logs [n]</code> : 📋 Son sistem loglarını listeleme.\n"
             "• <code>/backup</code> / <code>/yedek</code> : 📦 Bilanço JSON yedeği alma.\n"
             "• <code>/status</code> : ⚙️ Sistem Uptime ve metrik raporu.\n"
             "• <code>/reload</code> : 🔄 Canlı konfigürasyon tazeleme.\n\n"
             "🔐 <b>FİNANSAL GÜVENLİK VE DENETİM</b>\n"
-            "• <code>/anomali</code> : 🚨 Olağandışı finansal hareket ve sapma tespiti.\n"
-            "• <code>/mutabakat</code> : 🔎 Dünkü Kalan vs Bugünkü Devir çapraz denetimi.\n"
+            "• <code>/anomali</code> : 🚨 Olağandışı finansal sapma tespiti.\n"
+            "• <code>/mutabakat</code> : 🔎 Dünkü Kalan vs Bugünkü Devir denetimi.\n"
             "• <code>/limit [Tutar]</code> : Tekil işlem limiti belirleme.\n"
             "• <code>/kilitle [Grup]</code> / <code>/kilitac</code> : Cari kasa dondurma/açma.\n"
             "• <code>/audit [Grup]</code> : Matematiksel bakiye denetimi.\n"
@@ -2114,14 +2131,14 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/ai</code> / <code>/analiz</code> : 🤖 Yapay Zeka Finans Analisti ve Yönetici Özeti.\n"
             "• <code>/indir [Cari]</code> / <code>/csvekstre</code> : 📥 Hesap ekstresini Excel/CSV indirme.\n"
             "• <code>/akilliiban [Cari]</code> / <code>/ototahsis</code> : 🎯 Otomatik akıllı İBAN dağıtıcı.\n"
-            "• <code>/tahsisliibanlar</code> : 📋 Tüm tahsisli İBAN listesi & toplu temizlik.\n"
+            "• <code>/tahsisliibanlar</code> : 📋 Tüm tahsisli İBAN listesi ve toplu temizlik.\n"
             "• <code>/synciban</code> : 🔄 İBAN migrasyonu ve senkronizasyonu.\n"
-            "• <code>/hedef</code> : 🎯 Canlı ciro hedefi & ilerleme çubuğu.\n"
+            "• <code>/hedef</code> : 🎯 Canlı ciro hedefi ve ilerleme çubuğu.\n"
             "• <code>/trend</code> : 📈 Haftalık büyüme trendi.\n"
             "• <code>/dashboard</code> : 📱 Görsel canlı finans kartı.\n"
-            "• <code>/bakiye</code> / <code>/borclular</code> / <code>/alacaklar</code> : Risk & bakiye sıralaması.\n"
+            "• <code>/bakiye</code> / <code>/borclular</code> / <code>/alacaklar</code> : Risk ve bakiye sıralaması.\n"
             "• <code>/iban</code> / <code>/hesaplar</code> / <code>/sablon</code> / <code>/ibantahsis</code> / <code>/ibanbosalt</code> : İBAN yönetimi.\n"
-            "• <code>/kur</code> / <code>/kurfark</code> / <code>/arbitraj</code> / <code>/doviz</code> / <code>/portfoy</code> : Kripto & Döviz piyasası.\n"
+            "• <code>/kur</code> / <code>/kurfark</code> / <code>/arbitraj</code> / <code>/doviz</code> / <code>/portfoy</code> : Kripto ve Döviz piyasası.\n"
             "• <code>/adminler</code> / <code>/adminekle</code> / <code>/adminsil</code> / <code>/kapanis</code> : Yönetici ayarları."
         )
 
@@ -7594,6 +7611,58 @@ def _process_telegram_update_core(update: dict):
         # Telegram API, her callback query'yi yalnızca 1 kez yanıtlamaya izin verir.
         _cq_answered = False
         
+        # 1. Herkes tarafından kullanılabilen temel arayüz işlemleri (Mesaj kapatma ve Rehber inceleme)
+        if data in ["mesaj_kapat", "panel_kapat", "kapat"]:
+            msg_id = cq.get("message", {}).get("message_id")
+            if msg_id:
+                telegramMesajSil(chat_id, msg_id)
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
+            except Exception:
+                pass
+            return
+
+        if data in ["rehber", "rehber_ana"]:
+            msg_id = cq.get("message", {}).get("message_id")
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, rehber_ana_metni(), rehber_ana_klavyesi())
+            else:
+                telegramMesajGonder(chat_id, rehber_ana_metni(), rehber_ana_klavyesi())
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
+            except Exception:
+                pass
+            return
+
+        if data.startswith("rehber_"):
+            kat = data.replace("rehber_", "")
+            msg_id = cq.get("message", {}).get("message_id")
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, rehber_kategori_metni(kat), rehber_kategori_klavyesi())
+            else:
+                telegramMesajGonder(chat_id, rehber_kategori_metni(kat), rehber_kategori_klavyesi())
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
+            except Exception:
+                pass
+            return
+
+        if data == "cariekle_rehber":
+            telegramMesajGonder(
+                chat_id,
+                "➕ <b>Yeni Cari Tanımlama:</b>\n\n"
+                "Telegram üzerinden anında yeni bir cari eklemek için:\n"
+                "<code>/cariekle [Cari Adı]</code>\n\n"
+                "Örnek: <code>/cariekle MEHMET BEY</code>\n"
+                "<i>Bot satırı otomatik oluşturur, formülleri bağlar ve hafızaya alır.</i>"
+            )
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
+            except Exception:
+                pass
+            return
+
+        # 2. Kurucuya özel varlık sorgulama
         if data.startswith("t_yenile_"):
             if user_id != KURUCU_ID:
                 yetkisiz_uyari_gonder(chat_id, user_id, "⛔ <b>Yetkisiz İşlem:</b> Şirket cüzdan ve rezerv raporunu sorgulama yetkisi sadece <b>Şirket Kurucusuna</b> aittir.")
@@ -7602,10 +7671,11 @@ def _process_telegram_update_core(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, trc20_varlik_raporu_uret, cuzdan)
             return
 
+        # 3. Kısıtlı ve Tam Yetkili Yönetici Kontrolleri
         if kullanici_kisitli_mi(user_id):
             if (data.startswith("grup_iban_yenile_") or data == "canli_kur_yenile" or 
                 data.startswith("cevir_") or data in ["mesaj_kapat", "panel_kapat", "kapat"] or 
-                data.startswith("rapor_") or data.startswith("cariler_")):
+                data.startswith("rapor_") or data.startswith("cariler_") or data.startswith("rehber")):
                 pass
             else:
                 telegram_api("answerCallbackQuery", {
@@ -7616,21 +7686,15 @@ def _process_telegram_update_core(update: dict):
                 return
         elif not yetkili_mi(user_id):
             yetkisiz_uyari_gonder(chat_id, user_id, "⛔ <b>Erişim Reddedildi!</b>\nBu işlem için yetkiniz bulunmamaktadır.")
+            try:
+                telegram_api("answerCallbackQuery", {
+                    "callback_query_id": cq["id"],
+                    "text": "⛔ Erişim Reddedildi!",
+                    "show_alert": True
+                })
+            except Exception:
+                pass
             return
-            
-        if data in ["rehber", "rehber_ana"]:
-            msg_id = cq.get("message", {}).get("message_id")
-            if msg_id:
-                telegramMesajDuzenle(chat_id, msg_id, rehber_ana_metni(), rehber_ana_klavyesi())
-            else:
-                telegramMesajGonder(chat_id, rehber_ana_metni(), rehber_ana_klavyesi())
-        elif data.startswith("rehber_"):
-            kat = data.replace("rehber_", "")
-            msg_id = cq.get("message", {}).get("message_id")
-            if msg_id:
-                telegramMesajDuzenle(chat_id, msg_id, rehber_kategori_metni(kat), rehber_kategori_klavyesi())
-            else:
-                telegramMesajGonder(chat_id, rehber_kategori_metni(kat), rehber_kategori_klavyesi())
         elif data == "rapor_ozet":
             islemi_analiz_bildirimiyle_yap(chat_id, hizliOzetUret_impl)
         elif data == "rapor_masraf":
@@ -7911,10 +7975,6 @@ def _process_telegram_update_core(update: dict):
                 telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
             else:
                 telegramMesajGonder(chat_id, metin, klavye)
-        elif data in ["mesaj_kapat", "panel_kapat", "kapat"]:
-            msg_id = cq.get("message", {}).get("message_id")
-            if msg_id:
-                telegramMesajSil(chat_id, msg_id)
         # Callback query henüz özel bir show_alert ile yanıtlanmadıysa, varsayılan sessiz yanıt gönder
         try:
             telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
