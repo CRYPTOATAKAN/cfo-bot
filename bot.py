@@ -147,52 +147,32 @@ def http_get_text(url: str, headers: dict = None, **kwargs) -> str:
     with urllib.request.urlopen(req, timeout=timeout) as response:
         return response.read().decode("utf-8", errors="ignore")
 
-_tg_thread_local = threading.local()
-
-
-def _get_telegram_conn():
-    conn = getattr(_tg_thread_local, "conn", None)
-    if conn is None:
-        try:
-            import http.client
-            import ssl
-            ctx = ssl.create_default_context()
-            conn = http.client.HTTPSConnection("api.telegram.org", timeout=12, context=ctx)
-            _tg_thread_local.conn = conn
-        except Exception:
-            conn = None
-    return conn
-
 def telegram_api(method: str, payload: dict) -> dict:
-    url_path = f"/bot{TELEGRAM_TOKEN}/{method}"
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/{method}"
     data = json.dumps(payload).encode("utf-8")
-    headers = {"Content-Type": "application/json", "Connection": "keep-alive"}
+    headers = {
+        "Content-Type": "application/json",
+        "User-Agent": "CFO-BOT/1.0",
+        "Accept": "application/json"
+    }
     
-    # 1. Hızlı Kalıcı TLS Soketi (Keep-Alive)
     for attempt in range(2):
-        conn = _get_telegram_conn()
-        if conn is not None:
+        try:
+            req = urllib.request.Request(url, data=data, headers=headers)
+            with urllib.request.urlopen(req, timeout=10) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as he:
             try:
-                conn.request("POST", url_path, body=data, headers=headers)
-                resp = conn.getresponse()
-                raw_bytes = resp.read()
-                return json.loads(raw_bytes.decode("utf-8"))
+                err_body = he.read().decode("utf-8")
+                return json.loads(err_body)
             except Exception:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-                _tg_thread_local.conn = None
-
-    # 2. Güvenli Yedek urllib çağrısı
-    try:
-        url = f"https://api.telegram.org{url_path}"
-        req = urllib.request.Request(url, data=data, headers=headers)
-        with urllib.request.urlopen(req, timeout=12) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except Exception as e:
-        print(f"Telegram API Hatası ({method}): {e}")
-        return {"ok": False, "error": str(e)}
+                return {"ok": False, "error_code": he.code, "description": str(he)}
+        except Exception as e:
+            if attempt == 1:
+                print(f"Telegram API Hatası ({method}): {e}")
+                return {"ok": False, "error": str(e)}
+            time.sleep(0.1)
+    return {"ok": False, "error": "Bilinmeyen hata"}
 
 def _append_close_button_if_needed(reply_markup):
     close_btn = [{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]
@@ -7613,41 +7593,53 @@ def _process_telegram_update_core(update: dict):
         
         # 1. Herkes tarafından kullanılabilen temel arayüz işlemleri (Mesaj kapatma ve Rehber inceleme)
         if data in ["mesaj_kapat", "panel_kapat", "kapat"]:
+            cq_id = cq.get("id")
+            if cq_id:
+                try:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id})
+                except Exception:
+                    pass
             msg_id = cq.get("message", {}).get("message_id")
             if msg_id:
                 telegramMesajSil(chat_id, msg_id)
-            try:
-                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
-            except Exception:
-                pass
             return
 
         if data in ["rehber", "rehber_ana"]:
+            cq_id = cq.get("id")
+            if cq_id:
+                try:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id})
+                except Exception:
+                    pass
             msg_id = cq.get("message", {}).get("message_id")
             if msg_id:
                 telegramMesajDuzenle(chat_id, msg_id, rehber_ana_metni(), rehber_ana_klavyesi())
             else:
                 telegramMesajGonder(chat_id, rehber_ana_metni(), rehber_ana_klavyesi())
-            try:
-                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
-            except Exception:
-                pass
             return
 
         if data.startswith("rehber_"):
+            cq_id = cq.get("id")
+            if cq_id:
+                try:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id})
+                except Exception:
+                    pass
             kat = data.replace("rehber_", "")
             msg_id = cq.get("message", {}).get("message_id")
             if msg_id:
                 telegramMesajDuzenle(chat_id, msg_id, rehber_kategori_metni(kat), rehber_kategori_klavyesi())
             else:
                 telegramMesajGonder(chat_id, rehber_kategori_metni(kat), rehber_kategori_klavyesi())
-            try:
-                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
-            except Exception:
-                pass
             return
 
         if data == "cariekle_rehber":
+            cq_id = cq.get("id")
+            if cq_id:
+                try:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id})
+                except Exception:
+                    pass
             telegramMesajGonder(
                 chat_id,
                 "➕ <b>Yeni Cari Tanımlama:</b>\n\n"
@@ -7656,10 +7648,6 @@ def _process_telegram_update_core(update: dict):
                 "Örnek: <code>/cariekle MEHMET BEY</code>\n"
                 "<i>Bot satırı otomatik oluşturur, formülleri bağlar ve hafızaya alır.</i>"
             )
-            try:
-                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
-            except Exception:
-                pass
             return
 
         # 2. Kurucuya özel varlık sorgulama
@@ -7775,15 +7763,6 @@ def _process_telegram_update_core(update: dict):
                 telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
             else:
                 telegramMesajGonder(chat_id, metin, klavye)
-        elif data == "cariekle_rehber":
-            telegramMesajGonder(
-                chat_id,
-                "➕ <b>Yeni Cari Tanımlama:</b>\n\n"
-                "Telegram üzerinden anında yeni bir cari eklemek için:\n"
-                "<code>/cariekle [Cari Adı]</code>\n\n"
-                "Örnek: <code>/cariekle MEHMET BEY</code>\n"
-                "<i>Bot satırı otomatik oluşturur, formülleri bağlar ve hafızaya alır.</i>"
-            )
         elif data.startswith("rapor_ilet_"):
             draft_id = data.replace("rapor_ilet_", "").strip()
             item = app_state.get("RAPOR_TASLAKLARI", {}).get(draft_id)
@@ -12131,9 +12110,19 @@ def run_sheets_autosync_loop():
         time.sleep(3)
 
 def fetch_telegram_updates(offset: int, timeout: int = 20) -> dict:
-    """Telegram getUpdates uzun yoklama (long polling) isteğini uygun soket zaman aşımıyla gerçekleştirir."""
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates?offset={offset}&timeout={timeout}"
-    req = urllib.request.Request(url, headers={
+    """Telegram getUpdates uzun yoklama (long polling) isteğini uygun soket zaman aşımıyla ve callback_query dahil tüm güncellemeleri talep ederek gerçekleştirir."""
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getUpdates"
+    payload = {
+        "offset": offset,
+        "timeout": timeout,
+        "allowed_updates": [
+            "message", "edited_message", "channel_post", "edited_channel_post",
+            "callback_query", "chat_member", "my_chat_member"
+        ]
+    }
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={
+        "Content-Type": "application/json",
         "User-Agent": "CFO-BOT/1.0",
         "Accept": "application/json"
     })
@@ -12161,11 +12150,20 @@ if __name__ == "__main__":
     threading.Thread(target=run_sheets_autosync_loop, daemon=True).start()
     print(f"CFO Bot & Canlı Dashboard Başlatıldı (7/24 Kesintisiz - Otomatik Kapanış Saati: {app_state.get('KAPANIS_SAATI', '23:45')})...")
     
-    # 1. Başlangıçta olası eski/bozuk webhook'ları kaldırarak Long-Polling'i garantile
+    # 1. Başlangıçta olası eski/bozuk webhook'ları kaldırarak Long-Polling'i garantile ve allowed_updates'i Telegram sunucularına zorunlu kaydet
     try:
         del_wh = telegram_api("deleteWebhook", {"drop_pending_updates": False})
         if del_wh.get("ok"):
             print("Telegram Webhook kontrol edildi ve temizlendi (Long-Polling hazır).")
+        # Telegram API sunucularında callback_query dinleyicisini anında aktif et
+        telegram_api("getUpdates", {
+            "offset": -1,
+            "limit": 1,
+            "allowed_updates": [
+                "message", "edited_message", "channel_post", "edited_channel_post",
+                "callback_query", "chat_member", "my_chat_member"
+            ]
+        })
     except Exception as wh_err:
         print(f"Telegram deleteWebhook uyarısı: {wh_err}")
 

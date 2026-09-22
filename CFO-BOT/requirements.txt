@@ -2,6 +2,3 @@ python-telegram-bot==20.8
 gspread==6.1.2
 google-auth==2.34.0
 requests==2.32.3
-uvicorn==0.30.6
-fastapi==0.112.2
-apscheduler==3.10.4
