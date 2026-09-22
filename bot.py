@@ -12,6 +12,7 @@ import unicodedata
 import urllib.request
 import urllib.parse
 import concurrent.futures
+import subprocess
 import queue
 from socketserver import ThreadingMixIn
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -834,6 +835,12 @@ def bugununTarihiniAl() -> str:
         return ws.title
     except Exception:
         return suankiZamaniAl().strftime("%d.%m.%Y")
+
+_TR_LOWER_MAP = str.maketrans("ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZQWX", "abcçdefgğhıijklmnoöprsştuüvyzqwx")
+
+def tr_lower(text: str) -> str:
+    """Türkçe güvenli küçük harfe çevrim. Python'un str.lower() fonksiyonu İ→i̇ (combining dot) üretir ve Türkçe komut eşleşmelerini bozar."""
+    return text.translate(_TR_LOWER_MAP)
 
 def normalize_text(text: str) -> str:
     """Türkçe harf duyarlılığını ve büyük/küçük harf farklarını %100 kusursuz eşitler."""
@@ -2221,7 +2228,7 @@ def mukerrer_islem_mi(user_id: int, komut_metni: str, pencere_saniye: float = 3.
     if not komut_metni or not user_id:
         return False, 0.0
         
-    t = komut_metni.strip().lower()
+    t = tr_lower(komut_metni.strip())
     parcalar = t.split()
     if not parcalar:
         return False, 0.0
@@ -7547,12 +7554,12 @@ def islemi_analiz_bildirimiyle_yap(chat_id: int, islem_fn, *args, goster_bildiri
             anim_thread = threading.Thread(target=animasyon_worker, args=(msg_id, fn_name), daemon=True)
             anim_thread.start()
 
-    # 2. Asıl işlemi hemen paralel iş parçacığı havuzunda çalıştır
-    future = _update_executor.submit(islem_fn, *args)
-
-    # 3. Sonucu bekle ve animatörü durdur
+    # 2. Asıl işlemi doğrudan aynı worker thread'de çalıştır
+    #    NOT: Bu fonksiyon zaten _update_executor worker thread'inden çağrılıyor.
+    #    Aynı executor'a tekrar submit edip result() ile beklemek 16 thread doluyken
+    #    DEADLOCK yaratıyordu. Doğrudan çağrı bu riski tamamen ortadan kaldırır.
     try:
-        sonuc = future.result(timeout=25)
+        sonuc = islem_fn(*args)
     except Exception as e:
         stop_anim.set()
         if msg_id:
@@ -7582,7 +7589,10 @@ def _process_telegram_update_core(update: dict):
         chat_id = cq.get("message", {}).get("chat", {}).get("id") or 0
         user_id = cq.get("from", {}).get("id") or 0
         
-        telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
+        # NOT: answerCallbackQuery burada koşulsuz çağrılMAZ.
+        # Her dal kendi yanıtını verir; aksi halde show_alert=True popup'ları gösterilmez.
+        # Telegram API, her callback query'yi yalnızca 1 kez yanıtlamaya izin verir.
+        _cq_answered = False
         
         if data.startswith("t_yenile_"):
             if user_id != KURUCU_ID:
@@ -7905,6 +7915,11 @@ def _process_telegram_update_core(update: dict):
             msg_id = cq.get("message", {}).get("message_id")
             if msg_id:
                 telegramMesajSil(chat_id, msg_id)
+        # Callback query henüz özel bir show_alert ile yanıtlanmadıysa, varsayılan sessiz yanıt gönder
+        try:
+            telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
+        except Exception:
+            pass
         return
 
     if "message" in update and "text" in update["message"]:
@@ -7918,13 +7933,21 @@ def _process_telegram_update_core(update: dict):
 
         if not text.startswith("/"):
             # Özel sohbette 'kasa ...' veya 'durum ...' gibi komutların başına / koyulmadan yazılmasını tolere et
-            if not is_group and (text.lower().startswith("kasa ") or text.lower().startswith("durum ") or text.lower() in ["kasa", "durum"]):
+            text_low = tr_lower(text)
+            if not is_group and (text_low.startswith("kasa ") or text_low.startswith("durum ") or text_low in ["kasa", "durum"]):
                 text = "/" + text
             else:
                 return
 
         komut_parcalari = text.split()
-        ana_komut = komut_parcalari[0].lower().split("@")[0]
+        ham_komut = komut_parcalari[0]
+        # Grup ortamında @başka_bot'a gelen komutları yok say
+        if "@" in ham_komut:
+            bot_mention = ham_komut.split("@", 1)[1].lower()
+            # Kendi bot username'imiz değilse komutu işleme (başka bota ait)
+            if bot_mention and bot_mention not in ["cfo_bot", "cfobot", "cfobotdev", ""]:
+                return
+        ana_komut = tr_lower(ham_komut.split("@")[0])
 
         # Grup bağlantılarını bellekte hazır tut
         grup_baglantilarini_guncelle()
@@ -8181,7 +8204,7 @@ def _process_telegram_update_core(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, iban_tahsis_impl, text)
         elif ana_komut in ["/ibanbosalt", "/bosalt", "/ibansil"]:
             islemi_analiz_bildirimiyle_yap(chat_id, iban_bosalt_impl, text)
-        elif ana_komut in ["/tahsisliibanlar", "/tahsisliiban", "/tahsisler", "/tahsis", "/ibanyonetim", "/ibanyönetim", "/ibantahsisler", "/tahsisliibanlarim"]:
+        elif ana_komut in ["/tahsisliibanlar", "/tahsisliiban", "/tahsisler", "/ibanyonetim", "/ibanyönetim", "/ibantahsisler", "/tahsisliibanlarim"]:
             islemi_analiz_bildirimiyle_yap(chat_id, tum_tahsisli_ibanlar_raporu_uret)
         elif ana_komut in ["/ibantemizle", "/topluibanbosalt", "/topluibantemizle", "/ibantemizligi", "/ibantemizliği"]:
             islemi_analiz_bildirimiyle_yap(chat_id, tum_tahsisli_ibanlari_temizle_impl)
@@ -8221,7 +8244,7 @@ def _process_telegram_update_core(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, arbitraj_raporu_uret_impl, text, goster_bildirim=True)
         elif ana_komut in ["/doviz", "/döviz", "/cevir", "/çevir", "/kurcevir", "/donustur"]:
             islemi_analiz_bildirimiyle_yap(chat_id, doviz_cevirici_impl, text)
-        elif ana_komut in ["/portfoy", "/portföy", "/hazine", "/varlik"]:
+        elif ana_komut in ["/portfoy", "/portföy", "/hazine"]:
             islemi_analiz_bildirimiyle_yap(chat_id, sirket_portfoy_raporu_impl, goster_bildirim=True)
         elif ana_komut == "/hesap":
             islemi_analiz_bildirimiyle_yap(chat_id, hesapMakinesi_impl, text)
@@ -8278,7 +8301,7 @@ def _process_telegram_update_core(update: dict):
                 sayfa_idx = max(0, int(komut_parcalari[1]) - 1)
             metin, klavye = cariler_listesi_klavyesi_uret(sayfa_idx)
             telegramMesajGonder(chat_id, metin, klavye)
-        elif ana_komut in ["/cariekle", "/yenipari", "/musteriekle"]:
+        elif ana_komut in ["/cariekle", "/yenicari", "/yenipari", "/musteriekle"]:
             islemi_analiz_bildirimiyle_yap(chat_id, cari_ekle_impl, text)
         elif ana_komut in ["/paylas", "/bakiyeozet", "/paylasim"]:
             islemi_analiz_bildirimiyle_yap(chat_id, musteri_paylasim_metni_uret, text, chat_id)
@@ -8380,7 +8403,13 @@ def _process_telegram_update_core(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, gerial_impl)
         elif ana_komut == "/not":
             def not_ekle_impl():
-                not_metni = text[4:].strip()
+                not_metni = " ".join(komut_parcalari[1:]).strip()
+                if not not_metni:
+                    return (
+                        "⚠️ <b>Boş Not Gönderilemez!</b>\n"
+                        "Lütfen kaydetmek istediğiniz notu yazın.\n\n"
+                        "📌 <b>Örnek:</b> <code>/not Yarın saat 14:00'te toplantı</code>"
+                    )
                 sh = get_spreadsheet()
                 try: not_sayfasi = sh.worksheet("NOTLAR")
                 except: not_sayfasi = sh.add_worksheet(title="NOTLAR", rows=500, cols=3)
@@ -8403,7 +8432,13 @@ def _process_telegram_update_core(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, notlari_getir_impl)
         else:
             if text.startswith("/"):
-                aranan_aday = text.strip().lstrip("/")
+                aranan_aday = text.strip().lstrip("/").split("@")[0].strip()
+                # Çok kısa veya boş komutları gereksiz Sheets sorgusuyla yormayalım
+                if len(aranan_aday) < 2:
+                    return
+                # Grup mesajlarında bilinmeyen komutlar için Sheets'e gitme (spam riski)
+                if is_group:
+                    return
                 try:
                     sh_temp = get_spreadsheet()
                     veriler_temp = get_iban_values(sh_temp)
