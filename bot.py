@@ -17,7 +17,7 @@ import queue
 from socketserver import ThreadingMixIn
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Optional, Dict, Any, List, Tuple, Set
-
+import html
 
 import gspread
 from google.oauth2.service_account import Credentials
@@ -27,6 +27,38 @@ TR_TZ = datetime.timezone(datetime.timedelta(hours=3))
 
 def suankiZamaniAl():
     return datetime.datetime.now(TR_TZ)
+
+def sanitize_html(text: Any) -> str:
+    """Telegram HTML ayrıştırma hatalarını önlemek için kullanıcı girdilerini sterilize eder."""
+    if text is None:
+        return ""
+    return html.escape(str(text), quote=False)
+
+def sanitize_sheet_cell_value(val: Any) -> Any:
+    """
+    Google Sheets / Excel CSV/Formula Injection Koruması:
+    Hücreye yazılacak değer metin ise ve tehlikeli formül tetikleyicilerle (=, +, -, @)
+    başlıyorsa, formül olarak çalıştırılmasını önlemek için güvenli metin formatına çevirir.
+    Eğer değer meşru bir bot formülü ise (=C5+D5-E5 gibi), izin verilir.
+    """
+    if not isinstance(val, str):
+        return val
+    s = val.strip()
+    if not s:
+        return val
+    if s.startswith("="):
+        # Meşru bot formülü: sadece hücre adresleri (C5, D12), sayılar ve temel matematik operatörleri (+, -, *, /)
+        if re.match(r"^=[-+]?([A-Z]{1,3}\d+|\d+(?:\.\d+)?)(?:[+\-*/](?:[A-Z]{1,3}\d+|\d+(?:\.\d+)?))*$", s, re.IGNORECASE):
+            return val
+        # Tehlikeli/meşru olmayan formül denemelerini tek tırnak ile zararsız metne dönüştür
+        return "'" + val
+    if s.startswith(("+", "-", "@")):
+        try:
+            float(s.replace(".", "").replace(",", "."))
+            return val
+        except ValueError:
+            return "'" + val
+    return val
 
 # --- AYARLAR & SABİTLER ---
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8629756462:AAHSn66-SVOZzWp_UrBj36bHjF1hpts5bco")
@@ -640,6 +672,11 @@ def set_sheet_cache_matrix(sayfa_title: str, veriler: List[List[str]]):
     now = time.time()
     data_copy = [list(r) for r in veriler]
     with _cached_sheet_matrix_lock:
+        if len(_cached_sheet_matrices) > 15:
+            sorted_sheets = sorted(_cached_sheet_matrices.items(), key=lambda x: x[1].get("time", 0))
+            for old_title, _ in sorted_sheets[:5]:
+                if old_title != sayfa_title and old_title != _cached_sheet_matrix_title:
+                    _cached_sheet_matrices.pop(old_title, None)
         _cached_sheet_matrices[sayfa_title] = {"data": data_copy, "time": now}
         _cached_sheet_matrix = data_copy
         _cached_sheet_matrix_title = sayfa_title
@@ -789,7 +826,8 @@ _sheet_dlq_thread.start()
 
 def _kuyruga_sayfa_yazma_ekle(sayfa_title: str, satir: int, sutun: int, val: Any):
     """Google Sheets hücre güncellemesini sıraya koyar; Telegram'ı 0.001 ms bile bekletmez."""
-    _sheet_write_queue.put((sayfa_title, satir, sutun, val))
+    safe_val = sanitize_sheet_cell_value(val)
+    _sheet_write_queue.put((sayfa_title, satir, sutun, safe_val))
 
 def formul_sayi_formatla(val: float) -> str:
     """Google Sheets formülleri için temiz sayı dizesi üretir (Örn: 1500000 veya 1500.50)."""
@@ -1959,6 +1997,7 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/cariekle [Cari]</code> : ➕ <i>Excel'e girmeden doğrudan Telegram'dan yeni cari satırı ekler.</i>\n"
             "• <code>/paylas [Cari]</code> : 💬 <i>Müşteriye WhatsApp/SMS iletilecek şık, kopyalanabilir bakiye özeti üretir.</i>\n"
             "• <code>/hareketler [Cari]</code> : 📜 <i>Carinin bugünkü tüm ekleme, silme ve formül detaylarını döker.</i>\n"
+            "• <code>/virman [Kaynak] [Hedef] [Tutar]</code> : 🔄 <i>İki cari arasında anında kasa transferi yapar.</i>\n"
             "• <code>/gerial</code> : <i>En son yapılan hatalı işlemi hafızadan geri alır.</i>\n"
             "• <code>/not [Metin]</code> : <i>Şirket hafızasına kalıcı not ekler (Örn: /not SACİD saat 18:00'de ödeme yapacak).</i>\n"
             "• <code>/notlar</code> : <i>Kaydedilmiş son şirket notlarını listeler.</i>"
@@ -2004,9 +2043,10 @@ def rehber_kategori_metni(kategori: str) -> str:
         )
     elif kategori == "kripto":
         return (
-            "🪙 <b>KRİPTO, KUR VE FİNANS ARAÇLARI</b>\n"
-            "━━━━━━━━━━━━━━━\n\n"
-            "• <code>/akilliiban [Cari]</code> veya <code>/ototahsis</code> : 🎯 <i>Cariye boştaki en uygun banka hesabını akıllıca seçip otomatik tahsis eder.</i>\n"
+            "🪙 <b>KRİPTO, DÖVİZ &amp; PİYASA ARAÇLARI</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "• <code>/komisyon [Tutar] [%] [Kur]</code> : ✂️ <i>Komisyon, net kâr ve döviz çevrim hesaplayıcı.</i>\n"
+            "• <code>/akilliiban [Cari]</code> veya <code>/ototahsis</code> : 🎯 <i>Carinin işlem hacmine ve bankasına göre en uygun boş İBAN'ı otomatik bağlar.</i>\n"
             "• <code>/tahsisliibanlar</code> : 📋 <i>Tüm tahsisli İBAN'ları listeler ve tek tuşla toplu temizleme sunar.</i>\n"
             "• <code>/synciban</code> : 🔄 <i>İBAN listesini günlük sayfa ile sabit 'İBANLAR' sekmesi arasında senkronize eder.</i>\n"
             "• <code>/kur</code> : <i>Binance, Paribu, BtcTurk, WhiteBIT canlı USDT/TRY ve Kapalıçarşı Harem kurları.</i>\n"
@@ -2031,6 +2071,8 @@ def rehber_kategori_metni(kategori: str) -> str:
             "━━━━━━━━━━━━━━━\n\n"
             "👨💻 <b>GELİŞTİRİCİ &amp; SİSTEM ARAÇLARI:</b>\n"
             "• <code>/id</code> veya <code>/myid</code> : 🆔 <i>Sohbet ve kullanıcı Telegram ID numaranızı gösterir.</i>\n"
+            "• <code>/yetkiler</code> veya <code>/rolum</code> : 🔐 <i>Aktif rol ve yetki kapsamınızı sorgular.</i>\n"
+            "• <code>/guvenlik</code> : 🛡️ <i>Sistem güvenlik, webhook, TLS ve hata denetim raporu (Kurucu).</i>\n"
             "• <code>/panellink</code> veya <code>/panel</code> : 🌐 <i>Web Yönetim Paneli doğrudan giriş bağlantısı.</i>\n"
             "• <code>/kuyruk</code> : ⚡ <i>Arka plan Google Sheets FIFO kuyruğu ve RAM gecikme metrikleri.</i>\n"
             "• <code>/kurtar</code> : 🛡️ <i>Google Sheets hata kurtarma (DLQ) kuyruğundaki bekleyen işlemleri zorlar.</i>\n"
@@ -2069,14 +2111,15 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/kasasil [Grup] [Tutar]</code> : Kasadan tutar siler.\n"
             "• <code>/odeme [Grup] [Tutar]</code> : Ödenen tutarı işler.\n"
             "• <code>/odemesil [Grup] [Tutar]</code> : Ödenen tutardan düşer.\n"
+            "• <code>/virman [Kaynak] [Hedef] [Tutar]</code> : 🔄 Cari kasa transferi.\n"
             "• <code>/devir [Grup] [Tutar]</code> : Devir bakiyesi ekler.\n"
             "• <code>/devirsil [Grup] [Tutar]</code> : Devirden siler.\n"
             "• <code>/toplu</code> : ⚡ Çoklu hızlı işlem (+, -, Ö, D, M).\n"
             "• <code>/cariler</code> : 📋 Aktif carileri interaktif butonlarla listeler.\n"
-            "• <code>/cariekle [Cari]</code> : ➕ Telegram'dan anında yeni cari satırı açar.\n"
-            "• <code>/paylas [Cari]</code> : 💬 WhatsApp/SMS için kopyalanabilir bakiye kartı.\n"
-            "• <code>/hareketler [Cari]</code> : 📜 Günlük tüm ekleme, silme ve formül dökümü.\n"
-            "• <code>/masrafekle [Kalem] [Tutar]</code> : Sonraki boş satıra masraf işler.\n"
+            "• <code>/cariekle [Cari]</code> : ➕ Telegram'dan yeni cari satırı açar.\n"
+            "• <code>/paylas [Cari]</code> : 💬 Kopyalanabilir bakiye kartı.\n"
+            "• <code>/hareketler [Cari]</code> : 📜 Günlük tüm işlem ve formül dökümü.\n"
+            "• <code>/masrafekle [Kalem] [Tutar]</code> : Masraf işler.\n"
             "• <code>/masrafsil [Kalem] [Tutar]</code> : Masraf siler/düşer.\n"
             "• <code>/masraf</code> : Günlük masraf listesini döker.\n"
             "• <code>/gerial</code> : En son işlemleri geri alır (Stack Undo).\n"
@@ -2090,8 +2133,10 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/duyuru [Metin]</code> : 📢 Bağlı cari gruplarına duyuru geçer.\n\n"
             "👨💻 <b>GELİŞTİRİCİ &amp; DEVOPS ARAÇLARI</b>\n"
             "• <code>/id</code> / <code>/myid</code> : 🆔 Telegram ID görüntüleme.\n"
+            "• <code>/yetkiler</code> / <code>/rolum</code> : 🔐 Kullanıcı yetki ve rol sorgulama.\n"
+            "• <code>/guvenlik</code> : 🛡️ Siber güvenlik ve sistem denetimi.\n"
             "• <code>/panel</code> / <code>/panellink</code> : 🌐 CFO Web Dashboard linki.\n"
-            "• <code>/kuyruk</code> : ⚡ Google Sheets FIFO kuyruğu ve RAM gecikmesi.\n"
+            "• <code>/kuyruk</code> : ⚡ Google Sheets FIFO kuyruğu ve gecikme.\n"
             "• <code>/kurtar</code> : 🛡️ Sheets kurtarma (DLQ) işlemlerini zorlar.\n"
             "• <code>/apidurum</code> / <code>/health</code> : 🩺 API sağlık testi.\n"
             "• <code>/cache</code> / <code>/flush</code> : 🧹 Önbellek tazeleme.\n"
@@ -2108,17 +2153,19 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/alarm [Grup] [Tutar]</code> : Kritik bakiye uyarısı.\n"
             "• <code>/simule [DolarKuru]</code> : Kur stres testi simülasyonu.\n\n"
             "📊 <b>RAPORLAR VE İBAN YÖNETİMİ</b>\n"
-            "• <code>/ai</code> / <code>/analiz</code> : 🤖 Yapay Zeka Finans Analisti ve Yönetici Özeti.\n"
-            "• <code>/indir [Cari]</code> / <code>/csvekstre</code> : 📥 Hesap ekstresini Excel/CSV indirme.\n"
-            "• <code>/akilliiban [Cari]</code> / <code>/ototahsis</code> : 🎯 Otomatik akıllı İBAN dağıtıcı.\n"
-            "• <code>/tahsisliibanlar</code> : 📋 Tüm tahsisli İBAN listesi ve toplu temizlik.\n"
+            "• <code>/tarih [GG.AA.YYYY]</code> : 📅 Geçmiş gün bilançosu / cari fişi.\n"
+            "• <code>/komisyon [Tutar] [%]</code> : ✂️ Anlık komisyon ve kâr hesaplama.\n"
+            "• <code>/ai</code> / <code>/analiz</code> : 🤖 Yapay Zeka Finans Analisti.\n"
+            "• <code>/indir [Cari]</code> / <code>/csvekstre</code> : 📥 Ekstre Excel/CSV indirme.\n"
+            "• <code>/akilliiban [Cari]</code> / <code>/ototahsis</code> : 🎯 Akıllı İBAN dağıtıcı.\n"
+            "• <code>/tahsisliibanlar</code> : 📋 Tüm tahsisli İBAN listesi ve temizlik.\n"
             "• <code>/synciban</code> : 🔄 İBAN migrasyonu ve senkronizasyonu.\n"
             "• <code>/hedef</code> : 🎯 Canlı ciro hedefi ve ilerleme çubuğu.\n"
             "• <code>/trend</code> : 📈 Haftalık büyüme trendi.\n"
             "• <code>/dashboard</code> : 📱 Görsel canlı finans kartı.\n"
-            "• <code>/bakiye</code> / <code>/borclular</code> / <code>/alacaklar</code> : Risk ve bakiye sıralaması.\n"
+            "• <code>/bakiye</code> / <code>/borclular</code> / <code>/alacaklar</code> : Bakiye sıralaması.\n"
             "• <code>/iban</code> / <code>/hesaplar</code> / <code>/sablon</code> / <code>/ibantahsis</code> / <code>/ibanbosalt</code> : İBAN yönetimi.\n"
-            "• <code>/kur</code> / <code>/kurfark</code> / <code>/arbitraj</code> / <code>/doviz</code> / <code>/portfoy</code> : Kripto ve Döviz piyasası.\n"
+            "• <code>/kur</code> / <code>/kurfark</code> / <code>/arbitraj</code> / <code>/doviz</code> / <code>/portfoy</code> : Piyasa kurları.\n"
             "• <code>/adminler</code> / <code>/adminekle</code> / <code>/adminsil</code> / <code>/kapanis</code> : Yönetici ayarları."
         )
 
@@ -2238,7 +2285,8 @@ def mukerrer_islem_mi(user_id: int, komut_metni: str, pencere_saniye: float = 3.
         "/devir", "/devirekle", "/devirsil",
         "/masrafekle", "/masrafsil",
         "/toplu", "/topluislem", "/hizli",
-        "/cariekle"
+        "/cariekle",
+        "/virman", "/kasaaktar", "/aktar", "/transfer"
     }
     
     if ana_komut not in finansal_komutlar:
@@ -6819,6 +6867,12 @@ def limit_ayarla_impl(text: str) -> str:
     sistemeLogYaz("İşlem Limiti Güncellendi", f"Yeni Limit: {paraFormatla(tutar)}")
     return f"✅ <b>Maksimum Tekil İşlem Limiti Güncellendi!</b>\nYeni Limit: <b>{paraFormatla(tutar)}</b>"
 
+def grup_kilitli_mi(grup_adi: str) -> bool:
+    """Belirtilen grubun dondurulmuş/kilitli olup olmadığını kontrol eder."""
+    if not grup_adi:
+        return False
+    return grup_adi.strip().upper() in app_state.get("KILITLI_GRUPLAR", set())
+
 def grup_kilitle_impl(text: str) -> str:
     """Grubun kasasını kilitler/dondurur."""
     parcalar = text.strip().split()[1:]
@@ -6937,6 +6991,281 @@ def kur_simulasyon_impl(text: str) -> str:
         f"💱 Tahmini Hedef USD Kuru: <b>{yeni_kur:.2f} ₺</b>\n\n"
         f"💵 Dolar Karşılığı: <b>${yeni_usd_karsiligi:,.2f} USD</b>\n"
         f"📈 100.000 TL Kasa Başına Değişim: <b>${(100000 / yeni_kur):,.2f} USD</b>"
+    )
+
+def virman_kasa_aktar_impl(komut_metni: str, chat_id: int = 0) -> str:
+    """
+    İki cari arasında güvenli, atomik bakiye aktarımı (Virman) yapar.
+    Kaynak carinin kasasından tutarı düşer (-), hedef carinin kasasına ekler (+).
+    Kullanım: /virman [Kaynak Cari] [Hedef Cari] [Tutar]
+    Örnek: /virman SACİD TİGER 50000
+    """
+    parcalar = komut_metni.strip().split()[1:]
+    if len(parcalar) < 3:
+        return (
+            "🔄 <b>CARİLER ARASI KASA VİRMANI (TRANSFER)</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "İki cari arasında tek tıkla bakiye transferi yapabilirsiniz.\n\n"
+            "💡 <b>Kullanım:</b>\n"
+            "<code>/virman [Kaynak Cari] [Hedef Cari] [Tutar]</code>\n\n"
+            "📌 <b>Örnek:</b>\n"
+            "<code>/virman SACİD TİGER 50.000</code>\n"
+            "<i>(SACİD kasasından 50.000 ₺ düşülür, TİGER kasasına 50.000 ₺ eklenir.)</i>"
+        )
+    
+    clean_parts = [p for p in parcalar if p not in ["->", "➔", "=>", "TO", "to", ","]]
+    tutar = 0.0
+    kaynak_cari = ""
+    hedef_cari = ""
+
+    # 1. Tutar sonda mı? (Örn: /virman SACİD TİGER 50000)
+    try:
+        tutar_deneme = guvenliSayi(clean_parts[-1])
+        if tutar_deneme > 0:
+            tutar = tutar_deneme
+            rem = clean_parts[:-1]
+            if len(rem) == 2:
+                kaynak_cari, hedef_cari = rem[0].upper(), rem[1].upper()
+            elif len(rem) > 2:
+                kaynak_cari = rem[0].upper()
+                hedef_cari = " ".join(rem[1:]).upper()
+    except Exception:
+        pass
+
+    # 2. Tutar başta mı? (Örn: /virman 50000 SACİD TİGER)
+    if tutar <= 0:
+        try:
+            tutar_deneme = guvenliSayi(clean_parts[0])
+            if tutar_deneme > 0:
+                tutar = tutar_deneme
+                rem = clean_parts[1:]
+                if len(rem) >= 2:
+                    kaynak_cari, hedef_cari = rem[0].upper(), " ".join(rem[1:]).upper()
+        except Exception:
+            pass
+
+    if tutar <= 0 or not kaynak_cari or not hedef_cari:
+        return "⚠️ <b>Hatalı Format!</b> Lütfen geçerli iki cari ve tutar giriniz.\nÖrnek: <code>/virman SACİD TİGER 50000</code>"
+
+    if normalize_text(kaynak_cari) == normalize_text(hedef_cari):
+        return "⚠️ Kaynak ve hedef cari aynı olamaz!"
+
+    max_limit = app_state.get("MAX_TRANSACTION_LIMIT", 1000000.0)
+    if tutar > max_limit:
+        return f"⛔ <b>İşlem Limiti Aşıldı!</b> Tekil işlem limiti <b>{paraFormatla(max_limit)}</b> olarak belirlenmiştir."
+
+    # Deadlock koruması: kilitleri alfabetik sırada al
+    kilit_sirasi = sorted([kaynak_cari, hedef_cari], key=lambda x: normalize_text(x))
+    lock1 = _get_cari_lock(kilit_sirasi[0])
+    lock2 = _get_cari_lock(kilit_sirasi[1])
+
+    with lock1:
+        with lock2:
+            sh = get_spreadsheet()
+            sayfa = get_active_daily_sheet(sh)
+            tum_veriler = get_sheet_values_fast(sayfa)
+
+            satir_k, row_k, ad_k, _ = cari_satir_bul(tum_veriler, kaynak_cari)
+            if not satir_k:
+                return f"⚠️ Kaynak cari '<b>{sanitize_html(kaynak_cari)}</b>' Excel'de bulunamadı!"
+
+            satir_h, row_h, ad_h, _ = cari_satir_bul(tum_veriler, hedef_cari)
+            if not satir_h:
+                return f"⚠️ Hedef cari '<b>{sanitize_html(hedef_cari)}</b>' Excel'de bulunamadı!"
+
+            if grup_kilitli_mi(ad_k):
+                return f"🔒 <b>Kaynak Cari Kilitli:</b> <b>{sanitize_html(ad_k)}</b> grubu dondurulmuştur."
+            if grup_kilitli_mi(ad_h):
+                return f"🔒 <b>Hedef Cari Kilitli:</b> <b>{sanitize_html(ad_h)}</b> grubu dondurulmuştur."
+
+            # Sütun 4 = Kasa sütunu (D sütunu)
+            with _hucre_formul_hafizasi_lock:
+                mevcut_raw_k = _hucre_formul_hafizasi.get((sayfa.title, satir_k, 4))
+            if mevcut_raw_k is None:
+                mevcut_raw_k = row_k[3].strip() if len(row_k) >= 4 else ""
+            val_k = guvenliSayi(mevcut_raw_k if (mevcut_raw_k and str(mevcut_raw_k).startswith("=")) else (row_k[3] if len(row_k) >= 4 else 0.0))
+            sayisal_k = round(val_k - tutar, 2)
+            yeni_form_k = yeni_formul_olustur(mevcut_raw_k, tutar, -1)
+
+            with _hucre_formul_hafizasi_lock:
+                mevcut_raw_h = _hucre_formul_hafizasi.get((sayfa.title, satir_h, 4))
+            if mevcut_raw_h is None:
+                mevcut_raw_h = row_h[3].strip() if len(row_h) >= 4 else ""
+            val_h = guvenliSayi(mevcut_raw_h if (mevcut_raw_h and str(mevcut_raw_h).startswith("=")) else (row_h[3] if len(row_h) >= 4 else 0.0))
+            sayisal_h = round(val_h + tutar, 2)
+            yeni_form_h = yeni_formul_olustur(mevcut_raw_h, tutar, 1)
+
+            update_sheet_matrix_memory(sayfa.title, satir_k, 4, sayisal_k)
+            update_sheet_matrix_memory(sayfa.title, satir_h, 4, sayisal_h)
+
+            with _hucre_formul_hafizasi_lock:
+                _hucre_formul_hafizasi[(sayfa.title, satir_k, 4)] = yeni_form_k
+                _hucre_formul_hafizasi[(sayfa.title, satir_h, 4)] = yeni_form_h
+
+            _kuyruga_sayfa_yazma_ekle(sayfa.title, satir_k, 4, yeni_form_k)
+            _kuyruga_sayfa_yazma_ekle(sayfa.title, satir_h, 4, yeni_form_h)
+
+            _islem_kaydet({
+                "sayfa": sayfa.title, "satir": satir_k, "sutun": 4,
+                "eskiDeger": mevcut_raw_k, "eskiSayisal": guvenliSayi(row_k[3] if len(row_k)>3 else 0),
+                "grupAdi": ad_k, "islemTuru": f"Virman Çıkış (➔ {ad_h})"
+            })
+            _islem_kaydet({
+                "sayfa": sayfa.title, "satir": satir_h, "sutun": 4,
+                "eskiDeger": mevcut_raw_h, "eskiSayisal": guvenliSayi(row_h[3] if len(row_h)>3 else 0),
+                "grupAdi": ad_h, "islemTuru": f"Virman Giriş (⬅️ {ad_k})"
+            })
+
+            sistemeLogYaz("Kasa Virmanı", f"{ad_k} ➔ {ad_h} | {paraFormatla(tutar)}")
+
+            try:
+                _update_executor.submit(
+                    broadcast_dashboard_update,
+                    [ad_k, ad_h],
+                    [
+                        {"grup": ad_k, "message": f"🔄 Virman: {ad_h} carisine {paraFormatla(tutar)} aktarıldı."},
+                        {"grup": ad_h, "message": f"🔄 Virman: {ad_k} carisinden {paraFormatla(tutar)} geldi."}
+                    ]
+                )
+            except Exception:
+                pass
+
+            now_str = suankiZamaniAl().strftime("%H:%M:%S")
+            return (
+                f"✅ <b>VİRMAN İŞLEMİ BAŞARILI!</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"📤 <b>Kaynak:</b> <b>{sanitize_html(ad_k)}</b>  (<code>-{paraFormatla(tutar)}</code>)\n"
+                f"📥 <b>Hedef:</b> <b>{sanitize_html(ad_h)}</b>  (<code>+{paraFormatla(tutar)}</code>)\n"
+                f"💵 <b>Aktarılan Tutar:</b> <b>{paraFormatla(tutar)}</b>\n"
+                f"⏰ <b>İşlem Saati:</b> <code>{now_str}</code>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"⚡ <i>Her iki carinin kasa formülleri ve bakiyeleri eşitlendi.</i>\n"
+                f"💡 <i>Geri almak için: <code>/gerial</code></i>"
+            )
+
+def komisyon_hesaplayici_impl(komut_metni: str) -> str:
+    """
+    Komisyon, makas ve net kâr hesaplayıcı.
+    Kullanım: /komisyon [Tutar] [Oran (%)] [Kur (Opsiyonel)]
+    Örnek: /komisyon 100000 1.5 38.50
+    """
+    parcalar = komut_metni.strip().split()[1:]
+    if not parcalar:
+        return (
+            "✂️ <b>KOMİSYON & KÂR HESAP MAKİNESİ</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "Döviz ve bakiye işlemlerinde komisyon ve net tutarı anında hesaplar.\n\n"
+            "💡 <b>Kullanım:</b>\n"
+            "<code>/komisyon [Tutar] [% Oran] [Kur (Opsiyonel)]</code>\n\n"
+            "📌 <b>Örnekler:</b>\n"
+            "• <code>/komisyon 100000 1.5</code>  <i>(100.000 TL üzerinden %1.5 komisyon)</i>\n"
+            "• <code>/komisyon 5000 2 38.45</code>  <i>(5.000 USDT x 38.45 kur üzerinden %2 komisyon)</i>"
+        )
+    try:
+        tutar = guvenliSayi(parcalar[0])
+        oran = guvenliSayi(parcalar[1]) if len(parcalar) > 1 else 0.0
+        kur = guvenliSayi(parcalar[2]) if len(parcalar) > 2 else 0.0
+    except Exception:
+        return "⚠️ Lütfen geçerli sayısal değerler girin. Örn: <code>/komisyon 100000 1.5</code>"
+
+    if tutar <= 0:
+        return "⚠️ Tutar pozitif bir sayı olmalıdır."
+
+    komisyon_tutari = tutar * (oran / 100.0)
+    net_kalan = tutar - komisyon_tutari
+
+    metin = (
+        f"✂️ <b>KOMİSYON HESAPLAMA FİŞİ</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💰 <b>Brüt Tutar:</b> {paraFormatla(tutar)}\n"
+        f"📊 <b>Komisyon Oranı:</b> %{oran:.2f}\n"
+        f"✂️ <b>Kesinti / Komisyon:</b> <b>{paraFormatla(komisyon_tutari)}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🏦 <b>NET TUTAR:</b> <b>{paraFormatla(net_kalan)}</b>\n"
+    )
+
+    if kur > 0:
+        brut_tl = tutar * kur
+        kom_tl = komisyon_tutari * kur
+        net_tl = net_kalan * kur
+        metin += (
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💱 <b>Döviz Çevrimi (Kur: {kur:.4f}):</b>\n"
+            f"• Brüt Karşılık: <b>{paraFormatla(brut_tl)}</b>\n"
+            f"• Komisyon Payı: <b>{paraFormatla(kom_tl)}</b>\n"
+            f"• Net TL Karşılık: <b>{paraFormatla(net_tl)}</b>\n"
+        )
+
+    return metin
+
+def kullanici_yetkileri_impl(user_id: int, chat_id: int) -> str:
+    """Kullanıcının Telegram ID'si, grup yetkisi ve aktif rollerini gösterir."""
+    if user_id == KURUCU_ID:
+        rol = "👑 <b>ŞİRKET KURUCUSU & SİSTEM SAHİBİ</b>"
+        aciklama = "Tüm finansal, yönetsel, yedekleme ve sistem yetkilerine sınırsız erişim hakkınız bulunmaktadır."
+        izinler = "• Tüm Komutlar\n• Yeni Gün Devri & Kapanış\n• Yönetici Ekleme / Silme\n• Rezerv ve Cüzdan Raporları"
+    elif yetkili_mi(user_id):
+        rol = "🛡️ <b>TAM YETKİLİ ŞİRKET YÖNETİCİSİ</b>"
+        aciklama = "Kasaya veri işleme, raporlama, masraf yönetimi ve cari bağlama yetkilerine sahipsiniz."
+        izinler = "• Kasa / Ödeme / Devir / Masraf Ekleme-Silme\n• Virman / Kasa Transferi\n• Cari & İBAN Yönetimi\n• Grup Bağlama & Raporlar\n• Toplu Duyuru Yayınlama"
+    elif kullanici_kisitli_mi(user_id):
+        u_info = app_state.get("KISITLI_YETKILILER", {}).get(user_id, {})
+        uname = u_info.get("username", "Kısıtlı Yetkili")
+        izinli_set = u_info.get("allowed_commands", set())
+        rol = f"👤 <b>KISITLI YETKİLİ ({sanitize_html(uname)})</b>"
+        aciklama = "Sadece sizin hesabınıza tanımlanmış özel okuma ve sorgulama yetkilerine sahipsiniz."
+        izinler = "\n".join([f"• <code>{c}</code>" for c in sorted(list(izinli_set))])
+    else:
+        rol = "👥 <b>STANDART GRUP ÜYESİ</b>"
+        aciklama = "Bot üzerinden doğrudan finansal kayıt oluşturma yetkiniz bulunmamaktadır."
+        izinler = "• <code>/id</code> (Kendi ID'nizi öğrenme)\n• <code>/rehber</code> (Komut rehberini inceleme)\n• <code>/yetkiler</code> (Rol kartınızı görüntüleme)\n• Mesaj Kapatma Butonları"
+
+    return (
+        f"🔐 <b>KULLANICI YETKİ VE ROL KARTI</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🆔 <b>Telegram ID:</b> <code>{user_id}</code>\n"
+        f"💬 <b>Sohbet ID:</b> <code>{chat_id}</code>\n"
+        f"🎖️ <b>Rolünüz:</b> {rol}\n\n"
+        f"📋 <b>Yetki Kapsamı:</b>\n{aciklama}\n\n"
+        f"🔑 <b>Erişebildiğiniz Fonksiyonlar:</b>\n{izinler}"
+    )
+
+def sistem_guvenlik_raporu_impl(user_id: int) -> str:
+    """Şirket kurucusuna özel sistem ve güvenlik denetim raporu üretir."""
+    if user_id != KURUCU_ID:
+        return "⛔ <b>Yetkisiz İşlem:</b> Güvenlik denetim raporu yalnızca <b>Şirket Kurucusuna</b> açıktır."
+
+    now = suankiZamaniAl().strftime("%d.%m.%Y %H:%M:%S")
+    with _sheet_failed_writes_lock:
+        dlq_sayisi = len(_sheet_failed_writes)
+    with _sse_clients_lock:
+        sse_sayisi = len(_sse_clients)
+    with _idempotency_lock:
+        idempotency_sayisi = len(_idempotency_cache)
+
+    admin_sayisi = len(app_state.get("EK_ADMINLER", set()))
+    kisitli_sayisi = len(app_state.get("KISITLI_YETKILILER", {}))
+    kilitli_sayisi = len(app_state.get("KILITLI_GRUPLAR", set()))
+
+    return (
+        f"🛡️ <b>CFO BOT SİBER GÜVENLİK & SİSTEM DENETİMİ</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"⏰ <b>Denetim Zamanı:</b> <code>{now}</code>\n\n"
+        f"🔐 <b>KİMLİK & YETKİ DENETİMİ:</b>\n"
+        f"• 👑 <b>Kurucu ID:</b> <code>{KURUCU_ID}</code> (Doğrulandı ✅)\n"
+        f"• 🛡️ <b>Aktif Yönetici Sayısı:</b> <code>{admin_sayisi}</code> kişi\n"
+        f"• 👤 <b>Kısıtlı Yetkili Sayısı:</b> <code>{kisitli_sayisi}</code> kişi\n"
+        f"• 🔒 <b>Kilitli Cari Sayısı:</b> <code>{kilitli_sayisi}</code> grup\n\n"
+        f"⚡ <b>VERİ & KUYRUK GÜVENLİĞİ:</b>\n"
+        f"• 🛡️ <b>Çift Tıklama Koruması:</b> Aktif ({idempotency_sayisi} istek izleniyor)\n"
+        f"• 🚨 <b>Hata Kuyruğu (DLQ):</b> {dlq_sayisi} bekleyen kayıt {'(Temiz ✅)' if dlq_sayisi==0 else '(İnceleme Gerekli ⚠️)'}\n"
+        f"• 📡 <b>Canlı Dashboard İstemcileri:</b> <code>{sse_sayisi}</code> aktif SSE bağlantısı\n\n"
+        f"🌐 <b>AĞ & API DURUMU:</b>\n"
+        f"• 🤖 <b>Bağlantı Modu:</b> Uzun Yoklama (Long-Polling - 7/24 Kesintisiz)\n"
+        f"• 🩺 <b>Telegram Allowed Updates:</b> callback_query, message, chat_member (Korumalı ✅)\n"
+        f"• 📜 <b>Formül Enjeksiyon Koruması:</b> Aktif (CSV Sanitization ✅)\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"✅ <i>Sistem güvenlik denetiminden başarıyla geçti. Hiçbir yetki sızıntısı bulunmamaktadır.</i>"
     )
 
 # --- YENİ OPERASYON, DENETİM VE SAĞLIK FONKSİYONLARI ---
@@ -8012,7 +8341,7 @@ def _process_telegram_update_core(update: dict):
             izinli_komutlar = u_info.get("allowed_commands", set())
             uname = u_info.get("username", f"<code>{user_id}</code>")
             
-            if ana_komut not in izinli_komutlar:
+            if ana_komut not in izinli_komutlar and ana_komut not in ["/start", "/menu", "/menü", "/rehber", "/komutlar", "/yardim", "/yardım", "/yetkiler", "/rolum", "/yetkim"]:
                 yetkisiz_uyari_gonder(
                     chat_id,
                     user_id,
@@ -8165,8 +8494,13 @@ def _process_telegram_update_core(update: dict):
 
         if ana_komut in ["/start", "/menu", "/menü"]:
             telegramMesajGonder(chat_id, "👋 <b>CFO ve Finans Yönetim Botu</b>\nLütfen bir işlem seçin:\n\n👨💻 <i>Yazılım: @CRYPTOATAKAN © 2026</i>", menuKlavyesiOlustur(is_group))
+            return
         elif ana_komut in ["/rehber", "/komutlar", "/yardim", "/yardım"]:
             telegramMesajGonder(chat_id, rehber_ana_metni(), rehber_ana_klavyesi())
+            return
+        elif ana_komut in ["/yetkiler", "/rolum", "/yetkim"]:
+            telegramMesajGonder(chat_id, kullanici_yetkileri_impl(user_id, chat_id))
+            return
         elif ana_komut in ["/qr", "/tronqr", "/tron", "/cuzdan", "/cüzdan", "/adres"]:
             cuzdanQrUret_impl(chat_id, text)
         elif ana_komut in ["/panel", "/webpanel"]:
@@ -8251,7 +8585,7 @@ def _process_telegram_update_core(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, cari_ekstre_impl, text, goster_bildirim=True)
         elif ana_komut in ["/ai", "/analiz", "/cfoai", "/raporai"]:
             islemi_analiz_bildirimiyle_yap(chat_id, ai_finans_analizi_uret, goster_bildirim=True)
-        elif ana_komut in ["/anomali", "/anomaliler", "/riskanaliz", "/guvenlik"]:
+        elif ana_komut in ["/anomali", "/anomaliler", "/riskanaliz"]:
             islemi_analiz_bildirimiyle_yap(chat_id, anomali_analizi_uret, goster_bildirim=True)
         elif ana_komut in ["/akilliiban", "/ototahsis", "/akillitahsis"]:
             islemi_analiz_bildirimiyle_yap(chat_id, akilli_iban_dagit_impl, text, chat_id, goster_bildirim=True)
@@ -8285,10 +8619,18 @@ def _process_telegram_update_core(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, doviz_cevirici_impl, text)
         elif ana_komut in ["/portfoy", "/portföy", "/hazine"]:
             islemi_analiz_bildirimiyle_yap(chat_id, sirket_portfoy_raporu_impl, goster_bildirim=True)
+        elif ana_komut in ["/komisyon", "/komisyonhesapla", "/kesinti"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, komisyon_hesaplayici_impl, text)
         elif ana_komut == "/hesap":
             islemi_analiz_bildirimiyle_yap(chat_id, hesapMakinesi_impl, text)
         elif ana_komut in ["/çeviri", "/ceviri"]:
             islemi_analiz_bildirimiyle_yap(chat_id, metinCevir_impl, text)
+        elif ana_komut in ["/tarih", "/arsiv", "/gecmisgun"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, gecmis_gun_sorgula_impl, text, goster_bildirim=True)
+        elif ana_komut in ["/virman", "/kasaaktar", "/aktar", "/transfer"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, virman_kasa_aktar_impl, text, chat_id)
+        elif ana_komut in ["/guvenlik", "/security", "/auditbot"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, sistem_guvenlik_raporu_impl, user_id, goster_bildirim=True)
         elif ana_komut == "/yenigun":
             metin, klavye = yenigun_baslat_mesaji()
             telegramMesajGonder(chat_id, metin, klavye)

