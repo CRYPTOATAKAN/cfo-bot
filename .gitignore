@@ -8,6 +8,11 @@ venv/
 ENV/
 .env
 service_account.json
+**/service_account.json
+CFO-BOT/
+test_pure.py
 *.key
 *.pem
+*.log
+*.csv
 .DS_Store
