@@ -7990,11 +7990,12 @@ def _process_telegram_update_core(update: dict):
 
         # 3. Kısıtlı ve Tam Yetkili Yönetici Kontrolleri
         if kullanici_kisitli_mi(user_id):
-            if (data.startswith("grup_iban_yenile_") or data == "canli_kur_yenile" or 
-                data.startswith("cevir_") or data in ["mesaj_kapat", "panel_kapat", "kapat"] or 
-                data.startswith("rapor_") or data.startswith("cariler_") or data.startswith("rehber")):
-                pass
-            else:
+            allowed_for_kisitli = (
+                "grup_iban_yenile_", "canli_kur_yenile", "menu_kur", "cevir_",
+                "mesaj_kapat", "panel_kapat", "kapat", "rapor_", "cariler_",
+                "rehber", "dashboard_yenile", "cfo_dashboard", "risk_"
+            )
+            if not any(data.startswith(p) or data == p for p in allowed_for_kisitli):
                 telegram_api("answerCallbackQuery", {
                     "callback_query_id": cq["id"],
                     "text": "⛔ Yetkisiz İşlem: Hesabınız kısıtlı yetkiye sahiptir.",
@@ -8012,36 +8013,58 @@ def _process_telegram_update_core(update: dict):
             except Exception:
                 pass
             return
-        elif data == "rapor_ozet":
+
+        # 4. Yetkilendirilmiş Buton İşleyicileri
+        if data == "rapor_ozet":
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
+            except Exception:
+                pass
             islemi_analiz_bildirimiyle_yap(chat_id, hizliOzetUret_impl)
         elif data == "rapor_masraf":
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
+            except Exception:
+                pass
             islemi_analiz_bildirimiyle_yap(chat_id, masrafRaporuUret_impl)
         elif data == "rapor_tumu":
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
+            except Exception:
+                pass
             islemi_analiz_bildirimiyle_yap(chat_id, tumGruplarRaporu_impl, goster_bildirim=True)
         elif data.startswith("risk_"):
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
+            except Exception:
+                pass
             filtre = data.replace("risk_", "").strip()
             msg_id = cq.get("message", {}).get("message_id")
             metin, klavye = bakiye_risk_raporu_uret(filtre)
             if msg_id:
                 telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
-        elif data == "dashboard_yenile":
+        elif data in ["dashboard_yenile", "cfo_dashboard"]:
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
+            except Exception:
+                pass
             msg_id = cq.get("message", {}).get("message_id")
             metin, klavye = cfo_dashboard_raporu_uret()
             if msg_id:
                 telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
             else:
                 telegramMesajGonder(chat_id, metin, klavye)
-        elif data == "canli_kur_yenile":
+        elif data in ["canli_kur_yenile", "menu_kur"]:
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq["id"], "text": "🔄 Canlı kurlar güncellendi!"})
+            except Exception:
+                pass
             msg_id = cq.get("message", {}).get("message_id")
             metin, klavye = canliKurSorgula_impl(force_refresh=True)
             if msg_id:
                 telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
             else:
                 telegramMesajGonder(chat_id, metin, klavye)
-            try:
-                telegram_api("answerCallbackQuery", {"callback_query_id": cq["id"], "text": "🔄 Canlı kurlar güncellendi!"})
-            except Exception:
-                pass
         elif data == "kurtar_dlq":
             islemi_analiz_bildirimiyle_yap(chat_id, kurtar_basarisiz_yazimlari_impl, goster_bildirim=True)
             try:
@@ -8067,21 +8090,53 @@ def _process_telegram_update_core(update: dict):
             except Exception:
                 pass
         elif data == "menu_yenigun":
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
+            except Exception:
+                pass
             metin, klavye = yenigun_baslat_mesaji()
             telegramMesajGonder(chat_id, metin, klavye)
         elif data == "yenigun_onay_sil":
             if not yetkili_mi(user_id):
                 yetkisiz_uyari_gonder(chat_id, user_id, "⛔ <b>Yetkisiz İşlem:</b> Yeni gün devir işlemini onaylama yetkisi sadece <b>Şirket Yöneticilerine ve Kurucuya</b> aittir.")
+                try:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", ""), "text": "⛔ Yetkisiz İşlem!", "show_alert": True})
+                except Exception:
+                    pass
                 return
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", ""), "text": "⏳ Yeni gün devri başlatılıyor..."})
+            except Exception:
+                pass
             islemi_analiz_bildirimiyle_yap(chat_id, yenigun_gerceklestir_impl, True)
         elif data == "yenigun_onay_tut":
             if not yetkili_mi(user_id):
                 yetkisiz_uyari_gonder(chat_id, user_id, "⛔ <b>Yetkisiz İşlem:</b> Yeni gün devir işlemini onaylama yetkisi sadece <b>Şirket Yöneticilerine ve Kurucuya</b> aittir.")
+                try:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", ""), "text": "⛔ Yetkisiz İşlem!", "show_alert": True})
+                except Exception:
+                    pass
                 return
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", ""), "text": "⏳ Yeni gün devri başlatılıyor..."})
+            except Exception:
+                pass
             islemi_analiz_bildirimiyle_yap(chat_id, yenigun_gerceklestir_impl, False)
         elif data == "yenigun_iptal":
-            telegramMesajGonder(chat_id, "❌ Yeni gün devir işlemi iptal edildi.")
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", ""), "text": "❌ İptal edildi"})
+            except Exception:
+                pass
+            msg_id = cq.get("message", {}).get("message_id")
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, "❌ <b>Yeni gün devir işlemi iptal edildi.</b>", None)
+            else:
+                telegramMesajGonder(chat_id, "❌ <b>Yeni gün devir işlemi iptal edildi.</b>")
         elif data.startswith("cariler_sayfa_"):
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
+            except Exception:
+                pass
             try:
                 sayfa_idx = int(data.replace("cariler_sayfa_", "").strip())
             except Exception:
@@ -8130,7 +8185,7 @@ def _process_telegram_update_core(update: dict):
                     guncel_metin = grup_metni + f"\n\n🟢 <b>İletildi:</b> <i>{hedef_title} Telegram Grubu</i>"
                     yeni_klavye = {
                         "inline_keyboard": [
-                            [{"text": f"✅ {hedef_title} Grubuna İletildi", "callback_data": "duyuru_bos_uyari_"}],
+                            [{"text": f"✅ {hedef_title} Grubuna İletildi", "callback_data": f"duyuru_iletildi_{draft_id}"}],
                             [{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]
                         ]
                     }
@@ -8149,10 +8204,24 @@ def _process_telegram_update_core(update: dict):
                     "text": f"⚠️ '{grup_adi}' adında bağlı bir Telegram grubu bulunamadı!\n\nLütfen o grupta '/grupbagla {grup_adi}' yazarak grubu bağlayınız.",
                     "show_alert": True
                 })
+        elif data.startswith("duyuru_iletildi_"):
+            telegram_api("answerCallbackQuery", {
+                "callback_query_id": cq["id"],
+                "text": "✅ Bu rapor ilgili Telegram grubuna zaten başarıyla iletildi.",
+                "show_alert": True
+            })
         elif data.startswith("rapor_"):
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
+            except Exception:
+                pass
             grup = data.replace("rapor_", "")
             islemi_analiz_bildirimiyle_yap(chat_id, grup_kasa_analiz_fisi_uret, grup)
         elif data.startswith("ibanbosta_"):
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", ""), "text": "🔓 İBAN boşa çıkarılıyor..."})
+            except Exception:
+                pass
             hesap_adi = data.replace("ibanbosta_", "").strip()
             ok, h_ad, eski_c, s_title = iban_bosalt_direct(hesap_adi)
             msg_id = cq.get("message", {}).get("message_id")
@@ -8164,6 +8233,10 @@ def _process_telegram_update_core(update: dict):
             else:
                 telegramMesajGonder(chat_id, f"⚠️ {h_ad}")
         elif data.startswith("grup_iban_sil_"):
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", ""), "text": "🔓 İBAN kaldırılıyor..."})
+            except Exception:
+                pass
             parcalar = data.replace("grup_iban_sil_", "").rsplit("_", 1)
             hesap_adi = parcalar[0].strip()
             hedef_cari = parcalar[1].strip() if len(parcalar) > 1 else ""
@@ -8173,6 +8246,10 @@ def _process_telegram_update_core(update: dict):
             if msg_id:
                 telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
         elif data.startswith("grup_iban_yenile_"):
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", ""), "text": "🔄 İBAN listesi yenileniyor..."})
+            except Exception:
+                pass
             hedef_cari = data.replace("grup_iban_yenile_", "").strip()
             metin, klavye = grup_aktif_ibanlar_raporu_uret(hedef_cari, chat_id)
             msg_id = cq.get("message", {}).get("message_id")
@@ -8239,6 +8316,10 @@ def _process_telegram_update_core(update: dict):
                 "show_alert": True
             })
         elif data.startswith("tum_tahsis_sil_"):
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", ""), "text": "🔓 İBAN boşa çıkarılıyor..."})
+            except Exception:
+                pass
             hesap_adi = data.replace("tum_tahsis_sil_", "").strip()
             ok, h_ad, eski_c, s_title = iban_bosalt_direct(hesap_adi)
             metin, klavye = tum_tahsisli_ibanlar_raporu_uret()
@@ -8248,6 +8329,16 @@ def _process_telegram_update_core(update: dict):
             else:
                 telegramMesajGonder(chat_id, metin, klavye)
         elif data == "tahsis_tumunu_sil_onay":
+            if not yetkili_mi(user_id):
+                try:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq["id"], "text": "⛔ Yetkisiz İşlem: Bu işlem sadece yöneticilere açıktır.", "show_alert": True})
+                except Exception:
+                    pass
+                return
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", "")})
+            except Exception:
+                pass
             msg_id = cq.get("message", {}).get("message_id")
             metin = (
                 "⚠️ <b>EMİN MİSİNİZ?</b>\n\n"
@@ -8265,6 +8356,16 @@ def _process_telegram_update_core(update: dict):
             else:
                 telegramMesajGonder(chat_id, metin, klavye)
         elif data == "tahsis_tumunu_sil_evet":
+            if not yetkili_mi(user_id):
+                try:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq["id"], "text": "⛔ Yetkisiz İşlem: Bu işlem sadece yöneticilere açıktır.", "show_alert": True})
+                except Exception:
+                    pass
+                return
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", ""), "text": "⏳ İBAN tahsisleri sıfırlanıyor..."})
+            except Exception:
+                pass
             msg_id = cq.get("message", {}).get("message_id")
             sonuc_metni = tum_tahsisli_ibanlari_temizle_impl()
             klavye = {
@@ -8277,6 +8378,10 @@ def _process_telegram_update_core(update: dict):
             else:
                 telegramMesajGonder(chat_id, sonuc_metni, klavye)
         elif data == "tahsis_listesi_yenile":
+            try:
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", ""), "text": "🔄 Tahsis listesi güncellendi"})
+            except Exception:
+                pass
             metin, klavye = tum_tahsisli_ibanlar_raporu_uret()
             msg_id = cq.get("message", {}).get("message_id")
             if msg_id:

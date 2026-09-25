@@ -3461,6 +3461,76 @@ class TestSmartCariQueryAndMultiWordMatching(unittest.TestCase):
             bot.process_telegram_update(update_tarih)
             mock_gecmis.assert_called_once()
 
+    def test_cfo_dashboard_and_menu_kur_callbacks(self):
+        """cfo_dashboard ve menu_kur butonlarının başarıyla işlendiğini test eder."""
+        # 1. cfo_dashboard callback'i
+        cq_dash = {
+            "callback_query": {
+                "id": "cq_dash_1",
+                "from": {"id": bot.KURUCU_ID},
+                "message": {"chat": {"id": -100123}, "message_id": 999},
+                "data": "cfo_dashboard"
+            }
+        }
+        with patch.object(bot, "cfo_dashboard_raporu_uret", return_value=("Dashboard Metni", {"inline_keyboard": []})) as mock_d, \
+             patch.object(bot, "telegramMesajDuzenle") as mock_edit:
+            bot._process_telegram_update_core(cq_dash)
+            mock_d.assert_called_once()
+            mock_edit.assert_called_once()
+            self.assertEqual(mock_edit.call_args[0][2], "Dashboard Metni")
+
+        # 2. menu_kur callback'i
+        cq_kur = {
+            "callback_query": {
+                "id": "cq_kur_1",
+                "from": {"id": bot.KURUCU_ID},
+                "message": {"chat": {"id": -100123}, "message_id": 999},
+                "data": "menu_kur"
+            }
+        }
+        with patch.object(bot, "canliKurSorgula_impl", return_value=("Canlı Kur Metni", {"inline_keyboard": []})) as mock_k, \
+             patch.object(bot, "telegramMesajDuzenle") as mock_edit:
+            bot._process_telegram_update_core(cq_kur)
+            mock_k.assert_called_once()
+            mock_edit.assert_called_once()
+            self.assertEqual(mock_edit.call_args[0][2], "Canlı Kur Metni")
+
+    def test_kisitli_yetkili_button_execution(self):
+        """Kısıtlı yetkili kullanıcının izinli butonları sorunsuz çalıştırabildiğini test eder."""
+        kisitli_id = 876543210
+        with patch.dict(bot.app_state, {"KISITLI_YETKILILER": {kisitli_id: {"username": "KisitliTest", "allowed_commands": {"/kasa"}}}}):
+            # rapor_ozet butonu
+            cq_ozet = {
+                "callback_query": {
+                    "id": "cq_kisitli_1",
+                    "from": {"id": kisitli_id},
+                    "message": {"chat": {"id": -100123}, "message_id": 999},
+                    "data": "rapor_ozet"
+                }
+            }
+            with patch.object(bot, "hizliOzetUret_impl", return_value="Özet Raporu") as mock_ozet, \
+                 patch.object(bot, "telegramMesajGonder") as mock_send:
+                bot._process_telegram_update_core(cq_ozet)
+                mock_ozet.assert_called_once()
+                mock_send.assert_called_once()
+                self.assertIn("Özet Raporu", mock_send.call_args[0][1])
+
+            # canli_kur_yenile butonu
+            cq_kur = {
+                "callback_query": {
+                    "id": "cq_kisitli_2",
+                    "from": {"id": kisitli_id},
+                    "message": {"chat": {"id": -100123}, "message_id": 999},
+                    "data": "canli_kur_yenile"
+                }
+            }
+            with patch.object(bot, "canliKurSorgula_impl", return_value=("Kur Raporu", {"inline_keyboard": []})) as mock_kur, \
+                 patch.object(bot, "telegramMesajDuzenle") as mock_edit:
+                bot._process_telegram_update_core(cq_kur)
+                mock_kur.assert_called_once()
+                mock_edit.assert_called_once()
+                self.assertEqual(mock_edit.call_args[0][2], "Kur Raporu")
+
 if __name__ == "__main__":
     unittest.main()
 
