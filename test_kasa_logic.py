@@ -3531,6 +3531,150 @@ class TestSmartCariQueryAndMultiWordMatching(unittest.TestCase):
                 mock_edit.assert_called_once()
                 self.assertEqual(mock_edit.call_args[0][2], "Kur Raporu")
 
+class TestDashboardSecurityAndSessionTokens(unittest.TestCase):
+    def setUp(self):
+        self.kurucu_id = bot.KURUCU_ID
+        self.admin_id = 987654321
+        self.unauth_id = 1122334455
+        bot.app_state["EK_ADMINLER"] = {self.kurucu_id, self.admin_id}
+        bot._yetkisiz_uyarilanlar.clear()
+
+    def test_token_generation_and_verification(self):
+        token = bot.generate_dashboard_session_token(self.kurucu_id)
+        self.assertIsInstance(token, str)
+        parts = token.split(".")
+        self.assertEqual(len(parts), 4)
+        self.assertEqual(parts[0], str(self.kurucu_id))
+        
+        is_valid, uid = bot.verify_dashboard_session_token(token)
+        self.assertTrue(is_valid)
+        self.assertEqual(uid, self.kurucu_id)
+
+        admin_token = bot.generate_dashboard_session_token(self.admin_id)
+        is_valid_admin, uid_admin = bot.verify_dashboard_session_token(admin_token)
+        self.assertTrue(is_valid_admin)
+        self.assertEqual(uid_admin, self.admin_id)
+
+    def test_token_expiration(self):
+        expired_token = bot.generate_dashboard_session_token(self.kurucu_id, duration_seconds=-10)
+        is_valid, uid = bot.verify_dashboard_session_token(expired_token)
+        self.assertFalse(is_valid)
+        self.assertEqual(uid, self.kurucu_id)
+
+    def test_token_tampering(self):
+        valid_token = bot.generate_dashboard_session_token(self.kurucu_id)
+        parts = valid_token.split(".")
+        
+        bad_sig_token = f"{parts[0]}.{parts[1]}.{parts[2]}.badsignature12345"
+        is_valid, _ = bot.verify_dashboard_session_token(bad_sig_token)
+        self.assertFalse(is_valid)
+
+        fake_user_token = f"9999999999.{parts[1]}.{parts[2]}.{parts[3]}"
+        is_valid_fake, _ = bot.verify_dashboard_session_token(fake_user_token)
+        self.assertFalse(is_valid_fake)
+
+        self.assertFalse(bot.verify_dashboard_session_token("")[0])
+        self.assertFalse(bot.verify_dashboard_session_token("invalid.token")[0])
+
+    def test_token_instant_revocation_on_admin_removal(self):
+        temp_admin = 555666777
+        bot.app_state["EK_ADMINLER"].add(temp_admin)
+        token = bot.generate_dashboard_session_token(temp_admin)
+        
+        self.assertTrue(bot.verify_dashboard_session_token(token)[0])
+        
+        bot.app_state["EK_ADMINLER"].discard(temp_admin)
+        
+        is_valid, uid = bot.verify_dashboard_session_token(token)
+        self.assertFalse(is_valid)
+        self.assertEqual(uid, temp_admin)
+
+    def test_panel_linki_uret_with_user_id(self):
+        import urllib.parse
+        p_url = bot.panel_linki_uret(self.kurucu_id)
+        self.assertIn("token=", p_url)
+        self.assertIn(str(self.kurucu_id), p_url)
+        
+        parsed = urllib.parse.urlparse(p_url)
+        qs = urllib.parse.parse_qs(parsed.query)
+        token = qs["token"][0]
+        is_valid, uid = bot.verify_dashboard_session_token(token)
+        self.assertTrue(is_valid)
+        self.assertEqual(uid, self.kurucu_id)
+
+    def test_live_dashboard_handler_with_session_token(self):
+        import io
+        token = bot.generate_dashboard_session_token(self.kurucu_id)
+        handler = object.__new__(bot.LiveDashboardHandler)
+        handler.path = f"/?token={token}"
+        handler.headers = {}
+        handler.wfile = io.BytesIO()
+        handler.send_response = MagicMock()
+        handler.send_header = MagicMock()
+        handler.end_headers = MagicMock()
+        
+        handler.do_GET()
+        
+        handler.send_response.assert_called_with(200)
+        body = handler.wfile.getvalue().decode("utf-8")
+        self.assertIn("CFO Canlı Finans Paneli", body)
+        self.assertIn(token, body)
+        
+        cookie_calls = [call for call in handler.send_header.call_args_list if call[0][0] == "Set-Cookie"]
+        self.assertTrue(len(cookie_calls) > 0)
+        self.assertIn(f"dashboard_token={token}", cookie_calls[0][0][1])
+
+    def test_live_dashboard_handler_blocks_unauthorized_direct_access(self):
+        import io
+        handler = object.__new__(bot.LiveDashboardHandler)
+        handler.path = "/"
+        handler.headers = {}
+        handler.wfile = io.BytesIO()
+        handler.send_response = MagicMock()
+        handler.send_header = MagicMock()
+        handler.end_headers = MagicMock()
+        
+        handler.do_GET()
+        handler.send_response.assert_called_with(401)
+        body = handler.wfile.getvalue().decode("utf-8")
+        self.assertIn("Yetkisiz Erişim", body)
+        self.assertIn("/panel", body)
+
+    def test_panel_command_rejects_unauthorized_user(self):
+        update_unauth = {
+            "message": {
+                "chat": {"id": -100999, "title": "Grup"},
+                "from": {"id": self.unauth_id, "first_name": "Yetkisiz"},
+                "text": "/panel"
+            }
+        }
+        with patch.object(bot, "yetkisiz_uyari_gonder") as mock_uyari, \
+             patch.object(bot, "telegramMesajGonder") as mock_send:
+            bot._process_telegram_update_core(update_unauth)
+            mock_uyari.assert_called_once()
+            uyari_metni = mock_uyari.call_args[0][2]
+            self.assertTrue("Erişim Reddedildi" in uyari_metni or "Yetkisiz" in uyari_metni)
+            mock_send.assert_not_called()
+
+    def test_panel_command_allows_manager_with_session_token(self):
+        update_manager = {
+            "message": {
+                "chat": {"id": self.kurucu_id},
+                "from": {"id": self.kurucu_id, "first_name": "Atakan"},
+                "text": "/panel"
+            }
+        }
+        with patch.object(bot, "telegramMesajGonder") as mock_send:
+            bot._process_telegram_update_core(update_manager)
+            mock_send.assert_called_once()
+            args = mock_send.call_args[0]
+            self.assertEqual(args[0], self.kurucu_id)
+            self.assertIn("CANLI CFO WEB DASHBOARD", args[1])
+            kb = args[2]
+            url = kb["inline_keyboard"][0][0]["url"]
+            self.assertIn("token=", url)
+            self.assertIn(str(self.kurucu_id), url)
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -115,9 +115,97 @@ if not DASHBOARD_AUTH_TOKEN:
     import hashlib
     DASHBOARD_AUTH_TOKEN = hashlib.sha256(f"cfo_dashboard_{TELEGRAM_TOKEN}".encode()).hexdigest()[:24]
 
-def panel_linki_uret() -> str:
+PANEL_TOKEN_SECRET = os.environ.get("PANEL_TOKEN_SECRET", "").strip()
+if not PANEL_TOKEN_SECRET:
+    import hashlib
+    PANEL_TOKEN_SECRET = hashlib.sha256(f"cfo_pnl_sec_{TELEGRAM_TOKEN}_{KURUCU_ID}".encode()).hexdigest()
+
+def generate_dashboard_session_token(user_id: int, duration_seconds: int = 86400) -> str:
+    """
+    Belirli bir yetkili yönetici için süreli ve kriptografik (HMAC-SHA256) imzalı
+    canlı web paneli oturum token'ı üretir.
+    Format: user_id.expiry_ts.nonce.signature
+    """
+    import hmac
+    import hashlib
+    import secrets
+    import time
+
+    expiry_ts = int(time.time()) + int(duration_seconds)
+    nonce = secrets.token_hex(4)
+    payload = f"{user_id}:{expiry_ts}:{nonce}"
+    sig = hmac.new(
+        PANEL_TOKEN_SECRET.encode("utf-8"),
+        payload.encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest()[:32]
+    return f"{user_id}.{expiry_ts}.{nonce}.{sig}"
+
+def verify_dashboard_session_token(token_str: str) -> Tuple[bool, int]:
+    """
+    Dashboard oturum token'ını doğrular.
+    Dönüş: (is_valid: bool, user_id: int)
+    Kontroller:
+    1. Biçim kontrolü (user_id.expiry.nonce.sig)
+    2. Zaman aşımı (expiry_ts) kontrolü
+    3. Kriptografik HMAC-SHA256 imza doğrulaması
+    4. Canlı yetki kontrolü (yetkili_mi(user_id)) -> Yetkisi alınan yönetici anında bloke edilir.
+    """
+    if not token_str or not isinstance(token_str, str):
+        return False, 0
+
+    parts = token_str.strip().split(".")
+    if len(parts) != 4:
+        return False, 0
+
+    u_id_str, exp_str, nonce, sig = parts
+    try:
+        user_id = int(u_id_str)
+        expiry_ts = int(exp_str)
+    except (ValueError, TypeError):
+        return False, 0
+
+    import time
+    import hmac
+    import hashlib
+
+    # 1. Süre dolumu kontrolü
+    if time.time() > expiry_ts:
+        return False, user_id
+
+    # 2. HMAC imza kontrolü
+    payload = f"{user_id}:{expiry_ts}:{nonce}"
+    expected_sig = hmac.new(
+        PANEL_TOKEN_SECRET.encode("utf-8"),
+        payload.encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest()[:32]
+
+    if not hmac.compare_digest(sig, expected_sig):
+        return False, 0
+
+    # 3. Canlı yetkili kontrolü
+    try:
+        if not yetkili_mi(user_id):
+            return False, user_id
+    except Exception:
+        if user_id != KURUCU_ID:
+            return False, user_id
+
+    return True, user_id
+
+def panel_linki_uret(user_id: int = 0) -> str:
+    """
+    Yetkili yönetici için güvenli canlı panel bağlantısı üretir.
+    user_id verilmişse o yöneticiye özel süreli ve imzalı token üretilir.
+    user_id verilmemişse geriye dönük uyumluluk için statik token kullanılır.
+    """
     base_url = app_state.get("WEB_APP_URL", WEB_APP_URL).strip().rstrip("/")
-    if DASHBOARD_AUTH_TOKEN:
+    if user_id:
+        token = generate_dashboard_session_token(user_id)
+        sep = "&" if "?" in base_url else "?"
+        return f"{base_url}{sep}token={token}"
+    elif DASHBOARD_AUTH_TOKEN:
         sep = "&" if "?" in base_url else "?"
         return f"{base_url}{sep}token={DASHBOARD_AUTH_TOKEN}"
     return base_url
@@ -6842,8 +6930,8 @@ def sistem_durumu_impl() -> str:
         f"🔒 <b>Dondurulmuş Grup Sayısı:</b> <code>{kilitli_sayisi} Adet</code>\n"
         f"🚨 <b>Aktif Bakiye Alarmları:</b> <code>{alarm_sayisi} Adet</code>\n"
         f"↺ <b>Undo (Geri Alma) Hafızası:</b> <code>{gecmis_sayisi} / 10 İşlem</code>\n"
-        f"🕒 <b>Otomatik Kapanış Saati:</b> <code>{app_state.get('KAPANIS_SAATI', '23:00')}</code>\n"
-        f"🌐 <b>Canlı Dashboard URL:</b>\n{panel_linki_uret()}"
+        f"🌐 <b>Canlı Dashboard URL:</b> <code>{app_state.get('WEB_APP_URL', WEB_APP_URL).strip().rstrip('/')}</code>\n"
+        f"🔑 <b>Erişim:</b> <i>Yöneticilere özel süreli giriş için /panel kullanınız.</i>"
     )
 
 def sistem_yeniden_yukle_impl() -> str:
@@ -8054,6 +8142,54 @@ def _process_telegram_update_core(update: dict):
                 telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
             else:
                 telegramMesajGonder(chat_id, metin, klavye)
+        elif data == "al_panel_linki":
+            if not yetkili_mi(user_id):
+                try:
+                    telegram_api("answerCallbackQuery", {
+                        "callback_query_id": cq.get("id", ""),
+                        "text": "⛔ Bu finans paneline sadece şirket yöneticileri erişebilir.",
+                        "show_alert": True
+                    })
+                except Exception:
+                    pass
+                return
+
+            cur_link = panel_linki_uret(user_id)
+            kullanici_bilgi = cq.get("from", {}).get("first_name", "") or cq.get("from", {}).get("username", "") or f"Yönetici #{user_id}"
+            kullanici_bilgi = sanitize_html(kullanici_bilgi)
+            dm_btn = {
+                "inline_keyboard": [
+                    [{"text": "🚀 Canlı CFO Panelini Aç", "url": cur_link}],
+                    [{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]
+                ]
+            }
+            dm_metin = (
+                f"🌐 <b>CANLI CFO WEB DASHBOARD</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+                f"🔒 <b>Size Özel Güvenli Giriş:</b>\n"
+                f"• Yetkili: <b>{kullanici_bilgi}</b>\n"
+                f"• Oturum: <code>24 Saat Geçerli • HMAC-SHA256 İmzalı</code>\n\n"
+                f"👉 <i>Aşağıdaki butona tıklayarak güvenle giriş yapabilirsiniz.</i>"
+            )
+            try:
+                res_dm = telegramMesajGonder(user_id, dm_metin, dm_btn)
+                if res_dm and res_dm.get("ok"):
+                    telegram_api("answerCallbackQuery", {
+                        "callback_query_id": cq.get("id", ""),
+                        "text": "✅ Panel giriş linkiniz özel mesaj (DM) olarak iletildi!",
+                        "show_alert": True
+                    })
+                else:
+                    telegram_api("answerCallbackQuery", {
+                        "callback_query_id": cq.get("id", ""),
+                        "text": "⚠️ Lütfen önce botla özel sohbet başlatıp /start'a basınız.",
+                        "show_alert": True
+                    })
+            except Exception:
+                telegram_api("answerCallbackQuery", {
+                    "callback_query_id": cq.get("id", ""),
+                    "text": "⚠️ Lütfen önce botla özel sohbet başlatıp /start'a basınız.",
+                    "show_alert": True
+                })
         elif data in ["canli_kur_yenile", "menu_kur"]:
             try:
                 telegram_api("answerCallbackQuery", {"callback_query_id": cq["id"], "text": "🔄 Canlı kurlar güncellendi!"})
@@ -8609,20 +8745,61 @@ def _process_telegram_update_core(update: dict):
         elif ana_komut in ["/qr", "/tronqr", "/tron", "/cuzdan", "/cüzdan", "/adres"]:
             cuzdanQrUret_impl(chat_id, text)
         elif ana_komut in ["/panel", "/webpanel"]:
-            cur_panel_url = panel_linki_uret()
+            if not yetkili_mi(user_id):
+                yetkisiz_uyari_gonder(
+                    chat_id,
+                    user_id,
+                    "⛔ <b>Yetkisiz İşlem:</b> Canlı finans paneline erişim yetkisi sadece şirket yöneticilerine aittir."
+                )
+                return
+
+            cur_panel_url = panel_linki_uret(user_id)
+            kullanici_bilgi = from_user.get("first_name", "") or from_user.get("username", "") or f"Yönetici #{user_id}"
+            kullanici_bilgi = sanitize_html(kullanici_bilgi)
+
             panel_btn = {
                 "inline_keyboard": [
                     [{"text": "🚀 Canlı CFO Panelini Aç", "url": cur_panel_url}],
                     [{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]
                 ]
             }
-            telegramMesajGonder(
-                chat_id,
+            mesaj_metni = (
                 f"🌐 <b>CANLI CFO WEB DASHBOARD</b>\n━━━━━━━━━━━━━━━━━━━━\n"
                 f"📊 <i>Şirketinizin tüm finans ve kasa verilerini 7/24 canlı web panelinden anlık izleyebilirsiniz.</i>\n\n"
-                f"🔗 <b>Panel Linki:</b>\n{cur_panel_url}",
-                panel_btn
+                f"🔒 <b>Yetkili & Güvenli Oturum:</b>\n"
+                f"• Yönetici: <b>{kullanici_bilgi}</b>\n"
+                f"• Oturum: <code>24 Saat Geçerli • HMAC-SHA256 Şifreli</code>\n"
+                f"• Erişim Koruması: <i>Yalnızca doğrulanmış şirket yöneticileri erişebilir.</i>\n\n"
+                f"🔗 <b>Panel Linki:</b> <i>Güvenlik gereği aşağıdaki buton üzerinden şifreli iletilmiştir.</i>\n"
+                f"👉 <i>Aşağıdaki butona tıklayarak doğrudan panelinize güvenle giriş yapabilirsiniz.</i>"
             )
+
+            if not is_group:
+                telegramMesajGonder(chat_id, mesaj_metni, panel_btn)
+            else:
+                dm_gonderildi = False
+                try:
+                    res = telegramMesajGonder(user_id, mesaj_metni, panel_btn)
+                    if res and res.get("ok"):
+                        dm_gonderildi = True
+                except Exception:
+                    dm_gonderildi = False
+
+                if dm_gonderildi:
+                    grup_klavye = {
+                        "inline_keyboard": [
+                            [{"text": "📩 Özel Mesajınıza Git", "url": f"tg://user?id={user_id}"}],
+                            [{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]
+                        ]
+                    }
+                    telegramMesajGonder(
+                        chat_id,
+                        f"🔒 <b>Canlı Finans Paneli Bağlantısı:</b>\n"
+                        f"<i>Sayın <b>{kullanici_bilgi}</b>, şirket finansal gizliliği gereği güvenli panel giriş linkiniz size <b>özel mesaj (DM)</b> olarak iletilmiştir.</i>",
+                        grup_klavye
+                    )
+                else:
+                    telegramMesajGonder(chat_id, mesaj_metni, panel_btn)
         elif ana_komut == "/dashboard":
             islemi_analiz_bildirimiyle_yap(chat_id, cfo_dashboard_raporu_uret, goster_bildirim=True, islem_tipi="kasa")
         elif ana_komut in ["/panellink", "/panelurl", "/panellinki"]:
@@ -8631,10 +8808,11 @@ def _process_telegram_update_core(update: dict):
                 return
             p_args = text.split()[1:]
             if not p_args:
-                cur = panel_linki_uret()
+                cur = app_state.get("WEB_APP_URL", WEB_APP_URL).strip().rstrip("/")
                 telegramMesajGonder(
                     chat_id,
-                    f"🌐 <b>Mevcut Canlı Panel Linki:</b>\n{cur}\n\n"
+                    f"🌐 <b>Mevcut Canlı Panel Sunucu Adresi:</b>\n<code>{cur}</code>\n\n"
+                    f"🔒 <i>Yöneticilere özel giriş linki almak için /panel yazınız.</i>\n"
                     f"💡 Yeni link tanımlamak için: <code>/panellink https://yeni-linkiniz.code.run</code>"
                 )
                 return
@@ -12043,11 +12221,7 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
         if data_bytes:
             self.wfile.write(data_bytes)
 
-    def _check_auth(self, parsed_url, token_secret=None):
-        if token_secret is None:
-            token_secret = DASHBOARD_AUTH_TOKEN
-        if not token_secret:
-            return False
+    def _extract_req_token(self, parsed_url) -> str:
         query_params = urllib.parse.parse_qs(parsed_url.query)
         req_token = query_params.get("token", [""])[0] or self.headers.get("X-Dashboard-Token", "") or self.headers.get("X-Webhook-Token", "")
         if not req_token and "Authorization" in self.headers:
@@ -12062,8 +12236,31 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                     req_token = cookies["dashboard_token"].value
             except Exception:
                 pass
+        return req_token.strip() if req_token else ""
+
+    def _check_auth(self, parsed_url, token_secret=None):
+        req_token = self._extract_req_token(parsed_url)
+        if not req_token:
+            return False
+
         import hmac
-        return hmac.compare_digest(req_token, token_secret) if (req_token and token_secret) else False
+        # Özel webhook/secret kontrolü
+        if token_secret is not None:
+            if hmac.compare_digest(req_token, token_secret):
+                return True
+            if token_secret != DASHBOARD_AUTH_TOKEN:
+                return False
+
+        # 1. Dinamik imzalı yetkili oturum token'ı kontrolü
+        is_valid, _ = verify_dashboard_session_token(req_token)
+        if is_valid:
+            return True
+
+        # 2. Statik DASHBOARD_AUTH_TOKEN fallback kontrolü
+        if DASHBOARD_AUTH_TOKEN and hmac.compare_digest(req_token, DASHBOARD_AUTH_TOKEN):
+            return True
+
+        return False
 
     def do_OPTIONS(self):
         self._send_response_data(200, "text/plain", b"")
@@ -12149,7 +12346,7 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
             return
 
         elif parsed.path == "/api/sheets_list":
-            if not self._check_auth(parsed, DASHBOARD_AUTH_TOKEN):
+            if not self._check_auth(parsed):
                 self._send_response_data(401, "application/json; charset=utf-8", json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
                 return
 
@@ -12182,7 +12379,7 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
             return
 
         elif parsed.path == "/api/exchange_rate":
-            if not self._check_auth(parsed, DASHBOARD_AUTH_TOKEN):
+            if not self._check_auth(parsed):
                 self._send_response_data(401, "application/json; charset=utf-8", json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
                 return
 
@@ -12196,7 +12393,7 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
             return
 
         elif parsed.path == "/api/rates":
-            if not self._check_auth(parsed, DASHBOARD_AUTH_TOKEN):
+            if not self._check_auth(parsed):
                 self._send_response_data(401, "application/json; charset=utf-8", json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
                 return
 
@@ -12206,7 +12403,7 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
             return
 
         elif parsed.path == "/api/stream":
-            if not self._check_auth(parsed, DASHBOARD_AUTH_TOKEN):
+            if not self._check_auth(parsed):
                 self._send_response_data(401, "application/json; charset=utf-8", json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
                 return
 
@@ -12274,7 +12471,7 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                     _sse_clients.discard(client_q)
 
         elif parsed.path == "/api/dashboard":
-            if not self._check_auth(parsed, DASHBOARD_AUTH_TOKEN):
+            if not self._check_auth(parsed):
                 self._send_response_data(401, "application/json; charset=utf-8", json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
                 return
 
@@ -12315,7 +12512,7 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                 err_data = json.dumps({"error": "Veriler yüklenirken sunucu hatası oluştu."}).encode("utf-8")
                 self._send_response_data(500, "application/json; charset=utf-8", err_data)
         else:
-            if DASHBOARD_AUTH_TOKEN and not self._check_auth(parsed, DASHBOARD_AUTH_TOKEN):
+            if not self._check_auth(parsed):
                 unauth_html = """<!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -12376,8 +12573,9 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
             except Exception as e_rates:
                 print(f"Sunucu tarafı ilk kur hazırlama uyarısı: {e_rates}")
 
+            active_token = self._extract_req_token(parsed) or DASHBOARD_AUTH_TOKEN or ""
             html_to_send = DASHBOARD_HTML \
-                .replace("{{DASHBOARD_TOKEN}}", DASHBOARD_AUTH_TOKEN or "") \
+                .replace("{{DASHBOARD_TOKEN}}", active_token) \
                 .replace("{{USDT_RATE}}", rate_str) \
                 .replace("{{INITIAL_DATA}}", initial_data_json) \
                 .replace("{{INITIAL_RATES}}", initial_rates_json)
@@ -12387,8 +12585,8 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                 "Pragma": "no-cache",
                 "Expires": "0"
             }
-            if DASHBOARD_AUTH_TOKEN:
-                extra_h["Set-Cookie"] = f"dashboard_token={DASHBOARD_AUTH_TOKEN}; Path=/; SameSite=Lax; Max-Age=31536000; HttpOnly"
+            if active_token:
+                extra_h["Set-Cookie"] = f"dashboard_token={active_token}; Path=/; SameSite=Lax; Max-Age=86400; HttpOnly"
 
             self._send_response_data(200, "text/html; charset=utf-8", html_to_send.encode("utf-8"), extra_headers=extra_h)
 
