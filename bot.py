@@ -10432,6 +10432,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             font-size: 12px;
             color: #cbd5e1;
             padding-top: 8px;
+        }
+
         /* ==================== 1. TELEGRAM'A İLET BUTONU ==================== */
         .control-btn.telegram-btn {
             background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
@@ -10649,24 +10651,29 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         .donut-content-layout {
             display: flex;
             align-items: center;
-            justify-content: space-around;
+            justify-content: center;
             flex-wrap: wrap;
             gap: 20px;
-            margin-top: 14px;
+            margin-top: 10px;
         }
         .donut-chart-wrapper {
             position: relative;
-            width: 190px;
-            height: 190px;
+            width: 145px;
+            height: 145px;
+            max-width: 145px;
+            max-height: 145px;
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
+            margin: 0 auto;
         }
         .donut-svg {
-            width: 100%;
-            height: 100%;
-            transform: rotate(0deg);
+            width: 145px;
+            height: 145px;
+            max-width: 100%;
+            max-height: 100%;
+            display: block;
         }
         .donut-center-info {
             position: absolute;
@@ -10676,17 +10683,17 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            max-width: 110px;
+            max-width: 90px;
         }
         .donut-center-label {
-            font-size: 10px;
+            font-size: 9px;
             font-weight: 600;
             color: #94a3b8;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
         .donut-center-val {
-            font-size: 13.5px;
+            font-size: 11.5px;
             font-weight: 800;
             color: #ffffff;
             margin-top: 2px;
@@ -10694,17 +10701,17 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         }
         .donut-legend-list {
             flex: 1;
-            min-width: 180px;
+            min-width: 190px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 6px;
         }
         .donut-leg-row {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 8px 12px;
-            border-radius: 10px;
+            padding: 6px 10px;
+            border-radius: 8px;
             background: rgba(15, 23, 42, 0.6);
             border: 1px solid rgba(255, 255, 255, 0.05);
             transition: all 0.2s ease;
@@ -10881,6 +10888,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             padding: 20px;
             text-align: center;
             font-size: 12px;
+        }
+
         /* ==================== 5. WHATSAPP PAYLAŞIM BUTONU ==================== */
         .modal-whatsapp-btn {
             flex: 1;
@@ -11106,11 +11115,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             margin-bottom: 8px;
         }
         .qa-type-btn {
-            background: rgba(30, 41, 59, 0.7);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(22, 33, 56, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             color: #cbd5e1;
             padding: 8px 10px;
-            border-radius: 8px;
+            border-radius: 9px;
             font-size: 11.5px;
             font-weight: 700;
             cursor: pointer;
@@ -11121,75 +11130,132 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             gap: 6px;
         }
         .qa-type-btn:hover {
-            background: rgba(51, 65, 85, 0.9);
+            background: rgba(30, 48, 80, 0.95);
             color: #ffffff;
             border-color: rgba(255, 255, 255, 0.25);
         }
         .qa-type-btn.active.type-kasa {
-            background: linear-gradient(135deg, rgba(16, 185, 129, 0.35), rgba(5, 150, 105, 0.45));
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(5, 150, 105, 0.45));
             border-color: #10b981;
             color: #34d399;
             box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
         }
         .qa-type-btn.active.type-odenen {
-            background: linear-gradient(135deg, rgba(239, 68, 68, 0.35), rgba(220, 38, 38, 0.45));
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(220, 38, 38, 0.45));
             border-color: #ef4444;
             color: #f87171;
             box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
         }
         .qa-type-btn.active.type-devir {
-            background: linear-gradient(135deg, rgba(56, 189, 248, 0.35), rgba(14, 165, 233, 0.45));
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.3), rgba(14, 165, 233, 0.45));
             border-color: #38bdf8;
             color: #7dd3fc;
             box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
         }
         .qa-type-btn.active.type-masraf {
-            background: linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(217, 119, 6, 0.45));
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(217, 119, 6, 0.45));
             border-color: #f59e0b;
             color: #fbbf24;
             box-shadow: 0 0 12px rgba(245, 158, 11, 0.3);
         }
         .qa-cari-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
             gap: 6px;
-            max-height: 180px;
+            max-height: 200px;
             overflow-y: auto;
-            padding: 6px;
-            background: rgba(15, 23, 42, 0.5);
+            padding: 8px;
+            background: rgba(11, 19, 38, 0.7);
             border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
+            border-radius: 12px;
         }
         .qa-cari-btn {
-            background: rgba(30, 41, 59, 0.85);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            color: #e2e8f0;
+            background: rgba(22, 33, 56, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f1f5f9;
             padding: 8px 10px;
-            border-radius: 8px;
+            border-radius: 9px;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 6px;
+        }
+        .qa-cari-btn:hover {
+            background: rgba(30, 48, 80, 0.95);
+            border-color: #38bdf8;
+            transform: translateY(-1px);
+        }
+        .qa-cari-btn.active {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.4), rgba(29, 78, 216, 0.6)) !important;
+            border-color: #60a5fa !important;
+            box-shadow: 0 0 14px rgba(59, 130, 246, 0.45);
+        }
+        .qa-cari-btn .qa-name {
+            font-size: 11.5px;
+            font-weight: 800;
+            color: #ffffff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .qa-cari-btn .qa-amt {
+            font-size: 10.5px;
+            font-weight: 700;
+            padding: 2px 5px;
+            border-radius: 5px;
+            white-space: nowrap;
+        }
+        .qa-cari-btn .qa-amt.pos {
+            color: #34d399;
+            background: rgba(16, 185, 129, 0.15);
+        }
+        .qa-cari-btn .qa-amt.neg {
+            color: #f87171;
+            background: rgba(239, 68, 68, 0.15);
+        }
+        .qa-cari-btn .qa-amt.notr {
+            color: #94a3b8;
+            background: rgba(148, 163, 184, 0.1);
+        }
+        /* Masraf Grid */
+        .qa-masraf-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
+            gap: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 8px;
+            background: rgba(11, 19, 38, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+        }
+        .qa-masraf-btn {
+            background: rgba(22, 33, 56, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f1f5f9;
+            padding: 8px 10px;
+            border-radius: 9px;
             font-size: 11.5px;
             font-weight: 700;
             cursor: pointer;
             transition: all 0.2s;
-            text-align: left;
             display: flex;
-            flex-direction: column;
-            gap: 2px;
+            align-items: center;
+            gap: 6px;
         }
-        .qa-cari-btn:hover {
-            background: rgba(51, 65, 85, 0.95);
-            border-color: #3b82f6;
+        .qa-masraf-btn:hover {
+            background: rgba(30, 48, 80, 0.95);
+            border-color: #fbbf24;
             transform: translateY(-1px);
         }
-        .qa-cari-btn.active {
-            background: linear-gradient(135deg, #1d4ed8, #2563eb) !important;
-            border-color: #60a5fa !important;
-            color: #ffffff !important;
-            box-shadow: 0 0 12px rgba(59, 130, 246, 0.5);
-        }
-        .qa-cari-btn .cari-sub-kalan {
-            font-size: 10px;
-            font-weight: 600;
-            opacity: 0.85;
+        .qa-masraf-btn.active {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(217, 119, 6, 0.5)) !important;
+            border-color: #f59e0b !important;
+            color: #fef08a !important;
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
         }
         .qa-preset-amounts {
             display: flex;
@@ -11198,18 +11264,18 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             margin-top: 6px;
         }
         .qa-preset-btn {
-            background: rgba(30, 41, 59, 0.8);
+            background: rgba(22, 33, 56, 0.85);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #94a3b8;
+            color: #cbd5e1;
             font-size: 11px;
             font-weight: 700;
-            padding: 4px 8px;
-            border-radius: 6px;
+            padding: 5px 9px;
+            border-radius: 7px;
             cursor: pointer;
             transition: all 0.15s;
         }
         .qa-preset-btn:hover {
-            background: #3b82f6;
+            background: #2563eb;
             color: #ffffff;
             border-color: #60a5fa;
         }
@@ -11510,7 +11576,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                     </div>
                     <div class="donut-content-layout">
                         <div class="donut-chart-wrapper">
-                            <svg id="asset-donut-svg" viewBox="0 0 240 240" class="donut-svg">
+                            <svg id="asset-donut-svg" viewBox="0 0 240 240" class="donut-svg" style="width:145px; height:145px; max-width:145px; max-height:145px;">
                                 <circle cx="120" cy="120" r="80" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="24" />
                             </svg>
                             <div class="donut-center-info">
@@ -11930,6 +11996,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                         <button type="button" id="qa-manual-toggle-btn" onclick="toggleManualTargetInput()" style="background:none; border:none; color:#60a5fa; font-size:11px; font-weight:600; cursor:pointer; text-decoration:underline;">
                             ➕ Listede Olmayan İsim Yaz
                         </button>
+                    </div>
+
+                    <!-- Hızlı Arama & Filtreleme -->
+                    <div style="margin-bottom:8px;">
+                        <input type="text" id="qa-filter-input" class="modal-quick-input" style="width:100%; padding:7px 12px; font-size:12px; border-radius:8px;" placeholder="🔍 Listede hızlı ara..." oninput="onQaFilterInput()">
                     </div>
 
                     <!-- Cari/Masraf Butonları Izgarası -->
@@ -12472,6 +12543,21 @@ _CFO Finans Yönetim Sistemi Tarafından Hazırlanmıştır._`;
         let selectedQaType = 'kasa';
         let selectedQaTarget = '';
 
+        function fmtCompact(n) {
+            const num = Number(n) || 0;
+            const abs = Math.abs(num);
+            const sym = (activeCurrency === 'USDT') ? '$' : '₺';
+            if (abs >= 1000000) {
+                return (num < 0 ? '-' : '+') + (abs / 1000000).toFixed(1).replace('.', ',') + 'M ' + sym;
+            } else if (abs >= 1000) {
+                return (num < 0 ? '-' : '+') + (abs / 1000).toFixed(0) + 'K ' + sym;
+            } else if (abs > 0.01) {
+                return (num < 0 ? '-' : '+') + abs.toFixed(0) + ' ' + sym;
+            } else {
+                return '0 ' + sym;
+            }
+        }
+
         function selectQuickActionType(type) {
             selectedQaType = type;
             const selEl = document.getElementById('qa-select-type');
@@ -12487,31 +12573,44 @@ _CFO Finans Yönetim Sistemi Tarafından Hazırlanmıştır._`;
 
             const labelEl = document.getElementById('qa-target-label');
             if (labelEl) {
-                if (type === 'kasa') labelEl.innerText = "2. KASA GİRİŞİ YAPILACAK CARİ (BUTONA DOKUNUN)";
-                else if (type === 'odenen') labelEl.innerText = "2. ÖDEME (KASA ÇIKIŞI) YAPILACAK CARİ (BUTONA DOKUNUN)";
-                else if (type === 'masraf') labelEl.innerText = "2. MASRAF KALEMİ (BUTONA DOKUNUN VEYA YAZIN)";
-                else if (type === 'devir') labelEl.innerText = "2. DEVİR EKLENECEK CARİ (BUTONA DOKUNUN)";
+                if (type === 'kasa') labelEl.innerText = "2. KASA GİRİŞİ YAPILACAK CARİ (DOKUNUN)";
+                else if (type === 'odenen') labelEl.innerText = "2. ÖDEME (ÇIKIŞ) YAPILACAK CARİ (DOKUNUN)";
+                else if (type === 'masraf') labelEl.innerText = "2. MASRAF KALEMİ (DOKUNUN VEYA YAZIN)";
+                else if (type === 'devir') labelEl.innerText = "2. DEVİR EKLENECEK CARİ (DOKUNUN)";
+            }
+
+            const fInp = document.getElementById('qa-filter-input');
+            if (fInp) {
+                fInp.placeholder = (type === 'masraf') ? "🔍 Masraf ara..." : "🔍 Listede cari ara...";
+                fInp.value = '';
             }
 
             renderQaButtons();
             updateSubmitButtonLabel();
         }
 
+        function onQaFilterInput() {
+            renderQaButtons();
+        }
+
         function renderQaButtons() {
             const grid = document.getElementById('qa-cari-button-grid');
             if (!grid) return;
 
+            const q = (document.getElementById('qa-filter-input') ? document.getElementById('qa-filter-input').value : '').trim().toLocaleLowerCase('tr');
+
             if (selectedQaType === 'masraf') {
-                const presets = [
+                grid.className = 'qa-masraf-grid';
+                let presets = [
                     { name: 'Yemek', icon: '🍽️' },
                     { name: 'Ofis', icon: '🏢' },
                     { name: 'Kira', icon: '🏠' },
                     { name: 'Yakıt', icon: '⛽' },
-                    { name: 'Mutfak & Çay', icon: '☕' },
-                    { name: 'Personel & Maaş', icon: '👥' },
-                    { name: 'Kargo & Lojistik', icon: '📦' },
-                    { name: 'Yazılım & Sunucu', icon: '💻' },
-                    { name: 'Muhasebe & Noter', icon: '📑' },
+                    { name: 'Çay & Mutfak', icon: '☕' },
+                    { name: 'Personel', icon: '👥' },
+                    { name: 'Kargo', icon: '📦' },
+                    { name: 'Sunucu & Web', icon: '💻' },
+                    { name: 'Noter', icon: '📑' },
                     { name: 'Genel Gider', icon: '📌' }
                 ];
 
@@ -12524,19 +12623,33 @@ _CFO Finans Yönetim Sistemi Tarafından Hazırlanmıştır._`;
                     });
                 }
 
+                if (q) {
+                    presets = presets.filter(p => p.name.toLocaleLowerCase('tr').includes(q));
+                }
+
+                if (presets.length === 0) {
+                    grid.innerHTML = '<div style="color:#94a3b8; font-size:12px; grid-column:1/-1; padding:10px; text-align:center;">Eşleşen masraf bulunamadı.</div>';
+                    return;
+                }
+
                 grid.innerHTML = presets.map(p => {
                     const isSelected = (selectedQaTarget && selectedQaTarget.toLocaleLowerCase('tr') === p.name.toLocaleLowerCase('tr'));
                     return `
-                        <button type="button" class="qa-cari-btn ${isSelected ? 'active' : ''}" onclick="selectQaTarget('${escapeHtml(p.name)}', this)">
-                            <span>${p.icon} <b>${escapeHtml(p.name)}</b></span>
-                            <span class="cari-sub-kalan" style="color:#fbbf24;">Masraf Kalemi</span>
+                        <button type="button" class="qa-masraf-btn ${isSelected ? 'active' : ''}" onclick="selectQaTarget('${escapeHtml(p.name)}', this)" title="${escapeHtml(p.name)}">
+                            <span>${p.icon}</span> <span>${escapeHtml(p.name)}</span>
                         </button>
                     `;
                 }).join('');
             } else {
-                const gruplar = (currentDashboardData && currentDashboardData.gruplar) || [];
+                grid.className = 'qa-cari-grid';
+                let gruplar = (currentDashboardData && currentDashboardData.gruplar) || [];
+
+                if (q) {
+                    gruplar = gruplar.filter(g => String(g.ad || '').toLocaleLowerCase('tr').includes(q));
+                }
+
                 if (gruplar.length === 0) {
-                    grid.innerHTML = '<div style="color:#94a3b8; font-size:12px; grid-column:1/-1; padding:10px; text-align:center;">Henüz kayıtlı cari grubu bulunmuyor.</div>';
+                    grid.innerHTML = '<div style="color:#94a3b8; font-size:12px; grid-column:1/-1; padding:10px; text-align:center;">Eşleşen cari kaydı bulunamadı.</div>';
                     return;
                 }
 
@@ -12544,13 +12657,13 @@ _CFO Finans Yönetim Sistemi Tarafından Hazırlanmıştır._`;
                     const isSelected = (selectedQaTarget && selectedQaTarget.toLocaleLowerCase('tr') === String(g.ad).toLocaleLowerCase('tr'));
                     const isNeg = (g.kalan < -0.01);
                     const isPos = (g.kalan > 0.01);
-                    const badgeColor = isNeg ? '#f87171' : (isPos ? '#34d399' : '#94a3b8');
-                    const badgeText = isNeg ? 'Borçlu: ' + fmt(g.kalan) : (isPos ? 'Alacaklı: ' + fmt(g.kalan) : 'Nötr: 0 ₺');
+                    const amtClass = isNeg ? 'neg' : (isPos ? 'pos' : 'notr');
+                    const amtText = fmtCompact(g.kalan);
 
                     return `
-                        <button type="button" class="qa-cari-btn ${isSelected ? 'active' : ''}" onclick="selectQaTarget('${escapeHtml(g.ad)}', this)">
-                            <span>🔹 <b>${escapeHtml(g.ad)}</b></span>
-                            <span class="cari-sub-kalan" style="color:${badgeColor};">${badgeText}</span>
+                        <button type="button" class="qa-cari-btn ${isSelected ? 'active' : ''}" onclick="selectQaTarget('${escapeHtml(g.ad)}', this)" title="${escapeHtml(g.ad)} (Bakiye: ${fmt(g.kalan)})">
+                            <span class="qa-name">${escapeHtml(g.ad)}</span>
+                            <span class="qa-amt ${amtClass}">${amtText}</span>
                         </button>
                     `;
                 }).join('');
@@ -12573,7 +12686,7 @@ _CFO Finans Yönetim Sistemi Tarafından Hazırlanmıştır._`;
 
             const grid = document.getElementById('qa-cari-button-grid');
             if (grid) {
-                grid.querySelectorAll('.qa-cari-btn').forEach(b => b.classList.remove('active'));
+                grid.querySelectorAll('.qa-cari-btn, .qa-masraf-btn').forEach(b => b.classList.remove('active'));
             }
             if (btnEl) btnEl.classList.add('active');
 
@@ -12605,7 +12718,7 @@ _CFO Finans Yönetim Sistemi Tarafından Hazırlanmıştır._`;
 
             const grid = document.getElementById('qa-cari-button-grid');
             if (grid) {
-                grid.querySelectorAll('.qa-cari-btn').forEach(b => b.classList.remove('active'));
+                grid.querySelectorAll('.qa-cari-btn, .qa-masraf-btn').forEach(b => b.classList.remove('active'));
             }
 
             const bEl = document.getElementById('qa-selected-badge');
@@ -12677,6 +12790,9 @@ _CFO Finans Yönetim Sistemi Tarafından Hazırlanmıştır._`;
 
             const amtInp = document.getElementById('qa-amount-input');
             if (amtInp) amtInp.value = '';
+
+            const fInp = document.getElementById('qa-filter-input');
+            if (fInp) fInp.value = '';
 
             const manBox = document.getElementById('qa-manual-target-box');
             if (manBox) manBox.style.display = 'none';
