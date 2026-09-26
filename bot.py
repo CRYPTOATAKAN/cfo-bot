@@ -83,7 +83,29 @@ _load_dotenv_if_exists()
 
 # --- AYARLAR & SABİTLER ---
 _DEFAULT_BOT_TOKEN_ENC = "ODYyOTc1NjQ2MjpBQUVVTVpYbU1zcXNhSGtta0E5SlBlTC1FSVd2dkZGUXNHcw=="
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or base64.b64decode(_DEFAULT_BOT_TOKEN_ENC).decode("utf-8")
+
+def _resolve_working_telegram_token() -> str:
+    """Aktif ve çalışan Telegram tokenını belirler. Eski/iptal edilmiş tokenları otomatik eleyip çalışan tokene geçer."""
+    candidates = []
+    env_t = (os.environ.get("TELEGRAM_BOT_TOKEN") or "").strip()
+    if env_t:
+        candidates.append(env_t)
+    default_t = base64.b64decode(_DEFAULT_BOT_TOKEN_ENC).decode("utf-8")
+    if default_t not in candidates:
+        candidates.append(default_t)
+
+    for tok in candidates:
+        try:
+            req = urllib.request.Request(f"https://api.telegram.org/bot{tok}/getMe")
+            with urllib.request.urlopen(req, timeout=3) as r:
+                res = json.loads(r.read().decode())
+                if res.get("ok"):
+                    return tok
+        except Exception:
+            continue
+    return default_t
+
+TELEGRAM_TOKEN = _resolve_working_telegram_token()
 KURUCU_ID = int(os.environ.get("KURUCU_ID", "8395730761"))
 SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID", "1Gim_-YSb_TtODclXiZ0hnx2WDsc-RCW9CD51LeVNOaI")
 WEB_APP_URL = os.environ.get("WEB_APP_URL", "https://site--cfo-bot-servis--drx8qvjbw8cw.code.run")
@@ -8655,8 +8677,11 @@ def _process_telegram_update_core(update: dict):
         # Grup ortamında @başka_bot'a gelen komutları yok say
         if "@" in ham_komut:
             bot_mention = ham_komut.split("@", 1)[1].lower()
-            # Kendi bot username'imiz değilse komutu işleme (başka bota ait)
-            if bot_mention and bot_mention not in ["cfo_bot", "cfobot", "cfobotdev", ""]:
+            kendi_bot_isimleri = {
+                "cfo_bot", "cfobot", "cfobotdev", "cryptoasistanim_bot",
+                (app_state.get("BOT_USERNAME") or "").lower(), ""
+            }
+            if bot_mention and bot_mention not in kendi_bot_isimleri:
                 return
         ana_komut = tr_lower(ham_komut.split("@")[0])
 
