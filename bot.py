@@ -6,6 +6,8 @@ import json
 import time
 import base64
 import uuid
+import ast
+import operator
 import random
 import datetime
 import threading
@@ -3419,31 +3421,41 @@ def kurRaporuUret_impl() -> str:
     
     b = rates.get("binance")
     if b and b.get("last"):
-        yanit += f"🟡 <b>BİNANCE USDT/TRY</b>\n💵 Anlık Kur: {f_tl(b['last'])}\n🔺 24saat En Yüksek: {f_tl(b['high'])}\n🔻 24saat En Düşük: {f_tl(b['low'])}\n\n"
+        b_high = b.get("high") or b.get("last") or 0.0
+        b_low = b.get("low") or b.get("last") or 0.0
+        yanit += f"🟡 <b>BİNANCE USDT/TRY</b>\n💵 Anlık Kur: {f_tl(b['last'])}\n🔺 24saat En Yüksek: {f_tl(b_high)}\n🔻 24saat En Düşük: {f_tl(b_low)}\n\n"
     else:
         yanit += "🟡 <b>BİNANCE USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
         
     p = rates.get("paribu")
     if p and p.get("last"):
-        yanit += f"🔵 <b>PARİBU USDT/TRY</b>\n💵 Anlık Kur: {f_tl(p['last'])}\n🔺 24saat En Yüksek: {f_tl(p['high'])}\n🔻 24saat En Düşük: {f_tl(p['low'])}\n\n"
+        p_high = p.get("high") or p.get("last") or 0.0
+        p_low = p.get("low") or p.get("last") or 0.0
+        yanit += f"🔵 <b>PARİBU USDT/TRY</b>\n💵 Anlık Kur: {f_tl(p['last'])}\n🔺 24saat En Yüksek: {f_tl(p_high)}\n🔻 24saat En Düşük: {f_tl(p_low)}\n\n"
     else:
         yanit += "🔵 <b>PARİBU USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
         
     bt = rates.get("btcturk")
     if bt and bt.get("last"):
-        yanit += f"🟢 <b>BTCTÜRK USDT/TRY</b>\n💵 Anlık Kur: {f_tl(bt['last'])}\n🔺 24saat En Yüksek: {f_tl(bt['high'])}\n🔻 24saat En Düşük: {f_tl(bt['low'])}\n\n"
+        bt_high = bt.get("high") or bt.get("last") or 0.0
+        bt_low = bt.get("low") or bt.get("last") or 0.0
+        yanit += f"🟢 <b>BTCTÜRK USDT/TRY</b>\n💵 Anlık Kur: {f_tl(bt['last'])}\n🔺 24saat En Yüksek: {f_tl(bt_high)}\n🔻 24saat En Düşük: {f_tl(bt_low)}\n\n"
     else:
         yanit += "🟢 <b>BTCTÜRK USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
         
     wb = rates.get("whitebit")
     if wb and wb.get("last"):
-        yanit += f"⚪ <b>WHITEBIT USDT/TRY</b>\n💵 Anlık Kur: {f_tl(wb['last'])}\n🔺 24saat En Yüksek: {f_tl(wb['high'])}\n🔻 24saat En Düşük: {f_tl(wb['low'])}\n\n"
+        wb_high = wb.get("high") or wb.get("last") or 0.0
+        wb_low = wb.get("low") or wb.get("last") or 0.0
+        yanit += f"⚪ <b>WHITEBIT USDT/TRY</b>\n💵 Anlık Kur: {f_tl(wb['last'])}\n🔺 24saat En Yüksek: {f_tl(wb_high)}\n🔻 24saat En Düşük: {f_tl(wb_low)}\n\n"
     else:
         yanit += "⚪ <b>WHITEBIT USDT/TRY</b>\n⚠️ Veri çekilemedi.\n\n"
         
     ok = rates.get("okx")
     if ok and ok.get("last"):
-        yanit += f"⚫ <b>OKX USDT/TRY</b>\n💵 Anlık Kur: {f_tl(ok['last'])}\n🔺 24saat En Yüksek: {f_tl(ok['high'])}\n🔻 24saat En Düşük: {f_tl(ok['low'])}\n\n"
+        ok_high = ok.get("high") or ok.get("last") or 0.0
+        ok_low = ok.get("low") or ok.get("last") or 0.0
+        yanit += f"⚫ <b>OKX USDT/TRY</b>\n💵 Anlık Kur: {f_tl(ok['last'])}\n🔺 24saat En Yüksek: {f_tl(ok_high)}\n🔻 24saat En Düşük: {f_tl(ok_low)}\n\n"
         
     return yanit.strip()
 
@@ -4336,77 +4348,157 @@ def cuzdanQrUret_impl(chat_id: int, komut_metni: str):
         if not res2.get("ok"):
             telegramMesajGonder(chat_id, caption, klavye)
 
-def hesapMakinesi_impl(orijinalMetin: str) -> str:
-    args = orijinalMetin.strip().split()
-    if len(args) < 4:
-        return "⚠️ <b>Hatalı Kullanım!</b>\nFormat: <code>/hesap GRUPADI ORAN KUR</code>\nÖrnek: <code>/hesap SACİD 2 48.00</code>"
-    kurStr = args.pop()
-    komisyonStr = args.pop()
-    arananGrup = " ".join(args[1:]).strip()
-    hedef_norm = normalize_text(arananGrup)
-    
-    kur = float(kurStr.replace(",", "."))
-    komisyonOrani = float(komisyonStr.replace(",", "."))
-    
-    sh = get_spreadsheet()
-    sayfa = get_active_daily_sheet(sh)
-    veriler = get_sheet_values_fast(sayfa)
-    
-    grupBulundu = False
-    devirBorc = 0.0
-    guncelKasa = 0.0
-    gercekGrupAdi = arananGrup
-    
-    for row in veriler[1:]:
-        if len(row) >= 2 and normalize_text(row[1]) == hedef_norm:
-            gercekGrupAdi = row[1]
-            devirBorc = guvenliSayi(row[2]) if len(row) > 2 else 0.0
-            guncelKasa = guvenliSayi(row[3]) if len(row) > 3 else 0.0
-            grupBulundu = True
-            break
-            
-    if not grupBulundu:
-        return f"⚠️ <b>Grup Bulunamadı:</b> Excel tablosunda <code>{arananGrup}</code> bulunamadı."
-        
-    komisyonKesintisi = guncelKasa * (komisyonOrani / 100.0)
-    netKasaTl = guncelKasa - komisyonKesintisi
-    usdtKarsiligi = netKasaTl / kur if kur > 0 else 0
-    duzUsdt = int(round(usdtKarsiligi))
-    
-    islemZamani = suankiZamaniAl().strftime("%d.%m.%Y | %H:%M")
-    mesaj = (
-        f"👑 <b>HESAP KESİMİ & BAKİYE RAPORU</b>\n\n"
-        f"🏛️ <b>Cari Hesap:</b> {gercekGrupAdi.upper()}\n"
-        f"⏰ <b>Rapor Zamanı:</b> {islemZamani}\n\n"
-    )
-    if devirBorc != 0:
-        mesaj += (
-            f"⚠️ <b>GEÇMİŞTEN KALAN BORÇ HATIRLATMASI</b>\n"
-            f"🔻 Devir/Borç Bakiyesi: {paraFormatla(devirBorc)}\n\n"
+def guvenli_matematik_hesapla(expr: str) -> Optional[float]:
+    """Kullanıcının gönderdiği matematiksel ifadeyi (+, -, *, /, %, parantez) AST ile güvenle çözer."""
+    try:
+        clean_expr = expr.strip()
+        clean_expr = clean_expr.replace("x", "*").replace("X", "*").replace("÷", "/").replace(":", "/")
+        clean_expr = clean_expr.replace("%", "* 0.01 *")
+        if "," in clean_expr and "." in clean_expr:
+            clean_expr = clean_expr.replace(".", "").replace(",", ".")
+        elif "," in clean_expr:
+            clean_expr = clean_expr.replace(",", ".")
+
+        clean_expr = re.sub(r'\s+', '', clean_expr)
+        clean_expr = clean_expr.rstrip("*").rstrip("+")
+
+        _ops = {
+            ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul,
+            ast.Div: operator.truediv, ast.FloorDiv: operator.floordiv,
+            ast.Mod: operator.mod, ast.Pow: operator.pow, ast.USub: operator.neg, ast.UAdd: operator.pos
+        }
+
+        def _eval_node(node):
+            if isinstance(node, ast.Constant):
+                if isinstance(node.value, (int, float)):
+                    return float(node.value)
+                raise ValueError
+            elif hasattr(ast, "Num") and isinstance(node, ast.Num):
+                return float(node.n)
+            elif isinstance(node, ast.BinOp):
+                if type(node.op) in _ops:
+                    left = _eval_node(node.left)
+                    right = _eval_node(node.right)
+                    return _ops[type(node.op)](left, right)
+                raise ValueError
+            elif isinstance(node, ast.UnaryOp):
+                if type(node.op) in _ops:
+                    operand = _eval_node(node.operand)
+                    return _ops[type(node.op)](operand)
+                raise ValueError
+            raise ValueError
+
+        tree = ast.parse(clean_expr, mode="eval")
+        res = _eval_node(tree.body)
+        return float(res)
+    except Exception:
+        return None
+
+def hesapMakinesi_impl(orijinalMetin: str):
+    ham_girdi = re.sub(r'^/hesap(?:@\w+)?\s*', '', orijinalMetin.strip(), flags=re.IGNORECASE).strip()
+    if not ham_girdi:
+        return (
+            "🧮 <b>HESAP MAKİNESİ & CARİ HESAP KESİMİ</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📌 <b>1. Hızlı Matematik Hesaplama:</b>\n"
+            "• <code>/hesap 1000 * 1.2</code>\n"
+            "• <code>/hesap 50000 / 34.25</code>\n"
+            "• <code>/hesap (150000 + 25000) * 0.02</code>\n\n"
+            "📌 <b>2. Cari Hesap Kesimi:</b>\n"
+            "Format: <code>/hesap [Grup Adı] [Komisyon %] [Kur]</code>\n"
+            "Örnek: <code>/hesap SACİD 2 48.00</code>"
         )
-    mesaj += (
-        f"💰 <b>Mevcut Kasa:</b> {paraFormatla(guncelKasa)}\n"
-        f"✂️ <b>Hizmet Bedeli (%{komisyonOrani}):</b> {paraFormatla(komisyonKesintisi)}\n"
-        f"💎 <b>Net Hak Edilen (TL):</b> {paraFormatla(netKasaTl)}\n\n"
-        f"📊 <b>Uygulanan Kur:</b> {kur}\n"
-        f"🌐 <b>ÖDENECEK TETHER (USDT):</b> <b>{rakamFormatla(duzUsdt)} USDT</b>"
+
+    # 1. Önce matematik ifadesi mi kontrol et
+    math_val = guvenli_matematik_hesapla(ham_girdi)
+    if math_val is not None:
+        sonuc_str = f"{math_val:,.4f}".rstrip('0').rstrip('.')
+        return (
+            f"🧮 <b>HESAPLAMA SONUCU</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📝 <b>İşlem:</b> <code>{ham_girdi}</code>\n"
+            f"📊 <b>Sonuç:</b> <code>{sonuc_str}</code>\n"
+            f"💰 <b>Formatlı:</b> <code>{paraFormatla(math_val)}</code>"
+        )
+
+    # 2. Cari Hesap Kesimi: /hesap SACİD 2 48.00
+    args = orijinalMetin.strip().split()
+    if len(args) >= 4:
+        try:
+            kurStr = args[-1]
+            komisyonStr = args[-2]
+            kur = float(kurStr.replace(",", "."))
+            komisyonOrani = float(komisyonStr.replace(",", "."))
+            arananGrup = " ".join(args[1:-2]).strip()
+            hedef_norm = normalize_text(arananGrup)
+
+            sh = get_spreadsheet()
+            sayfa = get_active_daily_sheet(sh)
+            veriler = get_sheet_values_fast(sayfa)
+
+            grupBulundu = False
+            devirBorc = 0.0
+            guncelKasa = 0.0
+            gercekGrupAdi = arananGrup
+
+            for row in veriler[1:]:
+                if len(row) >= 2 and normalize_text(row[1]) == hedef_norm:
+                    gercekGrupAdi = row[1]
+                    devirBorc = guvenliSayi(row[2]) if len(row) > 2 else 0.0
+                    guncelKasa = guvenliSayi(row[3]) if len(row) > 3 else 0.0
+                    grupBulundu = True
+                    break
+
+            if not grupBulundu:
+                return f"⚠️ <b>Grup Bulunamadı:</b> Excel tablosunda <code>{arananGrup}</code> bulunamadı."
+
+            komisyonKesintisi = guncelKasa * (komisyonOrani / 100.0)
+            netKasaTl = guncelKasa - komisyonKesintisi
+            usdtKarsiligi = netKasaTl / kur if kur > 0 else 0
+            duzUsdt = int(round(usdtKarsiligi))
+
+            islemZamani = suankiZamaniAl().strftime("%d.%m.%Y | %H:%M")
+            mesaj = (
+                f"👑 <b>HESAP KESİMİ & BAKİYE RAPORU</b>\n\n"
+                f"🏛️ <b>Cari Hesap:</b> {gercekGrupAdi.upper()}\n"
+                f"⏰ <b>Rapor Zamanı:</b> {islemZamani}\n\n"
+            )
+            if devirBorc != 0:
+                mesaj += (
+                    f"⚠️ <b>GEÇMİŞTEN KALAN BORÇ HATIRLATMASI</b>\n"
+                    f"🔻 Devir/Borç Bakiyesi: {paraFormatla(devirBorc)}\n\n"
+                )
+            mesaj += (
+                f"💰 <b>Mevcut Kasa:</b> {paraFormatla(guncelKasa)}\n"
+                f"✂️ <b>Hizmet Bedeli (%{komisyonOrani}):</b> {paraFormatla(komisyonKesintisi)}\n"
+                f"💎 <b>Net Hak Edilen (TL):</b> {paraFormatla(netKasaTl)}\n\n"
+                f"📊 <b>Uygulanan Kur:</b> {kur:,.2f} ₺\n"
+                f"🌐 <b>ÖDENECEK TETHER (USDT):</b> <b>{rakamFormatla(duzUsdt)} USDT</b>"
+            )
+
+            _prune_taslaklar()
+            draft_id = f"r_{int(time.time())}_{random.randint(100, 999)}"
+            app_state.setdefault("RAPOR_TASLAKLARI", {})[draft_id] = {
+                "grup": gercekGrupAdi,
+                "metin": mesaj,
+                "created_at": time.time()
+            }
+
+            klavye = {
+                "inline_keyboard": [
+                    [{"text": f"📤 {gercekGrupAdi.upper()} Grubuna İlet", "callback_data": f"rapor_ilet_{draft_id}"}],
+                    [{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]
+                ]
+            }
+            return mesaj, klavye
+        except Exception:
+            pass
+
+    return (
+        "⚠️ <b>Hatalı Kullanım!</b>\n\n"
+        "📌 <b>Matematik için:</b> <code>/hesap 1000 * 1.2</code> veya <code>/hesap 50000 / 34.25</code>\n"
+        "📌 <b>Cari hesap kesimi için:</b> <code>/hesap SACİD 2 48.00</code>"
     )
-
-    _prune_taslaklar()
-    draft_id = f"r_{int(time.time())}_{random.randint(100, 999)}"
-    app_state.setdefault("RAPOR_TASLAKLARI", {})[draft_id] = {
-        "grup": gercekGrupAdi,
-        "metin": mesaj,
-        "created_at": time.time()
-    }
-
-    klavye = {
-        "inline_keyboard": [
-            [{"text": f"📤 {gercekGrupAdi.upper()} Grubuna İlet", "callback_data": f"rapor_ilet_{draft_id}"}],
-            [{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]
-        ]
-    }
-    return mesaj, klavye
 
 # --- TÜRKİYE BANKA KODLARI LİSTESİ (TCMB) ---
 BANKA_KODLARI = {
@@ -6404,7 +6496,7 @@ def metinCevir_impl(gelenMetin: str) -> str:
             etiket = "🇹🇷 Türkçe ➔ 🇺🇸 İngilizce"
         return f"🌐 <b>YAPAY ZEKA ÇEVİRİSİ</b>\n━━━━━━━━━━━━\n\n📝 <b>Orijinal Metin:</b>\n<i>{cevrilecek}</i>\n\n🎯 <b>{etiket}:</b>\n<code>{son_ceviri}</code>"
     except Exception as e:
-        return f"❌ <b>Çeviri Hatası:</b> {e}"
+        return f"⚠️ <b>Çeviri Servisi Uyarısı:</b> Çeviri servisine şu anda ulaşılamıyor ({e}). Lütfen kısa bir süre sonra tekrar deneyiniz."
 
 # --- YENİ GÜN DEVİR İŞLEMİ (GRUP BAZLI G ➔ C AKTARIMI & D, E SIFIRLAMA) ---
 def yenigun_baslat_mesaji():
