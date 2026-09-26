@@ -10881,7 +10881,221 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             padding: 20px;
             text-align: center;
             font-size: 12px;
-            color: #94a3b8;
+        /* ==================== 5. WHATSAPP PAYLAŞIM BUTONU ==================== */
+        .modal-whatsapp-btn {
+            flex: 1;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: 1px solid rgba(52, 211, 153, 0.4);
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 700;
+            padding: 12px 18px;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 18px rgba(16, 185, 129, 0.3);
+            transition: all 0.25s ease;
+        }
+        .modal-whatsapp-btn:hover {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5);
+        }
+
+        /* ==================== 6. CFO AI YÖNETİCİ BRİFİNGİ ==================== */
+        .cfo-ai-card {
+            background: rgba(15, 23, 42, 0.82);
+            border: 1px solid rgba(168, 85, 247, 0.35);
+            backdrop-filter: blur(14px);
+            border-radius: 16px;
+            padding: 18px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(168, 85, 247, 0.15), 0 0 15px rgba(56, 189, 248, 0.1);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .cfo-ai-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 3px;
+            background: linear-gradient(90deg, #a855f7, #6366f1, #38bdf8, #10b981);
+        }
+        .cfo-ai-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .cfo-ai-title-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .ai-sparkle-icon {
+            font-size: 24px;
+            padding: 8px;
+            border-radius: 12px;
+            background: rgba(168, 85, 247, 0.15);
+            border: 1px solid rgba(168, 85, 247, 0.35);
+            animation: pulseDot 2s infinite;
+        }
+        .cfo-ai-badge {
+            font-size: 10px;
+            font-weight: 800;
+            color: #c084fc;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+        .cfo-ai-heading {
+            font-size: 14.5px;
+            font-weight: 800;
+            color: #ffffff;
+            margin: 2px 0 0 0;
+            letter-spacing: -0.3px;
+        }
+        .ai-refresh-btn {
+            background: rgba(168, 85, 247, 0.15);
+            border: 1px solid rgba(168, 85, 247, 0.4);
+            color: #e9d5ff;
+            font-size: 11.5px;
+            font-weight: 700;
+            padding: 6px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+        .ai-refresh-btn:hover {
+            background: rgba(168, 85, 247, 0.3);
+            border-color: #c084fc;
+            color: #ffffff;
+            transform: translateY(-1px);
+        }
+        .cfo-ai-body {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .ai-insight-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            background: rgba(30, 41, 59, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 10px 14px;
+            transition: all 0.2s ease;
+        }
+        .ai-insight-row:hover {
+            background: rgba(30, 41, 59, 0.7);
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+        .ai-insight-bullet {
+            font-size: 16px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+        .ai-insight-text {
+            font-size: 12.5px;
+            color: #e2e8f0;
+            line-height: 1.5;
+            font-weight: 500;
+        }
+        .ai-insight-text b {
+            color: #38bdf8;
+        }
+
+        /* ==================== 7. HIZLI İŞLEM PANELİ & MODAL ==================== */
+        .control-btn.quick-action-btn {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+            border: 1px solid rgba(251, 191, 36, 0.45) !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 16px rgba(245, 158, 11, 0.35);
+        }
+        .control-btn.quick-action-btn:hover {
+            background: linear-gradient(135deg, #d97706 0%, #b45309 100%) !important;
+            border-color: rgba(251, 191, 36, 0.8) !important;
+            box-shadow: 0 0 24px rgba(251, 191, 36, 0.6);
+            transform: translateY(-2px) scale(1.02);
+        }
+        .modal-quick-box {
+            background: rgba(15, 23, 42, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 12px 14px;
+            margin-top: 14px;
+        }
+        .modal-quick-title {
+            font-size: 12px;
+            font-weight: 800;
+            color: #cbd5e1;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .modal-quick-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .modal-quick-input {
+            flex: 1;
+            min-width: 140px;
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #ffffff;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            outline: none;
+        }
+        .modal-quick-input:focus {
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.2);
+        }
+        .btn-quick-kasa {
+            background: #10b981;
+            border: none;
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-quick-kasa:hover {
+            background: #059669;
+            transform: scale(1.03);
+        }
+        .btn-quick-odenen {
+            background: #ef4444;
+            border: none;
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-quick-odenen:hover {
+            background: #dc2626;
+            transform: scale(1.03);
         }
 
         /* YAZDIRMA & PDF ŞABLONU */
@@ -10962,6 +11176,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                     <span>✈️</span> <span id="telegram-btn-text">Telegram'a İlet</span>
                 </button>
 
+                <!-- 6. HIZLI İŞLEM BUTONU -->
+                <button id="quick-action-header-btn" class="control-btn quick-action-btn" onclick="openQuickActionModal()" title="Hızlı Kasa, Ödeme veya Masraf Ekle">
+                    <span>⚡</span> <span>Hızlı İşlem</span>
+                </button>
+
                 <!-- MANUEL YENİLE -->
                 <button class="control-btn refresh-btn" onclick="fetchData(true)">🔄 Yenile</button>
                 
@@ -10988,6 +11207,38 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
         <!-- TAB 1: KASA & FİNANS PANELİ -->
         <div id="tab-finance" class="tab-content active">
+            <!-- 0. CFO AI FİNANSAL YÖNETİCİ BRİFİNGİ -->
+            <div class="cfo-ai-card" id="cfo-ai-brief-card">
+                <div class="cfo-ai-header">
+                    <div class="cfo-ai-title-box">
+                        <span class="ai-sparkle-icon">🤖</span>
+                        <div>
+                            <div class="cfo-ai-badge">CFO AI ADVISOR</div>
+                            <h3 class="cfo-ai-heading">YÖNETİCİ BRİFİNGİ & STRATEJİK İÇGÖRÜ</h3>
+                        </div>
+                    </div>
+                    <div class="cfo-ai-controls">
+                        <button type="button" class="ai-refresh-btn" onclick="refreshAiBrief()" title="Yapay zeka analizini tazele">
+                            <span>⚡</span> Analizi Güncelle
+                        </button>
+                    </div>
+                </div>
+                <div class="cfo-ai-body" id="cfo-ai-brief-content">
+                    <div class="ai-insight-row">
+                        <span class="ai-insight-bullet">💡</span>
+                        <div class="ai-insight-text" id="ai-insight-general">Finansal akış ve nakit dengesi taranıyor...</div>
+                    </div>
+                    <div class="ai-insight-row">
+                        <span class="ai-insight-bullet">🎯</span>
+                        <div class="ai-insight-text" id="ai-insight-risk">Portföy riski ve cari konsantrasyonu değerlendiriliyor...</div>
+                    </div>
+                    <div class="ai-insight-row">
+                        <span class="ai-insight-bullet">🚀</span>
+                        <div class="ai-insight-text" id="ai-insight-action">Stratejik CFO aksiyon önerisi hazırlanıyor...</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 7'Lİ İSTATİSTİK KARTLARI (CFO KPI) -->
             <div class="stats-grid">
                 <div class="stat-card stat-devir">
@@ -11432,9 +11683,22 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                         <div class="timeline-loading">Hareket dökümü taranıyor...</div>
                     </div>
                 </div>
-                <div class="modal-actions">
-                    <button class="modal-copy-btn" onclick="copyGroupStatement()">
-                        📋 Cari Ekstresini Kopyala (WhatsApp / Telegram)
+                <!-- HIZLI BAKİYE İŞLEMİ (PANELDEN DOĞRUDAN EKLEME) -->
+                <div class="modal-quick-box">
+                    <div class="modal-quick-title">⚡ Hızlı Bakiye İşlemi (Web Girişi)</div>
+                    <div class="modal-quick-row">
+                        <input type="number" id="group-quick-amount" class="modal-quick-input" placeholder="Tutar girin (örn: 50000)" min="1" step="any">
+                        <button type="button" class="btn-quick-kasa" onclick="submitGroupQuickAction('kasa')">➕ Kasa Ekle</button>
+                        <button type="button" class="btn-quick-odenen" onclick="submitGroupQuickAction('odenen')">➖ Ödeme Yap</button>
+                    </div>
+                </div>
+
+                <div class="modal-actions" style="display:flex; gap:10px; margin-top:14px;">
+                    <button class="modal-copy-btn" style="flex:1;" onclick="copyGroupStatement()">
+                        📋 Ekstre Kopyala
+                    </button>
+                    <button class="modal-whatsapp-btn" onclick="shareOnWhatsApp()">
+                        <span>💬</span> WhatsApp'ta Paylaş
                     </button>
                 </div>
             </div>
@@ -11505,6 +11769,44 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                         Tamam
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 6. HIZLI İŞLEM GENEL PENCERESİ (MODAL) -->
+    <div id="quick-action-modal" class="modal-backdrop" onclick="closeQuickActionModal(event)">
+        <div class="modal-card" style="max-width:440px;" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title-box">
+                    <div class="modal-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">⚡</div>
+                    <div>
+                        <h2 style="font-size:16px; font-weight:800; color:#f8fafc; margin:0;">HIZLI FİNANSAL İŞLEM GİRİŞİ</h2>
+                        <span class="modal-status-pill" style="background:rgba(245,158,11,0.2); color:#fbbf24; border:1px solid rgba(251,191,36,0.3);">Canlı Web Motoru</span>
+                    </div>
+                </div>
+                <button class="modal-close-btn" onclick="closeQuickActionModal()">✕</button>
+            </div>
+            <div class="modal-body" style="display:flex; flex-direction:column; gap:14px;">
+                <div>
+                    <label style="font-size:11.5px; font-weight:700; color:#cbd5e1; display:block; margin-bottom:6px;">İŞLEM TÜRÜ</label>
+                    <select id="qa-select-type" class="header-select" style="width:100%; padding:10px;">
+                        <option value="kasa">💰 Kasa Girişi (+)</option>
+                        <option value="odenen">💸 Yapılan Ödeme / Çıkış (-)</option>
+                        <option value="devir">🔄 Güne Devir Ekle</option>
+                        <option value="masraf">📉 Şirket Masrafı / Gider</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:11.5px; font-weight:700; color:#cbd5e1; display:block; margin-bottom:6px;">CARİ VEYA MASRAF ADI</label>
+                    <input type="text" id="qa-target-input" class="modal-quick-input" style="width:100%; padding:10px;" placeholder="Örn: SACİD veya Yemek...">
+                </div>
+                <div>
+                    <label style="font-size:11.5px; font-weight:700; color:#cbd5e1; display:block; margin-bottom:6px;">TUTAR (TL)</label>
+                    <input type="number" id="qa-amount-input" class="modal-quick-input" style="width:100%; padding:10px;" placeholder="Örn: 50000" min="1" step="any">
+                </div>
+                <button id="qa-submit-btn" class="modal-copy-btn" style="background:linear-gradient(135deg, #10b981, #059669); margin-top:8px;" onclick="submitGlobalQuickAction()">
+                    ⚡ İşlemi Kaydet & Canlıya Al
+                </button>
             </div>
         </div>
     </div>
@@ -11890,9 +12192,215 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                     container.innerHTML = html;
                 })
                 .catch(err => {
-                    container.innerHTML = '<div class="timeline-empty" style="color:#f87171;">İşlem dökümü yüklenirken bağlantı hatası oluştu.</div>';
-                    if (badge) badge.innerText = "Hata";
-                });
+        // 5. WHATSAPP CARİ MUTABAKATI PAYLAŞIMI
+        function shareOnWhatsApp() {
+            if (!activeModalGroup) return;
+            const g = activeModalGroup;
+            const tarih = (currentDashboardData && currentDashboardData.tarih) || new Date().toLocaleDateString('tr-TR');
+            const durumText = g.kalan < -0.01 ? "🔴 BORÇLU DURUMDA" : (g.kalan > 0.01 ? "🟢 ALACAKLI DURUMDA" : "⚪ BAKİYE SIFIR / NÖTR");
+            
+            const slipText = 
+`📊 *[ ${g.ad.toUpperCase()} ] CARİ HESAP EKSTRESİ*
+📅 *Tarih:* ${tarih}
+━━━━━━━━━━━━━━━━━━
+🔄 *Güne Devir:* ${fmt(g.devir)}
+💰 *Eklenen Kasa:* ${fmt(g.kasa)}
+💸 *Yapılan Ödeme:* ${fmt(g.odenen)}
+✂️ *Komisyon / Kesinti:* ${fmt(g.komisyon)}
+━━━━━━━━━━━━━━━━━━
+🏦 *GÜNCEL NET KALAN:* *${fmt(g.kalan)}* (${durumText})
+━━━━━━━━━━━━━━━━━━
+_CFO Finans Yönetim Sistemi Tarafından Hazırlanmıştır._`;
+
+            const waUrl = "https://api.whatsapp.com/send?text=" + encodeURIComponent(slipText);
+            window.open(waUrl, "_blank");
+        }
+
+        // 6. CFO AI YÖNETİCİ BRİFİNGİ & STRATEJİK İÇGÖRÜ
+        function updateAiBrief(d) {
+            if (!d) return;
+            const genEl = document.getElementById('ai-insight-general');
+            const riskEl = document.getElementById('ai-insight-risk');
+            const actEl = document.getElementById('ai-insight-action');
+            if (!genEl || !riskEl || !actEl) return;
+
+            const kasa = Number(d.kasa || 0);
+            const odenen = Number(d.odenen || 0);
+            const kalan = Number(d.kalan || 0);
+            const komisyon = Number(d.komisyon || 0);
+            const masraf = Number(d.toplam_masraf || 0);
+            const netKar = komisyon - masraf;
+            const gruplar = d.gruplar || [];
+
+            let totalAlacak = 0;
+            let maxAlacak = 0;
+            let maxAlacakGrup = "";
+            let totalBorc = 0;
+            let maxBorc = 0;
+            let maxBorcGrup = "";
+
+            gruplar.forEach(g => {
+                const k = Number(g.kalan || 0);
+                if (k > 0.01) {
+                    totalAlacak += k;
+                    if (k > maxAlacak) { maxAlacak = k; maxAlacakGrup = g.ad; }
+                } else if (k < -0.01) {
+                    const b = Math.abs(k);
+                    totalBorc += b;
+                    if (b > maxBorc) { maxBorc = b; maxBorcGrup = g.ad; }
+                }
+            });
+
+            // 1. Genel Durum & Likidite
+            let genText = "";
+            if (kasa > 0 && odenen > 0) {
+                const coverage = (kasa / odenen).toFixed(1);
+                if (kalan >= 0) {
+                    genText = `Günlük kasa girişleri (<b>${fmt(kasa)}</b>) yapılan ödemeleri (<b>${fmt(odenen)}</b>) <b>${coverage} kat</b> karşılıyor. Şirket likidite havuzu oldukça dirençli ve pozitif net kasa ile güvenli bölgede.`;
+                } else {
+                    genText = `Dikkat: Yapılan ödemeler (<b>${fmt(odenen)}</b>) kasa girişlerinin üzerinde seyrediyor. Net kasa açığı (<b>${fmt(kalan)}</b>) acil tahsilat gerektiriyor.`;
+                }
+            } else if (kasa > 0) {
+                genText = `Bugün henüz çıkış yapılmadı, <b>${fmt(kasa)}</b> tutarında net nakit girişi mevcut. Kasa rezervi güçlü.`;
+            } else {
+                genText = `Bilanço açılış seviyesinde, aktif nakit hareketleri takip ediliyor. Net kasa durumu: <b>${fmt(kalan)}</b>.`;
+            }
+
+            // 2. Risk & Portföy Konsantrasyonu
+            let riskText = "";
+            if (totalAlacak > 0 && maxAlacakGrup) {
+                const ratio = ((maxAlacak / totalAlacak) * 100).toFixed(0);
+                if (ratio >= 40) {
+                    riskText = `Piyasa alacaklarının <b>%${ratio}</b> gibi yüksek bir bölümü tek bir caride (<b>${escapeHtml(maxAlacakGrup)}</b>) toplanmış durumda. Konsantrasyon riski yüksek.`;
+                } else {
+                    riskText = `Alacaklar cariler arasında dengeli yayılmış durumda. En büyük alacak <b>${escapeHtml(maxAlacakGrup)}</b> (%${ratio}) üzerinde bulunuyor.`;
+                }
+            } else if (totalBorc > 0 && maxBorcGrup) {
+                riskText = `En yüksek açık <b>${escapeHtml(maxBorcGrup)}</b> carisinde (<b>${fmt(maxBorc)}</b>) bulunuyor.`;
+            } else {
+                riskText = `Piyasada riskli açık veya aşırı borçlu cari tespit edilmedi. Finansal denge stabil.`;
+            }
+
+            // 3. Stratejik Aksiyon Tavsiyesi
+            let actText = "";
+            if (maxAlacakGrup && maxAlacak > 10000) {
+                actText = `Nakit pozisyonunu güçlendirmek için gün içerisinde öncelikli olarak <b>${escapeHtml(maxAlacakGrup)}</b> carisinden tahsilat talep edilmesi önerilir. Net kârlılık: <b>${fmt(netKar)}</b>.`;
+            } else if (netKar < 0) {
+                actText = `Operasyonel masraflar komisyon gelirini aştı (Net Fark: <b>${fmt(netKar)}</b>). Masraf çıkışlarının kısıtlanması önerilir.`;
+            } else {
+                actText = `Mevcut nakit dengesi ve kâr marjı hedeflerle uyumlu. Standart operasyon akışı sürdürülebilir.`;
+            }
+
+            genEl.innerHTML = genText;
+            riskEl.innerHTML = riskText;
+            actEl.innerHTML = actText;
+        }
+
+        function refreshAiBrief() {
+            if (currentDashboardData) {
+                updateAiBrief(currentDashboardData);
+                showToast("🤖 Yapay Zeka CFO analizi başarıyla güncellendi!", "success");
+                if (typeof playFinancialChime === 'function') playFinancialChime();
+            }
+        }
+
+        // 7. HIZLI İŞLEM PANELİ (İKİ YÖNLÜ WEB YÖNETİMİ)
+        function openQuickActionModal() {
+            const m = document.getElementById('quick-action-modal');
+            if (m) m.classList.add('show');
+            const inp = document.getElementById('qa-target-input');
+            if (inp) inp.focus();
+        }
+
+        function closeQuickActionModal(e) {
+            const m = document.getElementById('quick-action-modal');
+            if (m) m.classList.remove('show');
+        }
+
+        function submitGlobalQuickAction() {
+            const type = document.getElementById('qa-select-type').value;
+            const target = (document.getElementById('qa-target-input').value || '').trim();
+            const amount = parseFloat(document.getElementById('qa-amount-input').value);
+            const btn = document.getElementById('qa-submit-btn');
+
+            if (!target) {
+                showToast("Lütfen bir cari veya masraf adı girin!", "error");
+                return;
+            }
+            if (isNaN(amount) || amount <= 0) {
+                showToast("Lütfen geçerli ve pozitif bir tutar girin!", "error");
+                return;
+            }
+
+            if (btn) {
+                btn.disabled = true;
+                btn.innerText = "⏳ İşleniyor...";
+            }
+
+            const url = '/api/quick_action?' + (token ? 'token=' + encodeURIComponent(token) : '');
+
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: type, target: target, amount: amount })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res && res.ok) {
+                    showToast(res.message || "İşlem başarıyla kaydedildi!", "success");
+                    if (typeof playFinancialChime === 'function') playFinancialChime();
+                    closeQuickActionModal();
+                    document.getElementById('qa-target-input').value = '';
+                    document.getElementById('qa-amount-input').value = '';
+                    fetchData(true);
+                } else {
+                    showToast("Hata: " + (res && res.error ? res.error : "İşlem kaydedilemedi"), "error");
+                }
+            })
+            .catch(err => {
+                showToast("Ağ hatası: Sunucuya ulaşılamadı", "error");
+            })
+            .finally(() => {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerText = "⚡ İşlemi Kaydet & Canlıya Al";
+                }
+            });
+        }
+
+        function submitGroupQuickAction(actionType) {
+            if (!activeModalGroup) return;
+            const target = activeModalGroup.ad;
+            const inputEl = document.getElementById('group-quick-amount');
+            const amount = parseFloat(inputEl ? inputEl.value : 0);
+
+            if (isNaN(amount) || amount <= 0) {
+                showToast("Lütfen geçerli bir tutar giriniz!", "error");
+                return;
+            }
+
+            const url = '/api/quick_action?' + (token ? 'token=' + encodeURIComponent(token) : '');
+
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: actionType, target: target, amount: amount })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res && res.ok) {
+                    showToast(res.message || "İşlem başarıyla kaydedildi!", "success");
+                    if (typeof playFinancialChime === 'function') playFinancialChime();
+                    if (inputEl) inputEl.value = '';
+                    loadGroupTimeline(target);
+                    fetchData(true);
+                } else {
+                    showToast("Hata: " + (res && res.error ? res.error : "İşlem kaydedilemedi"), "error");
+                }
+            })
+            .catch(err => {
+                showToast("Ağ hatası: Sunucuya ulaşılamadı", "error");
+            });
         }
 
         async function fetchMarketRates(isManual = false) {
@@ -12491,6 +12999,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
             // 8. Çoklu Varlık & Rezerv Dağılımı Donut Grafiğini Render Et
             renderAssetDonut(d);
+
+            // 9. CFO AI Finansal Özet & Yönetici Brifingi
+            updateAiBrief(d);
 
             // Grupları Render Et
             renderGroups(d.gruplar || [], updatedGroupsList);
@@ -13346,6 +13857,72 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 print(f"Telegram snapshot gönderme hatası: {e}")
                 self._send_response_data(500, "application/json; charset=utf-8", json.dumps({"ok": False, "error": str(e)}).encode("utf-8"))
+            return
+        elif parsed.path == "/api/quick_action":
+            if not self._check_auth(parsed):
+                self._send_response_data(401, "application/json; charset=utf-8", json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
+                return
+
+            try:
+                content_length = int(self.headers.get('Content-Length', 0))
+                body = self.rfile.read(content_length) if content_length > 0 else b""
+                req_data = json.loads(body.decode('utf-8')) if body else {}
+
+                action = (req_data.get("action") or "").lower().strip()
+                target = (req_data.get("target") or "").strip()
+                amount_raw = req_data.get("amount", 0)
+                amount = float(amount_raw) if amount_raw else 0.0
+
+                if not action or not target or amount <= 0:
+                    self._send_response_data(400, "application/json; charset=utf-8", json.dumps({"error": "Geçersiz işlem parametreleri. Cari/masraf adı ve pozitif tutar zorunludur."}).encode("utf-8"))
+                    return
+
+                res_msg = ""
+                if action == "kasa":
+                    res_msg = hucreyeVeriYaz_impl(f"/kasa {target} {amount}", 4, "Kasa Ekle", 1)
+                elif action in ["odenen", "odeme"]:
+                    res_msg = hucreyeVeriYaz_impl(f"/odeme {target} {amount}", 5, "Ödenen Ekle", 1)
+                elif action == "devir":
+                    res_msg = hucreyeVeriYaz_impl(f"/devir {target} {amount}", 3, "Devir Ekle", 1)
+                elif action == "masraf":
+                    res_msg = masrafVerisiYaz_impl(f"/masrafekle {target} {amount}", "Masraf Ekle", 1)
+                else:
+                    self._send_response_data(400, "application/json; charset=utf-8", json.dumps({"error": f"Bilinmeyen işlem türü: {action}"}).encode("utf-8"))
+                    return
+
+                # Canlı web istemcilerine anında SSE yayını yap
+                if action == "masraf":
+                    _update_executor.submit(broadcast_dashboard_update, [], [{"grup": "MASRAF", "message": f"📌 <b>{target.upper()}</b> masrafı eklendi: {paraFormatla(amount)}"}])
+                else:
+                    _update_executor.submit(broadcast_dashboard_update, [target], [{"grup": target.upper(), "message": f"⚡ <b>{target.upper()}</b> carisine {paraFormatla(amount)} {action.upper()} işlendi."}])
+
+                # Kurucuya bilgi
+                try:
+                    telegramMesajGonder(
+                        KURUCU_ID,
+                        f"⚡ <b>PANELDEN HIZLI İŞLEM YAPILDI</b>\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n"
+                        f"👤 <b>Kanal:</b> CFO Canlı Web Dashboard\n"
+                        f"🏢 <b>Hedef:</b> <b>{target.upper()}</b>\n"
+                        f"💰 <b>Tutar:</b> <code>{paraFormatla(amount)}</code>\n"
+                        f"📌 <b>İşlem Türü:</b> <code>{action.upper()}</code>\n"
+                        f"🕒 <b>Saat:</b> <code>{suankiZamaniAl().strftime('%H:%M:%S')}</code>"
+                    )
+                except Exception:
+                    pass
+
+                self._send_response_data(200, "application/json; charset=utf-8", json.dumps({
+                    "ok": True,
+                    "action": action,
+                    "target": target.upper(),
+                    "amount": amount,
+                    "message": f"<b>{target.upper()}</b> için {paraFormatla(amount)} {action.upper()} başarıyla işlendi."
+                }).encode("utf-8"))
+            except ValueError as ve:
+                self._send_response_data(400, "application/json; charset=utf-8", json.dumps({"error": str(ve)}).encode("utf-8"))
+            except Exception as e:
+                print(f"API quick_action hatası: {e}")
+                self._send_response_data(500, "application/json; charset=utf-8", json.dumps({"error": str(e)}).encode("utf-8"))
             return
         else:
             self._send_response_data(404, "application/json; charset=utf-8", json.dumps({"error": "Endpoint bulunamadı"}).encode("utf-8"))
