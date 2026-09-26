@@ -11098,6 +11098,122 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             transform: scale(1.03);
         }
 
+        /* ==================== HIZLI İŞLEM BUTON VE CARİ SEÇİM GRID ==================== */
+        .qa-type-switcher {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+        .qa-type-btn {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #cbd5e1;
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-size: 11.5px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .qa-type-btn:hover {
+            background: rgba(51, 65, 85, 0.9);
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+        .qa-type-btn.active.type-kasa {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.35), rgba(5, 150, 105, 0.45));
+            border-color: #10b981;
+            color: #34d399;
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
+        }
+        .qa-type-btn.active.type-odenen {
+            background: linear-gradient(135deg, rgba(239, 68, 68, 0.35), rgba(220, 38, 38, 0.45));
+            border-color: #ef4444;
+            color: #f87171;
+            box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+        }
+        .qa-type-btn.active.type-devir {
+            background: linear-gradient(135deg, rgba(56, 189, 248, 0.35), rgba(14, 165, 233, 0.45));
+            border-color: #38bdf8;
+            color: #7dd3fc;
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+        }
+        .qa-type-btn.active.type-masraf {
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.35), rgba(217, 119, 6, 0.45));
+            border-color: #f59e0b;
+            color: #fbbf24;
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.3);
+        }
+        .qa-cari-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(115px, 1fr));
+            gap: 6px;
+            max-height: 180px;
+            overflow-y: auto;
+            padding: 6px;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+        }
+        .qa-cari-btn {
+            background: rgba(30, 41, 59, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #e2e8f0;
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-size: 11.5px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .qa-cari-btn:hover {
+            background: rgba(51, 65, 85, 0.95);
+            border-color: #3b82f6;
+            transform: translateY(-1px);
+        }
+        .qa-cari-btn.active {
+            background: linear-gradient(135deg, #1d4ed8, #2563eb) !important;
+            border-color: #60a5fa !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 12px rgba(59, 130, 246, 0.5);
+        }
+        .qa-cari-btn .cari-sub-kalan {
+            font-size: 10px;
+            font-weight: 600;
+            opacity: 0.85;
+        }
+        .qa-preset-amounts {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            margin-top: 6px;
+        }
+        .qa-preset-btn {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #94a3b8;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .qa-preset-btn:hover {
+            background: #3b82f6;
+            color: #ffffff;
+            border-color: #60a5fa;
+        }
+
         /* YAZDIRMA & PDF ŞABLONU */
         @media print {
             body { background: #ffffff !important; color: #000000 !important; padding: 10px !important; }
@@ -11775,36 +11891,79 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
     <!-- 6. HIZLI İŞLEM GENEL PENCERESİ (MODAL) -->
     <div id="quick-action-modal" class="modal-backdrop" onclick="closeQuickActionModal(event)">
-        <div class="modal-card" style="max-width:440px;" onclick="event.stopPropagation()">
+        <div class="modal-card" style="max-width:480px;" onclick="event.stopPropagation()">
             <div class="modal-header">
                 <div class="modal-title-box">
                     <div class="modal-icon" style="background: linear-gradient(135deg, #f59e0b, #d97706);">⚡</div>
                     <div>
                         <h2 style="font-size:16px; font-weight:800; color:#f8fafc; margin:0;">HIZLI FİNANSAL İŞLEM GİRİŞİ</h2>
-                        <span class="modal-status-pill" style="background:rgba(245,158,11,0.2); color:#fbbf24; border:1px solid rgba(251,191,36,0.3);">Canlı Web Motoru</span>
+                        <span class="modal-status-pill" style="background:rgba(245,158,11,0.2); color:#fbbf24; border:1px solid rgba(251,191,36,0.3);">İki Yönlü Web Yönetimi</span>
                     </div>
                 </div>
                 <button class="modal-close-btn" onclick="closeQuickActionModal()">✕</button>
             </div>
-            <div class="modal-body" style="display:flex; flex-direction:column; gap:14px;">
+            <div class="modal-body" style="display:flex; flex-direction:column; gap:12px;">
+                <!-- 1. İŞLEM TÜRÜ (BUTONLAR) -->
                 <div>
-                    <label style="font-size:11.5px; font-weight:700; color:#cbd5e1; display:block; margin-bottom:6px;">İŞLEM TÜRÜ</label>
-                    <select id="qa-select-type" class="header-select" style="width:100%; padding:10px;">
-                        <option value="kasa">💰 Kasa Girişi (+)</option>
-                        <option value="odenen">💸 Yapılan Ödeme / Çıkış (-)</option>
-                        <option value="devir">🔄 Güne Devir Ekle</option>
-                        <option value="masraf">📉 Şirket Masrafı / Gider</option>
-                    </select>
+                    <label style="font-size:11px; font-weight:800; color:#94a3b8; display:block; margin-bottom:6px; letter-spacing:0.5px;">1. İŞLEM TÜRÜNÜ SEÇİN</label>
+                    <div class="qa-type-switcher">
+                        <button type="button" class="qa-type-btn active type-kasa" id="qa-type-btn-kasa" onclick="selectQuickActionType('kasa')">
+                            <span>💰</span> Kasa Girişi (+)
+                        </button>
+                        <button type="button" class="qa-type-btn type-odenen" id="qa-type-btn-odenen" onclick="selectQuickActionType('odenen')">
+                            <span>💸</span> Kasa Çıkışı / Ödeme (-)
+                        </button>
+                        <button type="button" class="qa-type-btn type-masraf" id="qa-type-btn-masraf" onclick="selectQuickActionType('masraf')">
+                            <span>📉</span> Masraf / Gider
+                        </button>
+                        <button type="button" class="qa-type-btn type-devir" id="qa-type-btn-devir" onclick="selectQuickActionType('devir')">
+                            <span>🔄</span> Güne Devir Ekle
+                        </button>
+                    </div>
+                    <input type="hidden" id="qa-select-type" value="kasa">
                 </div>
+
+                <!-- 2. CARİ / MASRAF BUTONLARI -->
                 <div>
-                    <label style="font-size:11.5px; font-weight:700; color:#cbd5e1; display:block; margin-bottom:6px;">CARİ VEYA MASRAF ADI</label>
-                    <input type="text" id="qa-target-input" class="modal-quick-input" style="width:100%; padding:10px;" placeholder="Örn: SACİD veya Yemek...">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                        <label id="qa-target-label" style="font-size:11px; font-weight:800; color:#94a3b8; letter-spacing:0.5px;">2. CARİ SEÇİN (BUTONA DOKUNUN)</label>
+                        <button type="button" id="qa-manual-toggle-btn" onclick="toggleManualTargetInput()" style="background:none; border:none; color:#60a5fa; font-size:11px; font-weight:600; cursor:pointer; text-decoration:underline;">
+                            ➕ Listede Olmayan İsim Yaz
+                        </button>
+                    </div>
+
+                    <!-- Cari/Masraf Butonları Izgarası -->
+                    <div id="qa-cari-button-grid" class="qa-cari-grid">
+                        <!-- JS ile otomatik butonlar doldurulacak -->
+                    </div>
+
+                    <!-- Manuel İsim Yazma Alanı (Varsayılan gizli) -->
+                    <div id="qa-manual-target-box" style="display:none; margin-top:8px;">
+                        <input type="text" id="qa-target-input" class="modal-quick-input" style="width:100%; padding:9px 12px;" placeholder="Örn: SACİD veya Yemek..." oninput="onManualTargetInput()">
+                    </div>
+
+                    <!-- Seçilen Cari Rozeti -->
+                    <div id="qa-selected-badge" style="display:none; margin-top:6px; font-size:11.5px; font-weight:700; color:#34d399; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); border-radius:6px; padding:6px 10px;">
+                        ✓ Seçilen: <b id="qa-selected-name"></b>
+                    </div>
                 </div>
+
+                <!-- 3. TUTAR (TL) -->
                 <div>
-                    <label style="font-size:11.5px; font-weight:700; color:#cbd5e1; display:block; margin-bottom:6px;">TUTAR (TL)</label>
-                    <input type="number" id="qa-amount-input" class="modal-quick-input" style="width:100%; padding:10px;" placeholder="Örn: 50000" min="1" step="any">
+                    <label style="font-size:11px; font-weight:800; color:#94a3b8; display:block; margin-bottom:6px; letter-spacing:0.5px;">3. TUTAR (TL)</label>
+                    <input type="number" id="qa-amount-input" class="modal-quick-input" style="width:100%; padding:10px 12px; font-size:15px; font-weight:800;" placeholder="Örn: 50000" min="1" step="any" oninput="updateSubmitButtonLabel()">
+                    <div class="qa-preset-amounts">
+                        <button type="button" class="qa-preset-btn" onclick="addQuickAmount(10000)">+10.000 ₺</button>
+                        <button type="button" class="qa-preset-btn" onclick="addQuickAmount(25000)">+25.000 ₺</button>
+                        <button type="button" class="qa-preset-btn" onclick="addQuickAmount(50000)">+50.000 ₺</button>
+                        <button type="button" class="qa-preset-btn" onclick="addQuickAmount(100000)">+100.000 ₺</button>
+                        <button type="button" class="qa-preset-btn" onclick="addQuickAmount(250000)">+250.000 ₺</button>
+                        <button type="button" class="qa-preset-btn" onclick="clearQuickAmount()" style="color:#f87171;">✕ Sıfırla</button>
+                    </div>
                 </div>
-                <button id="qa-submit-btn" class="modal-copy-btn" style="background:linear-gradient(135deg, #10b981, #059669); margin-top:8px;" onclick="submitGlobalQuickAction()">
+
+                <!-- 4. KAYDET VE CANLIYA AL BUTONU -->
+                <button id="qa-submit-btn" class="modal-copy-btn" style="background:linear-gradient(135deg, #10b981, #059669); margin-top:6px; padding:12px; font-size:13.5px;" onclick="submitGlobalQuickAction()">
                     ⚡ İşlemi Kaydet & Canlıya Al
                 </button>
             </div>
@@ -12309,31 +12468,243 @@ _CFO Finans Yönetim Sistemi Tarafından Hazırlanmıştır._`;
             }
         }
 
-        // 7. HIZLI İŞLEM PANELİ (İKİ YÖNLÜ WEB YÖNETİMİ)
-        function openQuickActionModal() {
+        // 7. HIZLI İŞLEM PANELİ (İKİ YÖNLÜ WEB YÖNETİMİ & BUTONLA SEÇİM)
+        let selectedQaType = 'kasa';
+        let selectedQaTarget = '';
+
+        function selectQuickActionType(type) {
+            selectedQaType = type;
+            const selEl = document.getElementById('qa-select-type');
+            if (selEl) selEl.value = type;
+
+            ['kasa', 'odenen', 'masraf', 'devir'].forEach(t => {
+                const btn = document.getElementById('qa-type-btn-' + t);
+                if (btn) {
+                    if (t === type) btn.classList.add('active');
+                    else btn.classList.remove('active');
+                }
+            });
+
+            const labelEl = document.getElementById('qa-target-label');
+            if (labelEl) {
+                if (type === 'kasa') labelEl.innerText = "2. KASA GİRİŞİ YAPILACAK CARİ (BUTONA DOKUNUN)";
+                else if (type === 'odenen') labelEl.innerText = "2. ÖDEME (KASA ÇIKIŞI) YAPILACAK CARİ (BUTONA DOKUNUN)";
+                else if (type === 'masraf') labelEl.innerText = "2. MASRAF KALEMİ (BUTONA DOKUNUN VEYA YAZIN)";
+                else if (type === 'devir') labelEl.innerText = "2. DEVİR EKLENECEK CARİ (BUTONA DOKUNUN)";
+            }
+
+            renderQaButtons();
+            updateSubmitButtonLabel();
+        }
+
+        function renderQaButtons() {
+            const grid = document.getElementById('qa-cari-button-grid');
+            if (!grid) return;
+
+            if (selectedQaType === 'masraf') {
+                const presets = [
+                    { name: 'Yemek', icon: '🍽️' },
+                    { name: 'Ofis', icon: '🏢' },
+                    { name: 'Kira', icon: '🏠' },
+                    { name: 'Yakıt', icon: '⛽' },
+                    { name: 'Mutfak & Çay', icon: '☕' },
+                    { name: 'Personel & Maaş', icon: '👥' },
+                    { name: 'Kargo & Lojistik', icon: '📦' },
+                    { name: 'Yazılım & Sunucu', icon: '💻' },
+                    { name: 'Muhasebe & Noter', icon: '📑' },
+                    { name: 'Genel Gider', icon: '📌' }
+                ];
+
+                if (currentDashboardData && currentDashboardData.masraflar && Array.isArray(currentDashboardData.masraflar)) {
+                    currentDashboardData.masraflar.forEach(m => {
+                        const mAd = (m.ad || '').trim();
+                        if (mAd && !presets.some(p => p.name.toLocaleLowerCase('tr') === mAd.toLocaleLowerCase('tr'))) {
+                            presets.unshift({ name: mAd, icon: '📌' });
+                        }
+                    });
+                }
+
+                grid.innerHTML = presets.map(p => {
+                    const isSelected = (selectedQaTarget && selectedQaTarget.toLocaleLowerCase('tr') === p.name.toLocaleLowerCase('tr'));
+                    return `
+                        <button type="button" class="qa-cari-btn ${isSelected ? 'active' : ''}" onclick="selectQaTarget('${escapeHtml(p.name)}', this)">
+                            <span>${p.icon} <b>${escapeHtml(p.name)}</b></span>
+                            <span class="cari-sub-kalan" style="color:#fbbf24;">Masraf Kalemi</span>
+                        </button>
+                    `;
+                }).join('');
+            } else {
+                const gruplar = (currentDashboardData && currentDashboardData.gruplar) || [];
+                if (gruplar.length === 0) {
+                    grid.innerHTML = '<div style="color:#94a3b8; font-size:12px; grid-column:1/-1; padding:10px; text-align:center;">Henüz kayıtlı cari grubu bulunmuyor.</div>';
+                    return;
+                }
+
+                grid.innerHTML = gruplar.map(g => {
+                    const isSelected = (selectedQaTarget && selectedQaTarget.toLocaleLowerCase('tr') === String(g.ad).toLocaleLowerCase('tr'));
+                    const isNeg = (g.kalan < -0.01);
+                    const isPos = (g.kalan > 0.01);
+                    const badgeColor = isNeg ? '#f87171' : (isPos ? '#34d399' : '#94a3b8');
+                    const badgeText = isNeg ? 'Borçlu: ' + fmt(g.kalan) : (isPos ? 'Alacaklı: ' + fmt(g.kalan) : 'Nötr: 0 ₺');
+
+                    return `
+                        <button type="button" class="qa-cari-btn ${isSelected ? 'active' : ''}" onclick="selectQaTarget('${escapeHtml(g.ad)}', this)">
+                            <span>🔹 <b>${escapeHtml(g.ad)}</b></span>
+                            <span class="cari-sub-kalan" style="color:${badgeColor};">${badgeText}</span>
+                        </button>
+                    `;
+                }).join('');
+            }
+
+            if (selectedQaTarget) {
+                const bEl = document.getElementById('qa-selected-badge');
+                const nEl = document.getElementById('qa-selected-name');
+                if (bEl && nEl) {
+                    bEl.style.display = 'block';
+                    nEl.innerText = selectedQaTarget;
+                }
+            }
+        }
+
+        function selectQaTarget(targetName, btnEl) {
+            selectedQaTarget = targetName;
+            const inp = document.getElementById('qa-target-input');
+            if (inp) inp.value = targetName;
+
+            const grid = document.getElementById('qa-cari-button-grid');
+            if (grid) {
+                grid.querySelectorAll('.qa-cari-btn').forEach(b => b.classList.remove('active'));
+            }
+            if (btnEl) btnEl.classList.add('active');
+
+            const bEl = document.getElementById('qa-selected-badge');
+            const nEl = document.getElementById('qa-selected-name');
+            if (bEl && nEl) {
+                bEl.style.display = 'block';
+                nEl.innerText = targetName;
+            }
+
+            updateSubmitButtonLabel();
+        }
+
+        function toggleManualTargetInput() {
+            const box = document.getElementById('qa-manual-target-box');
+            if (!box) return;
+            const isHidden = (box.style.display === 'none');
+            box.style.display = isHidden ? 'block' : 'none';
+            if (isHidden) {
+                const inp = document.getElementById('qa-target-input');
+                if (inp) inp.focus();
+            }
+        }
+
+        function onManualTargetInput() {
+            const inp = document.getElementById('qa-target-input');
+            const val = (inp ? inp.value : '').trim();
+            selectedQaTarget = val;
+
+            const grid = document.getElementById('qa-cari-button-grid');
+            if (grid) {
+                grid.querySelectorAll('.qa-cari-btn').forEach(b => b.classList.remove('active'));
+            }
+
+            const bEl = document.getElementById('qa-selected-badge');
+            const nEl = document.getElementById('qa-selected-name');
+            if (bEl && nEl) {
+                if (val) {
+                    bEl.style.display = 'block';
+                    nEl.innerText = val;
+                } else {
+                    bEl.style.display = 'none';
+                }
+            }
+            updateSubmitButtonLabel();
+        }
+
+        function addQuickAmount(amt) {
+            const inp = document.getElementById('qa-amount-input');
+            if (!inp) return;
+            const cur = parseFloat(inp.value) || 0;
+            inp.value = cur + amt;
+            updateSubmitButtonLabel();
+        }
+
+        function clearQuickAmount() {
+            const inp = document.getElementById('qa-amount-input');
+            if (!inp) return;
+            inp.value = '';
+            updateSubmitButtonLabel();
+        }
+
+        function updateSubmitButtonLabel() {
+            const btn = document.getElementById('qa-submit-btn');
+            if (!btn) return;
+            const type = selectedQaType || 'kasa';
+            const target = selectedQaTarget || (document.getElementById('qa-target-input') ? document.getElementById('qa-target-input').value : '');
+            const amtVal = document.getElementById('qa-amount-input') ? parseFloat(document.getElementById('qa-amount-input').value) : 0;
+            const amtStr = (amtVal > 0) ? fmt(amtVal) : '';
+
+            if (target && amtVal > 0) {
+                if (type === 'kasa') {
+                    btn.innerHTML = `⚡ <b>${escapeHtml(target)}</b> carisine <b>${amtStr}</b> Kasa Girişi Yap`;
+                    btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                } else if (type === 'odenen') {
+                    btn.innerHTML = `⚡ <b>${escapeHtml(target)}</b> carisine <b>${amtStr}</b> Ödeme Yap (Kasa Çıkışı)`;
+                    btn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+                } else if (type === 'masraf') {
+                    btn.innerHTML = `⚡ <b>${escapeHtml(target)}</b> için <b>${amtStr}</b> Masraf Ekle`;
+                    btn.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+                } else if (type === 'devir') {
+                    btn.innerHTML = `⚡ <b>${escapeHtml(target)}</b> carisine <b>${amtStr}</b> Devir Ekle`;
+                    btn.style.background = 'linear-gradient(135deg, #38bdf8, #0284c7)';
+                }
+            } else if (target) {
+                btn.innerHTML = `⚡ ${escapeHtml(target)} için Tutarı Girip Kaydedin`;
+                btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+            } else {
+                btn.innerHTML = `⚡ İşlemi Kaydet & Canlıya Al`;
+                btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+            }
+        }
+
+        function openQuickActionModal(preselectedTarget = '') {
             const m = document.getElementById('quick-action-modal');
             if (m) m.classList.add('show');
+
+            selectedQaTarget = preselectedTarget || (activeModalGroup ? activeModalGroup.ad : '');
             const inp = document.getElementById('qa-target-input');
-            if (inp) inp.focus();
+            if (inp) inp.value = selectedQaTarget;
+
+            const amtInp = document.getElementById('qa-amount-input');
+            if (amtInp) amtInp.value = '';
+
+            const manBox = document.getElementById('qa-manual-target-box');
+            if (manBox) manBox.style.display = 'none';
+
+            selectQuickActionType('kasa');
         }
 
         function closeQuickActionModal(e) {
+            if (e && e.target && e.target.id !== 'quick-action-modal') return;
             const m = document.getElementById('quick-action-modal');
             if (m) m.classList.remove('show');
         }
 
         function submitGlobalQuickAction() {
-            const type = document.getElementById('qa-select-type').value;
-            const target = (document.getElementById('qa-target-input').value || '').trim();
-            const amount = parseFloat(document.getElementById('qa-amount-input').value);
+            const type = selectedQaType || (document.getElementById('qa-select-type') ? document.getElementById('qa-select-type').value : 'kasa');
+            const target = (selectedQaTarget || (document.getElementById('qa-target-input') ? document.getElementById('qa-target-input').value : '')).trim();
+            const amtInp = document.getElementById('qa-amount-input');
+            const amount = parseFloat(amtInp ? amtInp.value : 0);
             const btn = document.getElementById('qa-submit-btn');
 
             if (!target) {
-                showToast("Lütfen bir cari veya masraf adı girin!", "error");
+                const isExpense = (type === 'masraf');
+                showToast("Eksik Bilgi", isExpense ? "Lütfen bir masraf kalemi butonuna tıklayın veya yazın!" : "Lütfen bir cari butonuna dokunarak cari seçin!", false);
                 return;
             }
             if (isNaN(amount) || amount <= 0) {
-                showToast("Lütfen geçerli ve pozitif bir tutar girin!", "error");
+                showToast("Eksik Tutar", "Lütfen geçerli ve pozitif bir işlem tutarı girin!", false);
+                if (amtInp) amtInp.focus();
                 return;
             }
 
@@ -12352,23 +12723,25 @@ _CFO Finans Yönetim Sistemi Tarafından Hazırlanmıştır._`;
             .then(r => r.json())
             .then(res => {
                 if (res && res.ok) {
-                    showToast(res.message || "İşlem başarıyla kaydedildi!", "success");
+                    showToast("İşlem Başarılı", res.message || "İşlem başarıyla kaydedildi!", true);
                     if (typeof playFinancialChime === 'function') playFinancialChime();
                     closeQuickActionModal();
-                    document.getElementById('qa-target-input').value = '';
-                    document.getElementById('qa-amount-input').value = '';
+                    selectedQaTarget = '';
+                    if (amtInp) amtInp.value = '';
+                    const tInp = document.getElementById('qa-target-input');
+                    if (tInp) tInp.value = '';
                     fetchData(true);
                 } else {
-                    showToast("Hata: " + (res && res.error ? res.error : "İşlem kaydedilemedi"), "error");
+                    showToast("Hata", (res && res.error ? res.error : "İşlem kaydedilemedi"), false);
                 }
             })
             .catch(err => {
-                showToast("Ağ hatası: Sunucuya ulaşılamadı", "error");
+                showToast("Ağ Hatası", "Sunucuya ulaşılamadı", false);
             })
             .finally(() => {
                 if (btn) {
                     btn.disabled = false;
-                    btn.innerText = "⚡ İşlemi Kaydet & Canlıya Al";
+                    updateSubmitButtonLabel();
                 }
             });
         }
