@@ -10432,7 +10432,456 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             font-size: 12px;
             color: #cbd5e1;
             padding-top: 8px;
-            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        /* ==================== 1. TELEGRAM'A İLET BUTONU ==================== */
+        .control-btn.telegram-btn {
+            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+            border: 1px solid rgba(56, 189, 248, 0.45) !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 16px rgba(2, 132, 199, 0.35);
+        }
+        .control-btn.telegram-btn:hover {
+            background: linear-gradient(135deg, #0369a1 0%, #075985 100%) !important;
+            border-color: rgba(56, 189, 248, 0.8) !important;
+            box-shadow: 0 0 24px rgba(56, 189, 248, 0.6);
+            transform: translateY(-2px) scale(1.02);
+        }
+
+        /* ==================== 2. FİNANSAL RİSK RADARI & KONSANTRASYON ==================== */
+        .risk-radar-card {
+            background: rgba(15, 23, 42, 0.78);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            backdrop-filter: blur(14px);
+            border-radius: 16px;
+            padding: 18px 20px;
+            margin-bottom: 22px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .risk-radar-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 3px;
+            background: linear-gradient(90deg, #10b981, #38bdf8, #f59e0b, #ef4444);
+        }
+        .risk-radar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        }
+        .risk-title-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .risk-radar-icon {
+            font-size: 24px;
+            padding: 8px;
+            border-radius: 12px;
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+        .risk-radar-title {
+            font-size: 15px;
+            font-weight: 800;
+            color: #f8fafc;
+            letter-spacing: -0.3px;
+            margin: 0;
+        }
+        .risk-radar-subtitle {
+            font-size: 11.5px;
+            color: #94a3b8;
+            margin: 2px 0 0 0;
+            font-weight: 500;
+        }
+        .risk-score-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 14px;
+            border-radius: 14px;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .score-grade {
+            font-size: 18px;
+            font-weight: 900;
+            line-height: 1;
+        }
+        .score-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        .risk-score-badge.grade-aplus {
+            background: rgba(16, 185, 129, 0.18);
+            border-color: rgba(52, 211, 153, 0.5);
+            color: #34d399;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.25);
+        }
+        .risk-score-badge.grade-a {
+            background: rgba(56, 189, 248, 0.18);
+            border-color: rgba(56, 189, 248, 0.5);
+            color: #38bdf8;
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
+        }
+        .risk-score-badge.grade-b {
+            background: rgba(245, 158, 11, 0.18);
+            border-color: rgba(251, 191, 36, 0.5);
+            color: #fbbf24;
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.2);
+        }
+        .risk-score-badge.grade-c {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(248, 113, 113, 0.6);
+            color: #f87171;
+            box-shadow: 0 0 22px rgba(239, 68, 68, 0.35);
+        }
+        .risk-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 14px;
+        }
+        .risk-metric-box {
+            background: rgba(30, 41, 59, 0.55);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .risk-m-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .risk-m-label {
+            font-size: 11.5px;
+            font-weight: 600;
+            color: #cbd5e1;
+        }
+        .risk-m-val {
+            font-size: 13.5px;
+            font-weight: 800;
+        }
+        .risk-progress-bg {
+            width: 100%;
+            height: 6px;
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .risk-progress-bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .risk-sub-note {
+            font-size: 11px;
+            color: #94a3b8;
+            font-weight: 500;
+        }
+        .risk-concentration-badge {
+            font-size: 10.5px;
+            font-weight: 800;
+            padding: 3px 8px;
+            border-radius: 6px;
+            text-transform: uppercase;
+        }
+        .risk-concentration-badge.balanced {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+            border: 1px solid rgba(52, 211, 153, 0.3);
+        }
+        .risk-concentration-badge.mid-risk {
+            background: rgba(245, 158, 11, 0.2);
+            color: #fbbf24;
+            border: 1px solid rgba(251, 191, 36, 0.3);
+        }
+        .risk-concentration-badge.high-risk {
+            background: rgba(239, 68, 68, 0.22);
+            color: #f87171;
+            border: 1px solid rgba(248, 113, 113, 0.4);
+            animation: pulse 1.5s infinite;
+        }
+        .risk-concentration-text {
+            font-size: 11.5px;
+            color: #cbd5e1;
+            line-height: 1.4;
+        }
+        .risk-concentration-stat {
+            font-size: 11px;
+            color: #94a3b8;
+        }
+
+        /* ==================== 3. ANALİTİK ÇİFTLİ GRID & DONUT ==================== */
+        .analytics-dual-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+            gap: 16px;
+            margin-bottom: 0;
+        }
+        .asset-donut-box {
+            background: rgba(19, 29, 49, 0.78);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            backdrop-filter: blur(14px);
+            border-radius: 18px;
+            padding: 22px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+        }
+        .donut-sub-badge {
+            font-size: 11px;
+            font-weight: 700;
+            color: #a78bfa;
+            background: rgba(167, 139, 250, 0.15);
+            border: 1px solid rgba(167, 139, 250, 0.3);
+            padding: 4px 10px;
+            border-radius: 8px;
+        }
+        .donut-content-layout {
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 14px;
+        }
+        .donut-chart-wrapper {
+            position: relative;
+            width: 190px;
+            height: 190px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .donut-svg {
+            width: 100%;
+            height: 100%;
+            transform: rotate(0deg);
+        }
+        .donut-center-info {
+            position: absolute;
+            text-align: center;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            max-width: 110px;
+        }
+        .donut-center-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .donut-center-val {
+            font-size: 13.5px;
+            font-weight: 800;
+            color: #ffffff;
+            margin-top: 2px;
+            word-break: break-word;
+        }
+        .donut-legend-list {
+            flex: 1;
+            min-width: 180px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .donut-leg-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-radius: 10px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.2s ease;
+        }
+        .donut-leg-row:hover {
+            background: rgba(30, 41, 59, 0.8);
+            border-color: rgba(255, 255, 255, 0.15);
+            transform: translateX(3px);
+        }
+        .donut-leg-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .donut-leg-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .donut-leg-icon {
+            font-size: 13px;
+        }
+        .donut-leg-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+        .donut-leg-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .donut-leg-pct {
+            font-size: 11px;
+            font-weight: 700;
+            color: #94a3b8;
+        }
+        .donut-leg-val {
+            font-size: 12px;
+            font-weight: 800;
+            color: #ffffff;
+        }
+
+        /* ==================== 4. CARİ DETAYI TIMELINE ==================== */
+        .modal-timeline-section {
+            margin-top: 18px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .modal-timeline-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .modal-timeline-title {
+            font-size: 13px;
+            font-weight: 800;
+            color: #cbd5e1;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .timeline-badge {
+            font-size: 11px;
+            font-weight: 700;
+            color: #38bdf8;
+            background: rgba(56, 189, 248, 0.12);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            padding: 3px 8px;
+            border-radius: 8px;
+        }
+        .modal-timeline-box {
+            max-height: 220px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .modal-timeline-box::-webkit-scrollbar {
+            width: 5px;
+        }
+        .modal-timeline-box::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 3px;
+        }
+        .timeline-tree {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            position: relative;
+            padding-left: 20px;
+        }
+        .timeline-tree::before {
+            content: '';
+            position: absolute;
+            left: 9px;
+            top: 6px;
+            bottom: 6px;
+            width: 2px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .timeline-item {
+            position: relative;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        .timeline-node-dot {
+            position: absolute;
+            left: -20px;
+            top: 8px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            z-index: 1;
+        }
+        .timeline-card {
+            flex: 1;
+            background: rgba(15, 23, 42, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            padding: 8px 12px;
+            transition: all 0.2s ease;
+        }
+        .timeline-card:hover {
+            background: rgba(30, 41, 59, 0.8);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+        .timeline-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 3px;
+        }
+        .timeline-badge-pill {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 6px;
+        }
+        .timeline-amt {
+            font-size: 12.5px;
+            font-weight: 800;
+        }
+        .timeline-main-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+        .timeline-sub-desc {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 2px;
+        }
+        .timeline-formula {
+            background: rgba(0, 0, 0, 0.35);
+            padding: 1px 5px;
+            border-radius: 4px;
+            color: #60a5fa;
+            font-family: monospace;
+            font-size: 10.5px;
+        }
+        .timeline-recent-bar {
+            margin-top: 8px;
+            padding: 6px 10px;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 8px;
+            font-size: 11px;
+            color: #94a3b8;
+        }
+        .timeline-loading, .timeline-empty {
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #94a3b8;
         }
 
         /* YAZDIRMA & PDF ŞABLONU */
@@ -10506,6 +10955,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 <!-- 4. ARKA PLAN & TEMA AYARI -->
                 <button id="theme-btn" class="control-btn" onclick="openThemeModal()" title="Arka Plan Görseli & Tema Ayarları">
                     <span>🎨</span> <span>Tema</span>
+                </button>
+
+                <!-- 5. TELEGRAM'A YÖNETİCİ ÖZETİ İLET -->
+                <button id="telegram-send-btn" class="control-btn telegram-btn" onclick="sendTelegramSnapshot()" title="Telegram'a anlık yönetici snapshot özeti gönder">
+                    <span>✈️</span> <span id="telegram-btn-text">Telegram'a İlet</span>
                 </button>
 
                 <!-- MANUEL YENİLE -->
@@ -10586,6 +11040,57 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 </div>
             </div>
 
+            <!-- 5. FİNANSAL RİSK RADARI & KONSANTRASYON ANALİZİ -->
+            <div class="risk-radar-card" id="risk-radar-section">
+                <div class="risk-radar-header">
+                    <div class="risk-title-box">
+                        <span class="risk-radar-icon">🎯</span>
+                        <div>
+                            <h3 class="risk-radar-title">FİNANSAL RİSK RADARI & KONSANTRASYON ANALİZİ</h3>
+                            <p class="risk-radar-subtitle">Gerçek zamanlı bilanço riski, alacak/borç yoğunlaşması ve likidite sağlık katsayısı</p>
+                        </div>
+                    </div>
+                    <div class="risk-score-badge grade-aplus" id="risk-score-badge">
+                        <span class="score-grade" id="risk-score-grade">A+</span>
+                        <span class="score-label" id="risk-score-text">MÜKEMMEL / DÜŞÜK RİSK</span>
+                    </div>
+                </div>
+                <div class="risk-metrics-grid">
+                    <div class="risk-metric-box">
+                        <div class="risk-m-header">
+                            <span class="risk-m-label">📊 Toplam Piyasa Alacağı</span>
+                            <span class="risk-m-val" id="risk-toplam-alacak" style="color:#34d399;">0,00 ₺</span>
+                        </div>
+                        <div class="risk-progress-bg">
+                            <div class="risk-progress-bar" id="risk-alacak-bar" style="width: 100%; background: linear-gradient(90deg, #10b981, #059669);"></div>
+                        </div>
+                        <div class="risk-sub-note" id="risk-alacak-count">0 Alacaklı Cari</div>
+                    </div>
+                    <div class="risk-metric-box">
+                        <div class="risk-m-header">
+                            <span class="risk-m-label">🚨 Toplam Açık / Şirket Borcu</span>
+                            <span class="risk-m-val" id="risk-toplam-borc" style="color:#f87171;">0,00 ₺</span>
+                        </div>
+                        <div class="risk-progress-bg">
+                            <div class="risk-progress-bar" id="risk-borc-bar" style="width: 0%; background: linear-gradient(90deg, #ef4444, #b91c1c);"></div>
+                        </div>
+                        <div class="risk-sub-note" id="risk-borc-count">0 Borçlu Cari</div>
+                    </div>
+                    <div class="risk-metric-box concentration-box">
+                        <div class="risk-m-header">
+                            <span class="risk-m-label">⚠️ Portföy Konsantrasyonu</span>
+                            <span class="risk-concentration-badge balanced" id="risk-concentration-tag">DENGELİ</span>
+                        </div>
+                        <div class="risk-concentration-text" id="risk-concentration-desc">
+                            Tek bir cariye aşırı bağımlılık tespit edilmedi. Sermaye dengeli dağılmış.
+                        </div>
+                        <div class="risk-concentration-stat" id="risk-concentration-detail">
+                            Lider Cari Payı: <b>%0</b>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 1. ARAMA VE AKILLI FİLTRELEME ARAÇ ÇUBUĞU -->
             <div class="toolbar">
                 <div class="search-area">
@@ -10625,18 +11130,45 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         </div>
         <!-- /TAB 1: KASA & FİNANS PANELİ -->
 
-        <!-- TAB 2: GÜN İÇİ CARİ NAKİT AKIŞI VE İŞLEM HACMİ -->
+        <!-- TAB 2: GÜN İÇİ CARİ NAKİT AKIŞI VE ÇOKLU VARLIK DAĞILIMI -->
         <div id="tab-trends" class="tab-content">
-            <div class="trend-chart-box" id="trend-chart-box" style="margin-bottom:0;">
-                <div class="trend-header">
-                    <div class="trend-title" style="font-size:15px;">📈 GÜN İÇİ CARİ NAKİT AKIŞI VE İŞLEM HACMİ</div>
-                    <div class="chart-legend">
-                        <div class="leg-item"><div class="leg-dot" style="background:#3b82f6;"></div> Kasa Girişi</div>
-                        <div class="leg-item"><div class="leg-dot" style="background:#f59e0b;"></div> Yapılan Ödeme</div>
+            <div class="analytics-dual-grid">
+                <!-- 1. ÇOKLU VARLIK & REZERV DAĞILIMI (DONUT) -->
+                <div class="asset-donut-box">
+                    <div class="trend-header">
+                        <div class="trend-title" style="font-size:15px;">🍩 ÇOKLU VARLIK & REZERV DAĞILIMI</div>
+                        <div class="chart-legend">
+                            <span class="donut-sub-badge" id="donut-mode-badge">Portföy Dağılımı</span>
+                        </div>
+                    </div>
+                    <div class="donut-content-layout">
+                        <div class="donut-chart-wrapper">
+                            <svg id="asset-donut-svg" viewBox="0 0 240 240" class="donut-svg">
+                                <circle cx="120" cy="120" r="80" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="24" />
+                            </svg>
+                            <div class="donut-center-info">
+                                <span class="donut-center-label">Toplam Portföy</span>
+                                <span class="donut-center-val" id="donut-center-val">0 ₺</span>
+                            </div>
+                        </div>
+                        <div class="donut-legend-list" id="donut-legend-container">
+                            <div class="timeline-loading">Portföy hesaplanıyor...</div>
+                        </div>
                     </div>
                 </div>
-                <div class="chart-canvas-wrapper" id="trend-chart-container">
-                    <p style="color:#94a3b8; font-size:12px; text-align:center; padding:25px 0;">Grafik verisi yükleniyor...</p>
+
+                <!-- 2. GÜN İÇİ CARİ NAKİT AKIŞI VE İŞLEM HACMİ (MEVCUT GRAFİK) -->
+                <div class="trend-chart-box" id="trend-chart-box" style="margin-bottom:0;">
+                    <div class="trend-header">
+                        <div class="trend-title" style="font-size:15px;">📈 GÜN İÇİ CARİ NAKİT AKIŞI VE İŞLEM HACMİ</div>
+                        <div class="chart-legend">
+                            <div class="leg-item"><div class="leg-dot" style="background:#3b82f6;"></div> Kasa Girişi</div>
+                            <div class="leg-item"><div class="leg-dot" style="background:#f59e0b;"></div> Yapılan Ödeme</div>
+                        </div>
+                    </div>
+                    <div class="chart-canvas-wrapper" id="trend-chart-container">
+                        <p style="color:#94a3b8; font-size:12px; text-align:center; padding:25px 0;">Grafik verisi yükleniyor...</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -10890,6 +11422,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                     <div class="modal-net-label">🏦 GÜNCEL NET KALAN BAKİYE</div>
                     <div class="modal-net-val" id="modal-kalan">0,00 ₺</div>
                 </div>
+                <!-- 3. GÜN İÇİ HAREKET ZAMAN ÇİZELGESİ (MINI TIMELINE) -->
+                <div class="modal-timeline-section">
+                    <div class="modal-timeline-header">
+                        <span class="modal-timeline-title">⏱️ Gün İçi Hareket Zaman Çizelgesi</span>
+                        <span class="timeline-badge" id="modal-timeline-badge">Yükleniyor...</span>
+                    </div>
+                    <div class="modal-timeline-box" id="modal-timeline-container">
+                        <div class="timeline-loading">Hareket dökümü taranıyor...</div>
+                    </div>
+                </div>
                 <div class="modal-actions">
                     <button class="modal-copy-btn" onclick="copyGroupStatement()">
                         📋 Cari Ekstresini Kopyala (WhatsApp / Telegram)
@@ -11012,8 +11554,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             if (tabName === 'trends') {
                 if (btnTrends) btnTrends.classList.add('active');
                 if (tabTrends) tabTrends.classList.add('active');
-                if (currentDashboardData && currentDashboardData.gruplar) {
-                    renderTrendChart(currentDashboardData.gruplar);
+                if (currentDashboardData) {
+                    if (currentDashboardData.gruplar) renderTrendChart(currentDashboardData.gruplar);
+                    renderAssetDonut(currentDashboardData);
                 }
             } else if (tabName === 'rates') {
                 if (btnRates) btnRates.classList.add('active');
@@ -11025,8 +11568,332 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             }
         }
 
-        function toggleCurrency() {}
-        function fetchExchangeRate() {}
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        // 1. TELEGRAM'A SNAPSHOT YÖNETİCİ RAPORU GÖNDERME
+        function sendTelegramSnapshot() {
+            const btn = document.getElementById('telegram-send-btn');
+            const btnText = document.getElementById('telegram-btn-text');
+            if (!btn) return;
+
+            btn.disabled = true;
+            if (btnText) btnText.innerText = "İletiliyor...";
+
+            const url = '/api/send_telegram_report?' + (token ? 'token=' + encodeURIComponent(token) : '');
+
+            fetch(url, { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data && data.ok) {
+                        showToast("🚀 Yönetici snapshot raporu Telegram'a başarıyla iletildi!", "success");
+                        if (typeof playFinancialChime === 'function') playFinancialChime();
+                    } else {
+                        showToast("⚠️ Gönderilemedi: " + (data && data.error ? data.error : "Bilinmeyen hata"), "error");
+                    }
+                })
+                .catch(err => {
+                    showToast("Ağ hatası: Telegram'a ulaşılamadı", "error");
+                })
+                .finally(() => {
+                    setTimeout(() => {
+                        btn.disabled = false;
+                        if (btnText) btnText.innerText = "Telegram'a İlet";
+                    }, 2000);
+                });
+        }
+
+        // 2. FİNANSAL RİSK RADARI & KONSANTRASYON ANALİZİ
+        function updateRiskRadar(d) {
+            if (!d) return;
+            const gruplar = d.gruplar || [];
+            
+            let totalAlacak = 0;
+            let totalBorc = 0;
+            let alacakCount = 0;
+            let borcCount = 0;
+            let maxAlacak = 0;
+            let maxAlacakGrup = "";
+            let maxBorc = 0;
+            let maxBorcGrup = "";
+
+            gruplar.forEach(g => {
+                const val = Number(g.kalan || 0);
+                if (val > 0.01) {
+                    totalAlacak += val;
+                    alacakCount++;
+                    if (val > maxAlacak) {
+                        maxAlacak = val;
+                        maxAlacakGrup = g.ad;
+                    }
+                } else if (val < -0.01) {
+                    const b = Math.abs(val);
+                    totalBorc += b;
+                    borcCount++;
+                    if (b > maxBorc) {
+                        maxBorc = b;
+                        maxBorcGrup = g.ad;
+                    }
+                }
+            });
+
+            const alacakEl = document.getElementById('risk-toplam-alacak');
+            const borcEl = document.getElementById('risk-toplam-borc');
+            const alacakCountEl = document.getElementById('risk-alacak-count');
+            const borcCountEl = document.getElementById('risk-borc-count');
+            const scoreGradeEl = document.getElementById('risk-score-grade');
+            const scoreTextEl = document.getElementById('risk-score-text');
+            const scoreBadgeEl = document.getElementById('risk-score-badge');
+            const concTagEl = document.getElementById('risk-concentration-tag');
+            const concDescEl = document.getElementById('risk-concentration-desc');
+            const concDetailEl = document.getElementById('risk-concentration-detail');
+            const alacakBar = document.getElementById('risk-alacak-bar');
+            const borcBar = document.getElementById('risk-borc-bar');
+
+            if (alacakEl) alacakEl.innerHTML = fmtHtml(totalAlacak);
+            if (borcEl) borcEl.innerHTML = fmtHtml(totalBorc);
+            if (alacakCountEl) alacakCountEl.innerText = `${alacakCount} Alacaklı Cari`;
+            if (borcCountEl) borcCountEl.innerText = `${borcCount} Borçlu Cari`;
+
+            const grandSum = totalAlacak + totalBorc;
+            if (grandSum > 0) {
+                if (alacakBar) alacakBar.style.width = Math.min(100, Math.round((totalAlacak / grandSum) * 100)) + '%';
+                if (borcBar) borcBar.style.width = Math.min(100, Math.round((totalBorc / grandSum) * 100)) + '%';
+            }
+
+            // Konsantrasyon Analizi
+            let maxRatio = 0;
+            let dominantName = "";
+            let isDebtDominant = false;
+
+            if (totalAlacak > 0 && maxAlacak > 0) {
+                const r = maxAlacak / totalAlacak;
+                if (r > maxRatio) {
+                    maxRatio = r;
+                    dominantName = maxAlacakGrup;
+                    isDebtDominant = false;
+                }
+            }
+            if (totalBorc > 0 && maxBorc > 0) {
+                const r = maxBorc / totalBorc;
+                if (r > maxRatio) {
+                    maxRatio = r;
+                    dominantName = maxBorcGrup;
+                    isDebtDominant = true;
+                }
+            }
+
+            const pctStr = (maxRatio * 100).toFixed(1) + '%';
+            if (concDetailEl) concDetailEl.innerHTML = dominantName ? `En Yüksek Pay: <b>${escapeHtml(dominantName)} (${pctStr})</b>` : 'Tekil yoğunlaşma yok';
+
+            if (maxRatio >= 0.45 && dominantName) {
+                if (concTagEl) {
+                    concTagEl.innerText = '⚠️ YÜKSEK RİSK';
+                    concTagEl.className = 'risk-concentration-badge high-risk';
+                }
+                if (concDescEl) {
+                    concDescEl.innerText = isDebtDominant 
+                        ? `Toplam borcun %${(maxRatio*100).toFixed(0)}'si ${dominantName} üzerinde toplanmış.`
+                        : `Toplam alacağın %${(maxRatio*100).toFixed(0)}'si ${dominantName} üzerinde toplanmış.`;
+                }
+            } else if (maxRatio >= 0.30 && dominantName) {
+                if (concTagEl) {
+                    concTagEl.innerText = '⚡ ORTA DİKKAT';
+                    concTagEl.className = 'risk-concentration-badge mid-risk';
+                }
+                if (concDescEl) {
+                    concDescEl.innerText = `Portföyde ${dominantName} ağırlığı (%${(maxRatio*100).toFixed(0)}) yakından izlenmeli.`;
+                }
+            } else {
+                if (concTagEl) {
+                    concTagEl.innerText = '🛡️ DENGELİ';
+                    concTagEl.className = 'risk-concentration-badge balanced';
+                }
+                if (concDescEl) {
+                    concDescEl.innerText = 'Sermaye cariler arasında dengeli yayılmış, tekil risk bulunmuyor.';
+                }
+            }
+
+            // Risk Skoru
+            const netKalan = (d.kalan !== undefined) ? Number(d.kalan) : (totalAlacak - totalBorc);
+            let grade = "A+";
+            let gradeText = "MÜKEMMEL / DÜŞÜK RİSK";
+            let gradeClass = "grade-aplus";
+
+            if (netKalan < -10000 || totalBorc > totalAlacak * 1.5) {
+                grade = "C";
+                gradeText = "YÜKSEK RİSK / LİKİDİTE AÇIĞI";
+                gradeClass = "grade-c";
+            } else if (netKalan < 0 || maxRatio >= 0.50) {
+                grade = "B";
+                gradeText = "ORTA / DİKKAT EDİLMELİ";
+                gradeClass = "grade-b";
+            } else if (maxRatio >= 0.35) {
+                grade = "A";
+                gradeText = "SAĞLAM / KONTROLLÜ RİSK";
+                gradeClass = "grade-a";
+            } else {
+                grade = "A+";
+                gradeText = "MÜKEMMEL / DÜŞÜK RİSK";
+                gradeClass = "grade-aplus";
+            }
+
+            if (scoreGradeEl) scoreGradeEl.innerText = grade;
+            if (scoreTextEl) scoreTextEl.innerText = gradeText;
+            if (scoreBadgeEl) {
+                scoreBadgeEl.className = `risk-score-badge ${gradeClass}`;
+            }
+        }
+
+        // 3. ÇOKLU VARLIK & REZERV DAĞILIMI DONUT GRAFİĞİ
+        function renderAssetDonut(d) {
+            const svg = document.getElementById('asset-donut-svg');
+            const centerVal = document.getElementById('donut-center-val');
+            const legendBox = document.getElementById('donut-legend-container');
+            if (!svg || !legendBox) return;
+
+            const kasaNet = Math.max(0, Number(d.kalan || 0));
+            let alacaklar = 0;
+            (d.gruplar || []).forEach(g => {
+                if (Number(g.kalan || 0) > 0.01) alacaklar += Number(g.kalan);
+            });
+            const netKar = Math.max(0, Number(d.komisyon || 0) - Number(d.toplam_masraf || 0));
+            const masraf = Number(d.toplam_masraf || 0);
+
+            const slices = [
+                { name: "Nakit Kasa", val: kasaNet, color: "#38bdf8", icon: "🏦" },
+                { name: "Cari Alacakları", val: alacaklar, color: "#10b981", icon: "📈" },
+                { name: "Şirket Kârı", val: netKar, color: "#a855f7", icon: "💎" },
+                { name: "Operasyonel Masraf", val: masraf, color: "#f43f5e", icon: "📉" }
+            ].filter(s => s.val > 0.001);
+
+            const total = slices.reduce((acc, s) => acc + s.val, 0);
+
+            if (centerVal) centerVal.innerHTML = fmtHtml(total || kasaNet);
+
+            if (total <= 0.001) {
+                svg.innerHTML = `
+                    <circle cx="120" cy="120" r="80" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="24" />
+                    <text x="120" y="125" text-anchor="middle" fill="#94a3b8" font-size="12">Bakiye 0</text>
+                `;
+                legendBox.innerHTML = '<div class="donut-empty-text" style="color:#94a3b8; font-size:12px; padding:15px 0;">Henüz portföy varlığı kaydedilmedi.</div>';
+                return;
+            }
+
+            const r = 80;
+            const cx = 120;
+            const cy = 120;
+            const circum = 2 * Math.PI * r;
+            let accumulatedPct = 0;
+
+            let svgContent = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="24" />`;
+            let legendContent = '';
+
+            slices.forEach(s => {
+                const pct = s.val / total;
+                const dashLen = pct * circum;
+                const dashOffset = - (accumulatedPct * circum);
+                const pctStr = (pct * 100).toFixed(1) + '%';
+                
+                svgContent += `
+                    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none"
+                        stroke="${s.color}" stroke-width="24"
+                        stroke-dasharray="${dashLen.toFixed(2)} ${circum.toFixed(2)}"
+                        stroke-dashoffset="${dashOffset.toFixed(2)}"
+                        transform="rotate(-90 ${cx} ${cy})"
+                        style="transition: stroke-dasharray 0.8s ease, stroke-dashoffset 0.8s ease;"
+                        opacity="0.9"
+                    >
+                        <title>${s.name}: ${fmt(s.val)} (${pctStr})</title>
+                    </circle>
+                `;
+
+                legendContent += `
+                    <div class="donut-leg-row" title="${s.name}: ${fmt(s.val)}">
+                        <div class="donut-leg-left">
+                            <span class="donut-leg-dot" style="background:${s.color}; box-shadow:0 0 8px ${s.color};"></span>
+                            <span class="donut-leg-icon">${s.icon}</span>
+                            <span class="donut-leg-name">${s.name}</span>
+                        </div>
+                        <div class="donut-leg-right">
+                            <span class="donut-leg-pct">${pctStr}</span>
+                            <span class="donut-leg-val">${fmt(s.val)}</span>
+                        </div>
+                    </div>
+                `;
+
+                accumulatedPct += pct;
+            });
+
+            svg.innerHTML = svgContent;
+            legendBox.innerHTML = legendContent;
+        }
+
+        // 4. CARİ GÜN İÇİ HAREKET ZAMAN ÇİZELGESİ (MINI TIMELINE)
+        function loadGroupTimeline(groupName) {
+            const container = document.getElementById('modal-timeline-container');
+            const badge = document.getElementById('modal-timeline-badge');
+            if (!container) return;
+
+            container.innerHTML = '<div class="timeline-loading">⏳ Hareket dökümü taranıyor...</div>';
+            if (badge) badge.innerText = "Yükleniyor...";
+
+            const url = '/api/group_timeline?group=' + encodeURIComponent(groupName) + (token ? '&token=' + encodeURIComponent(token) : '');
+
+            fetch(url)
+                .then(r => r.json())
+                .then(res => {
+                    if (!res || !res.items || res.items.length === 0) {
+                        container.innerHTML = '<div class="timeline-empty">Bu cari için gün içinde henüz çoklu alt hareket kaydedilmemiş veya tekil açılış mevcuttur.</div>';
+                        if (badge) badge.innerText = "0 Hareket";
+                        return;
+                    }
+
+                    if (badge) badge.innerText = `${res.items.length} İşlem`;
+
+                    let html = '<div class="timeline-tree">';
+                    res.items.forEach(it => {
+                        const isPos = (Number(it.amount || 0) >= 0);
+                        const sign = isPos ? '+' : '';
+                        const color = it.color || (isPos ? '#10b981' : '#f43f5e');
+                        const amtStr = sign + fmt(it.amount);
+
+                        html += `
+                        <div class="timeline-item">
+                            <div class="timeline-node-dot" style="background:${color}; box-shadow:0 0 8px ${color};">
+                                <span>${it.icon || '📌'}</span>
+                            </div>
+                            <div class="timeline-card">
+                                <div class="timeline-top">
+                                    <span class="timeline-badge-pill" style="background:rgba(255,255,255,0.06); color:${color}; border:1px solid ${color}40;">${escapeHtml(it.badge || it.type)}</span>
+                                    <span class="timeline-amt" style="color:${color};">${amtStr}</span>
+                                </div>
+                                <div class="timeline-main-title">${escapeHtml(it.title)}</div>
+                                <div class="timeline-sub-desc">${escapeHtml(it.desc || '')} ${it.formula ? `<code class="timeline-formula">${escapeHtml(it.formula)}</code>` : ''}</div>
+                            </div>
+                        </div>`;
+                    });
+
+                    if (res.recent_ops && res.recent_ops.length > 0) {
+                        html += `<div class="timeline-recent-bar"><b>🕒 Hafızadaki Son İşlemler:</b> `;
+                        html += res.recent_ops.map(o => `<span>${escapeHtml(o.tur)}: <code>${escapeHtml(o.yeniDeger)}</code></span>`).join(' • ');
+                        html += `</div>`;
+                    }
+                    html += '</div>';
+                    container.innerHTML = html;
+                })
+                .catch(err => {
+                    container.innerHTML = '<div class="timeline-empty" style="color:#f87171;">İşlem dökümü yüklenirken bağlantı hatası oluştu.</div>';
+                    if (badge) badge.innerText = "Hata";
+                });
+        }
 
         async function fetchMarketRates(isManual = false) {
             try {
@@ -11619,6 +12486,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             // 6. Gün İçi Nakit Akış Grafiğini Render Et
             renderTrendChart(d.gruplar || []);
 
+            // 7. Finansal Risk Radarı & Konsantrasyon Analizini Güncelle
+            updateRiskRadar(d);
+
+            // 8. Çoklu Varlık & Rezerv Dağılımı Donut Grafiğini Render Et
+            renderAssetDonut(d);
+
             // Grupları Render Et
             renderGroups(d.gruplar || [], updatedGroupsList);
 
@@ -11766,6 +12639,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             document.getElementById('modal-odenen').innerText = fmt(g.odenen);
             document.getElementById('modal-komisyon').innerText = fmt(g.komisyon);
             document.getElementById('modal-kalan').innerText = fmt(g.kalan);
+            
+            // Gün içi hareket zaman çizelgesini yükle
+            loadGroupTimeline(g.ad);
             
             const modal = document.getElementById('group-modal');
             if (modal) modal.classList.add('show');
@@ -12417,6 +13293,60 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
             # Webhook geldiğinde canlı yayını tetikle
             _update_executor.submit(broadcast_dashboard_update, updated_groups, group_changes)
             self._send_response_data(200, "application/json; charset=utf-8", json.dumps({"status": "ok", "message": "Anlık canlı güncelleme tetiklendi."}).encode("utf-8"))
+        elif parsed.path in ["/api/send_telegram_report", "/api/send_report"]:
+            if not self._check_auth(parsed):
+                self._send_response_data(401, "application/json; charset=utf-8", json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
+                return
+
+            try:
+                sh = get_spreadsheet()
+                sayfa = get_active_daily_sheet(sh)
+                veriler = get_sheet_values_fast(sayfa)
+                finans = tablodan_finans_ozeti_hesapla(veriler)
+                sheet_title = getattr(sayfa, "title", suankiZamaniAl().strftime("%d.%m.%Y"))
+                saat_str = suankiZamaniAl().strftime("%H:%M:%S")
+
+                kasa_toplam = finans["kasa"]
+                odenen_toplam = finans["odenen"]
+                devir_toplam = finans["devir"]
+                komisyon_toplam = finans["komisyon"]
+                masraf_toplam = finans.get("toplam_masraf", 0.0)
+                kalan_toplam = finans["kalan"]
+                net_kar = komisyon_toplam - masraf_toplam
+
+                aktif_sayi = len([g for g in finans.get("aktif_gruplar", []) if abs(g.get("kalan", 0)) > 0.01])
+
+                if kalan_toplam >= 0 and (komisyon_toplam >= masraf_toplam):
+                    risk_notu = "🟢 A+ (GÜVENLİ / DÜŞÜK RİSK)"
+                elif kalan_toplam >= 0:
+                    risk_notu = "🟡 A (KONTROLLÜ / DENGELİ)"
+                else:
+                    risk_notu = "🔴 B/C (DİKKAT / AÇIK MEVCUT)"
+
+                msg = (
+                    f"📊 <b>CFO CANLI PANELİ | YÖNETİCİ ÖZET RAPORU</b>\n"
+                    f"📅 <b>Bilanço Tarihi:</b> <code>{sheet_title}</code> | 🕒 <code>{saat_str}</code>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💰 <b>Kasa Girişi:</b> <code>{paraFormatla(kasa_toplam)}</code>\n"
+                    f"📤 <b>Yapılan Ödeme:</b> <code>{paraFormatla(odenen_toplam)}</code>\n"
+                    f"🔄 <b>Güne Devir:</b> <code>{paraFormatla(devir_toplam)}</code>\n"
+                    f"✂️ <b>Toplam Komisyon:</b> <code>{paraFormatla(komisyon_toplam)}</code>\n"
+                    f"📉 <b>Toplam Masraf:</b> <code>{paraFormatla(masraf_toplam)}</code>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🏦 <b>NET KASA BAKİYESİ:</b> <b>{paraFormatla(kalan_toplam)}</b>\n"
+                    f"💎 <b>NET ŞİRKET KÂRI:</b> <b>{paraFormatla(net_kar)}</b>\n"
+                    f"👥 <b>Aktif Hareketli Cari:</b> <code>{aktif_sayi} adet</code>\n"
+                    f"🛡️ <b>Finansal Risk Skoru:</b> <code>{risk_notu}</code>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🚀 <i>Web Dashboard üzerinden Kurucu hesabına tek tıkla iletildi.</i>"
+                )
+
+                telegramMesajGonder(KURUCU_ID, msg)
+                self._send_response_data(200, "application/json; charset=utf-8", json.dumps({"ok": True, "message": "Yönetici snapshot raporu Telegram'a başarıyla iletildi."}).encode("utf-8"))
+            except Exception as e:
+                print(f"Telegram snapshot gönderme hatası: {e}")
+                self._send_response_data(500, "application/json; charset=utf-8", json.dumps({"ok": False, "error": str(e)}).encode("utf-8"))
+            return
         else:
             self._send_response_data(404, "application/json; charset=utf-8", json.dumps({"error": "Endpoint bulunamadı"}).encode("utf-8"))
 
@@ -12635,6 +13565,177 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
                 print(f"API Dashboard sunucu hatası: {e}")
                 err_data = json.dumps({"error": "Veriler yüklenirken sunucu hatası oluştu."}).encode("utf-8")
                 self._send_response_data(500, "application/json; charset=utf-8", err_data)
+        elif parsed.path == "/api/group_timeline":
+            if not self._check_auth(parsed):
+                self._send_response_data(401, "application/json; charset=utf-8", json.dumps({"error": "Yetkisiz erişim"}).encode("utf-8"))
+                return
+
+            try:
+                query_params = urllib.parse.parse_qs(parsed.query)
+                group_name = urllib.parse.unquote(query_params.get("group", [""])[0]).strip()
+                if not group_name:
+                    self._send_response_data(400, "application/json; charset=utf-8", json.dumps({"error": "Grup adı belirtilmedi"}).encode("utf-8"))
+                    return
+
+                sh = get_spreadsheet()
+                sayfa = get_active_daily_sheet(sh)
+                veriler = get_sheet_values_fast(sayfa)
+                
+                satir_no, row_data, bulunan_ad, _ = cari_satir_bul(veriler, group_name)
+                if not satir_no or not row_data:
+                    self._send_response_data(200, "application/json; charset=utf-8", json.dumps({
+                        "group": group_name,
+                        "found": False,
+                        "items": []
+                    }).encode("utf-8"))
+                    return
+
+                devir = guvenliSayi(row_data[2]) if len(row_data) > 2 else 0.0
+                kasa = guvenliSayi(row_data[3]) if len(row_data) > 3 else 0.0
+                odenen = guvenliSayi(row_data[4]) if len(row_data) > 4 else 0.0
+                komisyon = guvenliSayi(row_data[5]) if len(row_data) > 5 else 0.0
+                kalan = guvenliSayi(row_data[6]) if len(row_data) > 6 else 0.0
+
+                with _hucre_formul_hafizasi_lock:
+                    devir_formul = _hucre_formul_hafizasi.get((sayfa.title, satir_no, 3), "")
+                    kasa_formul = _hucre_formul_hafizasi.get((sayfa.title, satir_no, 4), "")
+                    odenen_formul = _hucre_formul_hafizasi.get((sayfa.title, satir_no, 5), "")
+
+                items = []
+
+                # 1. Devir (Açılış)
+                if devir_formul or abs(devir) > 0.001:
+                    items.append({
+                        "type": "devir",
+                        "title": "Güne Devir Açılışı",
+                        "desc": "Önceki günden devreden net bakiye",
+                        "amount": devir,
+                        "formula": devir_formul or f"={devir}",
+                        "icon": "🔄",
+                        "badge": "Devir / Açılış",
+                        "color": "#38bdf8"
+                    })
+
+                # 2. Kasa parçaları
+                if kasa_formul and str(kasa_formul).startswith("="):
+                    terms = re.findall(r'([+-]?\s*\d+(?:[\.,]\d+)?)', str(kasa_formul))
+                    if len(terms) > 1:
+                        for idx_k, term in enumerate(terms, 1):
+                            val_t = guvenliSayi(term.replace(" ", ""))
+                            if abs(val_t) > 0.001:
+                                items.append({
+                                    "type": "kasa",
+                                    "title": f"Kasa Girişi #{idx_k}",
+                                    "desc": "Cariye eklenen nakit / tahsilat",
+                                    "amount": val_t,
+                                    "formula": term.strip(),
+                                    "icon": "📥",
+                                    "badge": "Kasa Girişi",
+                                    "color": "#10b981"
+                                })
+                    elif abs(kasa) > 0.001:
+                        items.append({
+                            "type": "kasa",
+                            "title": "Kasa Girişi",
+                            "desc": "Cariye eklenen nakit / tahsilat",
+                            "amount": kasa,
+                            "formula": str(kasa_formul),
+                            "icon": "📥",
+                            "badge": "Kasa Girişi",
+                            "color": "#10b981"
+                        })
+                elif abs(kasa) > 0.001:
+                    items.append({
+                        "type": "kasa",
+                        "title": "Kasa Girişi",
+                        "desc": "Cariye eklenen nakit / tahsilat",
+                        "amount": kasa,
+                        "formula": f"={kasa}",
+                        "icon": "📥",
+                        "badge": "Kasa Girişi",
+                        "color": "#10b981"
+                    })
+
+                # 3. Ödenen parçaları
+                if odenen_formul and str(odenen_formul).startswith("="):
+                    terms_o = re.findall(r'([+-]?\s*\d+(?:[\.,]\d+)?)', str(odenen_formul))
+                    if len(terms_o) > 1:
+                        for idx_o, term in enumerate(terms_o, 1):
+                            val_o = guvenliSayi(term.replace(" ", ""))
+                            if abs(val_o) > 0.001:
+                                items.append({
+                                    "type": "odenen",
+                                    "title": f"Ödeme Çıkışı #{idx_o}",
+                                    "desc": "Cariden yapılan çıkış / ödeme",
+                                    "amount": -abs(val_o),
+                                    "formula": term.strip(),
+                                    "icon": "📤",
+                                    "badge": "Ödenen",
+                                    "color": "#f43f5e"
+                                })
+                    elif abs(odenen) > 0.001:
+                        items.append({
+                            "type": "odenen",
+                            "title": "Ödeme Çıkışı",
+                            "desc": "Cariden yapılan çıkış / ödeme",
+                            "amount": -abs(odenen),
+                            "formula": str(odenen_formul),
+                            "icon": "📤",
+                            "badge": "Ödenen",
+                            "color": "#f43f5e"
+                        })
+                elif abs(odenen) > 0.001:
+                    items.append({
+                        "type": "odenen",
+                        "title": "Ödeme Çıkışı",
+                        "desc": "Cariden yapılan çıkış / ödeme",
+                        "amount": -abs(odenen),
+                        "formula": f"={odenen}",
+                        "icon": "📤",
+                        "badge": "Ödenen",
+                        "color": "#f43f5e"
+                    })
+
+                # 4. Komisyon
+                if abs(komisyon) > 0.001:
+                    items.append({
+                        "type": "komisyon",
+                        "title": "Cari Komisyonu",
+                        "desc": "İşlem kesintisi / hizmet bedeli",
+                        "amount": -abs(komisyon),
+                        "formula": f"={komisyon}",
+                        "icon": "🏷️",
+                        "badge": "Komisyon",
+                        "color": "#fbbf24"
+                    })
+
+                # 5. Hafızadaki son işlemler (zaman damgalı)
+                gecmis = app_state.get("ISLEM_GECMISI", [])
+                ilgili_gecmis = [
+                    item for item in gecmis
+                    if normalize_text(item.get("grupAdi", "")) == normalize_text(bulunan_ad)
+                ]
+
+                resp_payload = {
+                    "group": bulunan_ad,
+                    "found": True,
+                    "summary": {
+                        "devir": devir, "kasa": kasa, "odenen": odenen,
+                        "komisyon": komisyon, "kalan": kalan
+                    },
+                    "items": items,
+                    "recent_ops": [
+                        {
+                            "tur": it.get("islemTuru", "İşlem"),
+                            "yeniDeger": it.get("yeniDeger", "")
+                        } for it in ilgili_gecmis[-4:]
+                    ]
+                }
+                self._send_response_data(200, "application/json; charset=utf-8", json.dumps(resp_payload).encode("utf-8"))
+            except Exception as e:
+                print(f"API group_timeline hatası: {e}")
+                self._send_response_data(500, "application/json; charset=utf-8", json.dumps({"error": str(e)}).encode("utf-8"))
+            return
         else:
             if not self._check_auth(parsed):
                 unauth_html = """<!DOCTYPE html>
