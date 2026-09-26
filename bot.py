@@ -12192,6 +12192,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                     container.innerHTML = html;
                 })
                 .catch(err => {
+                    container.innerHTML = '<div class="timeline-empty">Zaman çizelgesi yüklenemedi.</div>';
+                    if (badge) badge.innerText = "Hata";
+                });
+        }
+
         // 5. WHATSAPP CARİ MUTABAKATI PAYLAŞIMI
         function shareOnWhatsApp() {
             if (!activeModalGroup) return;
