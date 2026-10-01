@@ -2173,6 +2173,8 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/devir [Tutar]</code> : <i>Bağlı grupta devir ekler.</i>\n"
             "• <code>/devirsil [Tutar]</code> : <i>Devir tutarından düşer.</i>\n"
             "• <code>/toplu</code> : ⚡ <i>Çoklu hızlı işlem: Birden fazla kasa, ödeme, masraf hareketini tek mesajda işler.</i>\n"
+            "• <code>/dekont</code> veya <code>/tara</code> : 📸 <i>Banka ve kripto dekontlarını OCR ile tarayıp tutarı ve cariyi tek tıkla işler (Örn: /dekont veya /dekont SACİD).</i>\n"
+            "• <code>/ses</code> veya 🎙️ <b>Sesli Mesaj</b> : <i>Ses kaydı atarak tek tıkla kasa ve ödeme işler (Örn: «Ahmet'e 150 bin ödeme geçtik»).</i>\n"
             "• <code>/cariler</code> : 📋 <i>Aktif carileri sayfalı butonlarla listeler, tek tıkla canlı kasa fişi açar.</i>\n"
             "• <code>/cariekle [Cari]</code> : ➕ <i>Excel'e girmeden doğrudan Telegram'dan yeni cari satırı ekler.</i>\n"
             "• <code>/paylas [Cari]</code> : 💬 <i>Müşteriye WhatsApp/SMS iletilecek şık, kopyalanabilir bakiye özeti üretir.</i>\n"
@@ -2218,7 +2220,7 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/tarih [GG.AA.YYYY]</code> : 📅 <i>Geçmiş günün genel bilançosunu veya cari fişini döker.</i>\n"
             "• <code>/ekstre [Cari] [Gün]</code> : <i>Carinin son 5 günlük Devir, Kasa, Ödeme ve Kalan hesap ekstresini döker.</i>\n"
             "• <code>/mutabakat</code> : 🔎 <i>Dünkü Kalan ile bugünkü Devir'i satır satır denetler, veri uyuşmazlıklarını yakalar.</i>\n"
-            "• <code>/yenigun</code> : 🌅 <i>Gün sonu devir işlemi: Dünün net kalan kasasını yeni günün devrine aktarır.</i>\n"
+            "• <code>/yenigun [ÖzelTarih]</code> : 🌅 <i>Gün sonu devir işlemi: Yerel tarihi baz alır veya isteğe bağlı özel tarihe devir açar (Örn: /yenigun veya /yenigun 05.10.2026).</i>\n"
             "• <code>/kapanis</code> : 🌙 <i>Kurucuya özel gün sonu kapanış bilançosu.</i>"
         )
     elif kategori == "kripto":
@@ -2243,7 +2245,8 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/ibanbosalt [Hesap]</code> : <i>İBAN'ı boşa çıkarır ve 'Müsait' yapar.</i>\n"
             "• <code>/ibancoz [İBAN]</code> : <i>İBAN'ı doğrular (MOD-97), bankasını bulur ve temiz format üretir.</i>\n"
             "• <code>/t [Cüzdan]</code> : 🏛️ <i>Canlı TRC-20 rezerv ve TL karşılığı (Sadece Kurucu).</i>\n"
-            "• <code>/qr [Cüzdan]</code> : ⚡ <i>Hızlı ödeme QR kodu üretir ve borsa analizi yapar.</i>"
+            "• <code>/qr [Cüzdan]</code> : ⚡ <i>Hızlı ödeme QR kodu üretir ve borsa analizi yapar.</i>\n"
+            "• <code>/tx [Hash]</code> : ⚡ <i>Canlı TRC-20 USDT transfer teyidi ve TxID doğrulama.</i>"
         )
     elif kategori == "admin":
         return (
@@ -2263,6 +2266,9 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/status</code> : ⚙️ <i>Sistem çalışma süresi (uptime), limitler ve hafıza metrikleri.</i>\n"
             "• <code>/reload</code> : 🔄 <i>Canlıda yetki ve konfigürasyon dosyalarını yeniden yükler.</i>\n\n"
             "🔐 <b>FİNANSAL GÜVENLİK VE DENETİM:</b>\n"
+            "• <code>/istihbarat [İBAN/Cüzdan]</code> : 🛡️ <i>Şüpheli hesap, dolandırıcılık veya MASAK bloke risk sorgulama.</i>\n"
+            "• <code>/karaliste</code> : 📋 <i>Tüm riskli ve yasaklı şirket hesapları listesi.</i>\n"
+            "• <code>/karalisteekle</code> / <code>/karalistesil</code> : <i>Risk havuzuna hesap ekler veya siler.</i>\n"
             "• <code>/anomali</code> : 🚨 <i>Finansal sapma ve olağandışı risk tespiti.</i>\n"
             "• <code>/limit [Tutar]</code> : 🚀 <i>Tekil maksimum işlem limitini belirler/görüntüler.</i>\n"
             "• <code>/kilitle [Grup]</code> : 🔒 <i>Seçilen grubun kasasını dondurur, veri girişini engeller.</i>\n"
@@ -2291,6 +2297,8 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/devir</code> / <code>/devirsil</code> : Devir bakiyesi ekler veya düşer.\n"
             "• <code>/virman [Kaynak] [Hedef] [Tutar]</code> : 🔄 Cari kasa transferi.\n"
             "• <code>/toplu</code> : ⚡ Hızlı çoklu işlem (+, -, Ö, D, M).\n"
+            "• <code>/dekont</code> : 📸 Akıllı dekont & OCR okuyucu.\n"
+            "• <code>/ses</code> : 🎙️ Sesli mesajla tek tıkla kasa & ödeme işleme.\n"
             "• <code>/cariler</code> / <code>/cariekle</code> : 📋 Aktif cariler ve yeni cari açma.\n"
             "• <code>/paylas</code> / <code>/hareketler</code> : Bakiye özeti ve işlem dökümü.\n"
             "• <code>/masraf</code> / <code>/masrafekle</code> / <code>/masrafsil</code> : Gider yönetimi.\n"
@@ -2320,8 +2328,10 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/akilliiban</code> / <code>/ototahsis</code> : 🎯 Otomatik boş İBAN bağlama.\n"
             "• <code>/tahsisliibanlar</code> / <code>/ibantemizle</code> : Tahsisli İBAN yönetimi.\n"
             "• <code>/sablon</code> / <code>/ibancoz</code> : Ödeme şablonu ve MOD-97 İBAN kontrolü.\n"
-            "• <code>/t [Cüzdan]</code> / <code>/qr</code> : 🏛️ Canlı TRC-20 rezervi ve ödeme QR kodu.\n\n"
+            "• <code>/t [Cüzdan]</code> / <code>/qr</code> / <code>/tx [Hash]</code> : 🏛️ TRC-20 rezervi, QR kod ve canlı TxID teyidi.\n\n"
             "🛡️ <b>YÖNETİCİ, GÜVENLİK VE DEVOPS</b>\n"
+            "• <code>/istihbarat</code> / <code>/karaliste</code> : 🛡️ Kara liste & şüpheli hesap istihbaratı.\n"
+            "• <code>/karalisteekle</code> / <code>/karalistesil</code> : Riskli hesap ekleme / silme.\n"
             "• <code>/id</code> / <code>/yetkiler</code> : 🆔 Telegram ID ve yetki sorgulama.\n"
             "• <code>/panel</code> / <code>/panellink</code> : 🌐 CFO Web Dashboard linki.\n"
             "• <code>/adminler</code> / <code>/adminekle</code> / <code>/adminsil</code> : Yönetici kadrosu.\n"
@@ -4403,6 +4413,1208 @@ def cuzdanQrUret_impl(chat_id: int, komut_metni: str):
         res2 = telegramFotoGonder(chat_id, fallback_qr, caption, klavye)
         if not res2.get("ok"):
             telegramMesajGonder(chat_id, caption, klavye)
+
+# --- TRON (TRC-20) CANLI TXID / HASH TRANSFER DOĞRULAMA ---
+def get_tron_tx_info(tx_hash: str) -> Optional[dict]:
+    """Tronscan resmi API üzerinden TxID / Hash detaylarını çeker."""
+    clean_hash = tx_hash.strip().lower()
+    if clean_hash.startswith("0x"):
+        clean_hash = clean_hash[2:]
+
+    url = f"https://apilist.tronscan.org/api/transaction-info?hash={clean_hash}"
+    req = urllib.request.Request(
+        url,
+        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=8) as res:
+            d = json.loads(res.read().decode())
+            if not d or not isinstance(d, dict) or ("hash" not in d and "contractRet" not in d):
+                return None
+            return d
+    except Exception as e:
+        print(f"Tronscan tx sorgulama hatası ({clean_hash}): {e}")
+        return None
+
+def trc20_tx_raporu_uret(tx_input: str) -> Tuple[str, dict]:
+    """TRON (TRC-20) TxID / Hash doğrulama raporu ve interaktif butonlar üretir."""
+    # 64 karakterli hex hash'i tespit et (link, metin veya temiz hash içinden)
+    m = re.search(r'([a-fA-F0-9]{64})', tx_input)
+    if not m:
+        yardim_metni = (
+            "🔍 <b>CANLI KRİPTO TRANSFER DOĞRULAMA (TxID)</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "TRON (TRC-20) ağındaki USDT ve TRX transferlerini anında doğrulamak için:\n\n"
+            "👉 <code>/tx [İşlem Hash veya Tronscan Linki]</code>\n\n"
+            "📌 <b>Örnek Kullanım:</b>\n"
+            "• <code>/tx c7490f23d069b12beff262a3f80c651e44280cf1e29e94477c7324eb2913f06b</code>\n"
+            "• <code>/tx https://tronscan.org/#/transaction/c7490f23...</code>\n\n"
+            "💡 <i>İşlem tutarı, gönderen/alıcı cüzdan, borsa etiketi, ağ onay durumu ve şirket kasasına ulaşıp ulaşmadığı anında teyit edilir.</i>"
+        )
+        klavye = {
+            "inline_keyboard": [
+                [{"text": "🌐 Tronscan Explorer", "url": "https://tronscan.org"}],
+                [{"text": "🗑️ Kapat", "callback_data": "mesaj_kapat"}]
+            ]
+        }
+        return yardim_metni, klavye
+
+    tx_hash = m.group(1).lower()
+    tx_data = get_tron_tx_info(tx_hash)
+
+    if not tx_data:
+        hata_metni = (
+            "⚠️ <b>İşlem Blok Zincirinde Bulunamadı!</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"🔗 <b>Aranan TxID:</b>\n<code>{tx_hash}</code>\n\n"
+            "🔍 <i>Bu işlem TRON ağında henüz tespit edilemedi. Olası sebepler:</i>\n"
+            "• Transfer henüz yeni yollandıysa ağa düşmesi <b>5-15 saniye</b> sürebilir.\n"
+            "• Girilen TxID hatalı veya başka bir ağa (BSC, Ethereum) ait olabilir.\n\n"
+            "💡 <i>Lütfen birkaç saniye bekleyip 'Yeniden Sorgula' butonuna basınız.</i>"
+        )
+        klavye = {
+            "inline_keyboard": [
+                [
+                    {"text": "🔍 Tronscan Web'de Aç", "url": f"https://tronscan.org/#/transaction/{tx_hash}"},
+                    {"text": "🔄 Yeniden Sorgula", "callback_data": f"tx_yenile_{tx_hash}"}
+                ],
+                [{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]
+            ]
+        }
+        return hata_metni, klavye
+
+    # Veri çözümleme
+    contract_ret = str(tx_data.get("contractRet", "")).upper()
+    confirmed = bool(tx_data.get("confirmed", False))
+    revert = bool(tx_data.get("revert", False))
+    block = tx_data.get("block") or tx_data.get("blockNumber") or "-"
+    
+    timestamp_ms = tx_data.get("timestamp") or tx_data.get("block_timestamp") or 0
+    if timestamp_ms:
+        dt_obj = datetime.datetime.fromtimestamp(timestamp_ms / 1000.0, TR_TZ)
+        tarih_saat = dt_obj.strftime("%d.%m.%Y | %H:%M:%S")
+    else:
+        tarih_saat = "-"
+
+    # Masraf
+    cost = tx_data.get("cost", {})
+    fee_sun = cost.get("energy_fee", 0) + cost.get("net_fee", 0) or tx_data.get("fee", 0)
+    fee_trx = fee_sun / 1_000_000.0
+    energy_used = cost.get("energy_usage_total", 0)
+    fee_fmt = f"{fee_trx:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    fee_str = f"{fee_fmt} TRX"
+    if energy_used > 0:
+        fee_str += f" (~{energy_used:,} Enerji)"
+
+    # Transfer detayları
+    transfers = tx_data.get("trc20TransferInfo") or []
+    if transfers:
+        t = transfers[0]
+        token_symbol = str(t.get("symbol", "USDT")).upper()
+        decimals = int(t.get("decimals", 6))
+        raw_amt = float(t.get("amount_str", 0))
+        amount = raw_amt / (10 ** decimals)
+        from_addr = t.get("from_address") or tx_data.get("ownerAddress", "")
+        to_addr = t.get("to_address", "")
+    elif tx_data.get("contractData", {}).get("amount"):
+        token_symbol = "TRX"
+        amount = float(tx_data["contractData"]["amount"]) / 1_000_000.0
+        from_addr = tx_data.get("ownerAddress", "")
+        to_addr = tx_data.get("toAddress", "")
+    else:
+        token_symbol = "USDT"
+        amount = float(tx_data.get("amount", 0))
+        from_addr = tx_data.get("ownerAddress", "")
+        to_addr = tx_data.get("toAddress", "")
+
+    # Durum rozeti
+    if (contract_ret == "SUCCESS" or not contract_ret) and confirmed and not revert:
+        durum_rozet = "🟢 <b>BAŞARILI &amp; ONAYLANDI (CONFIRMED)</b>"
+    elif contract_ret == "SUCCESS" and not confirmed:
+        durum_rozet = "🟡 <b>AĞDA BEKLİYOR (UNCONFIRMED / PENDING)</b>"
+    elif contract_ret in ["FAIL", "REVERT"] or revert:
+        durum_rozet = "🔴 <b>BAŞARISIZ / İPTAL (FAILED / REVERTED)</b>"
+    else:
+        durum_rozet = f"⚪ <b>{contract_ret or 'İŞLENDİ'}</b>"
+
+    # TL Karşılık hesabı
+    tl_metni = ""
+    amt_fmt = f"{amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    if token_symbol == "USDT" and amount > 0:
+        try:
+            _, usdt_try_kur = get_borsa_kurlari_listesi()
+            if usdt_try_kur > 0:
+                tl_tutar = amount * usdt_try_kur
+                tl_metni = f"\n🇹🇷 <i>Yaklaşık Karşılık: <b>{paraFormatla(tl_tutar)}</b> (1 USDT ≈ {usdt_try_kur:,.2f} ₺)</i>"
+        except Exception:
+            pass
+
+    # Şirket kasası eşleşmesi kontrolü
+    company_wallet = (VARSAYILAN_TRC20_ADRES or "").strip().lower()
+    to_notu = ""
+    from_notu = ""
+    if to_addr and to_addr.lower() == company_wallet:
+        to_notu = "\n🏢 <b>Şirket Kasası:</b> 🟢 <i>Giriş Şirket Ana Rezerv Cüzdanımıza Yapıldı! ✅</i>"
+    elif from_addr and from_addr.lower() == company_wallet:
+        from_notu = "\n🏢 <b>Şirket Kasası:</b> 📤 <i>Şirket Ana Rezerv Cüzdanımızdan Gönderildi!</i>"
+
+    # Borsa / kurum istihbaratı
+    from_entity = detect_wallet_entity(from_addr) if from_addr else ""
+    to_entity = detect_wallet_entity(to_addr) if to_addr else ""
+    if from_entity:
+        from_notu += f"\n{from_entity}"
+    if to_entity and not to_notu:
+        to_notu += f"\n{to_entity}"
+
+    block_str = f"{block:,}" if isinstance(block, int) else str(block)
+
+    mesaj = (
+        f"⚡ <b>TRC-20 KRİPTO TRANSFER DOĞRULAMA (TxID)</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📌 <b>İşlem Durumu:</b> {durum_rozet}\n"
+        f"📅 <b>Tarih &amp; Saat:</b> <code>{tarih_saat}</code>\n"
+        f"🧱 <b>Blok Numarası:</b> <code>{block_str}</code>\n\n"
+        f"💵 <b>TRANSFER EDİLEN TUTAR:</b>\n"
+        f"💰 <b>{amt_fmt} {token_symbol}</b>{tl_metni}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📤 <b>Gönderen (From):</b>\n<code>{from_addr}</code>{from_notu}\n\n"
+        f"📥 <b>Alıcı (To):</b>\n<code>{to_addr}</code>{to_notu}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"⛽ <b>Ağ Masrafı (Fee):</b> <code>{fee_str}</code>\n"
+        f"🔗 <b>TxID (Hash):</b>\n<code>{tx_hash}</code>"
+    )
+
+    klavye = {
+        "inline_keyboard": [
+            [
+                {"text": "🔍 Tronscan Explorer", "url": f"https://tronscan.org/#/transaction/{tx_hash}"},
+                {"text": "🔄 Yeniden Sorgula", "callback_data": f"tx_yenile_{tx_hash}"}
+            ],
+            [
+                {"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}
+            ]
+        ]
+    }
+    return mesaj, klavye
+
+def trc20_tx_sorgula_impl(param: str) -> Tuple[str, dict]:
+    """Telegram üzerinden TxID sorgusunu çalıştırır."""
+    return trc20_tx_raporu_uret(param)
+
+# --- AKILLI DEKONT & EKRAN GÖRÜNTÜSÜ OKUYUCU (OCR ENGINE) ---
+
+_PENDING_DEKONT_CACHE: Dict[str, dict] = {}
+_PENDING_DEKONT_LOCK = threading.Lock()
+
+def extract_photo_file_id(msg: dict) -> Optional[str]:
+    """Telegram mesajından veya yanıtlanan mesajdan en yüksek kaliteli görselin file_id bilgisini çıkarır."""
+    if not isinstance(msg, dict):
+        return None
+
+    # 1. Mesajın kendisindeki fotoğraf
+    photos = msg.get("photo")
+    if photos and isinstance(photos, list):
+        return photos[-1].get("file_id")
+
+    # 2. Mesajın kendisindeki görsel doküman
+    doc = msg.get("document")
+    if doc and isinstance(doc, dict):
+        mime = str(doc.get("mime_type", ""))
+        if mime.startswith("image/"):
+            return doc.get("file_id")
+
+    # 3. Yanıtlanan (Reply) mesajdaki fotoğraf
+    reply = msg.get("reply_to_message")
+    if reply and isinstance(reply, dict):
+        r_photos = reply.get("photo")
+        if r_photos and isinstance(r_photos, list):
+            return r_photos[-1].get("file_id")
+        r_doc = reply.get("document")
+        if r_doc and isinstance(r_doc, dict):
+            r_mime = str(r_doc.get("mime_type", ""))
+            if r_mime.startswith("image/"):
+                return r_doc.get("file_id")
+
+    return None
+
+def telegram_file_indir(file_id: str) -> Optional[bytes]:
+    """Telegram getFile API üzerinden görsel dosyasını indirip byte verisi olarak döndürür."""
+    if not file_id:
+        return None
+    try:
+        res = telegram_api("getFile", {"file_id": file_id})
+        if not res or not res.get("ok"):
+            return None
+        file_path = res.get("result", {}).get("file_path")
+        if not file_path:
+            return None
+        url_dl = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}"
+        req_dl = urllib.request.Request(url_dl, headers={"User-Agent": "CFO-BOT/1.0"})
+        with urllib.request.urlopen(req_dl, timeout=20) as r_dl:
+            return r_dl.read()
+    except Exception as e:
+        print(f"Telegram dosya indirme hatası: {e}")
+        return None
+
+def ocr_goruntu_tara(image_bytes: bytes) -> str:
+    """
+    Dekont veya ekran görüntüsünden metin okur.
+    1. Varsa GEMINI_API_KEY üzerinden Gemini Vision REST API.
+    2. Evrensel ve ücretsiz OCR.Space API (Engine 2, Türkçe dil desteği).
+    3. Sistemde tesseract kurulu ise yerel fallback.
+    """
+    if not image_bytes:
+        return ""
+
+    # 1. Gemini Vision REST API (Eğer GEMINI_API_KEY ortam değişkeni tanımlıysa)
+    gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if gemini_key:
+        try:
+            b64_img = base64.b64encode(image_bytes).decode("utf-8")
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+            payload = {
+                "contents": [{
+                    "parts": [
+                        {"text": "Bu bir banka havale/EFT/FAST veya kripto transfer dekontu ekran görüntüsüdür. Lütfen görseldeki kurum adını, işlem tutarını, gönderen adını, alıcı adını, IBAN ve referans numarasını eksiksiz dök."},
+                        {"inline_data": {"mime_type": "image/jpeg", "data": b64_img}}
+                    ]
+                }]
+            }
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json", "User-Agent": "CFO-BOT/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=12) as response:
+                res = json.loads(response.read().decode("utf-8"))
+                candidates = res.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if parts:
+                        return parts[0].get("text", "")
+        except Exception as e:
+            print(f"Gemini Vision OCR deneme uyarısı: {e}")
+
+    # 2. OCR.Space API (Evrensel, API kurulumu gerektirmez, Türkçe destekli OCR Engine 2)
+    try:
+        b64_img = base64.b64encode(image_bytes).decode("utf-8")
+        ocr_key = os.environ.get("OCR_SPACE_API_KEY", "helloworld").strip()
+        data_fields = {
+            "apikey": ocr_key,
+            "language": "tur",
+            "isOverlayRequired": "false",
+            "OCREngine": "2",
+            "detectOrientation": "true",
+            "scale": "true",
+            "base64Image": f"data:image/jpeg;base64,{b64_img}"
+        }
+        encoded_data = urllib.parse.urlencode(data_fields).encode("utf-8")
+        req = urllib.request.Request(
+            "https://api.ocr.space/parse/image",
+            data=encoded_data,
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": "CFO-BOT/1.0"
+            }
+        )
+        with urllib.request.urlopen(req, timeout=15) as response:
+            res = json.loads(response.read().decode("utf-8"))
+            parsed_results = res.get("ParsedResults", [])
+            if parsed_results:
+                parsed_text = parsed_results[0].get("ParsedText", "")
+                if parsed_text.strip():
+                    return parsed_text
+    except Exception as e:
+        print(f"OCR.space API deneme uyarısı: {e}")
+
+    # 3. Yerel Tesseract (Sistemde yüklüyse)
+    try:
+        import subprocess
+        proc = subprocess.Popen(
+            ["tesseract", "stdin", "stdout", "-l", "tur+eng"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        out, _ = proc.communicate(input=image_bytes, timeout=10)
+        if out:
+            return out.decode("utf-8", errors="ignore")
+    except Exception:
+        pass
+
+    return ""
+
+def dekont_verisi_ayristir(metin: str) -> dict:
+    """OCR ile taranmış metinden finansal alanları (banka, tutar, gönderen, alıcı, iban, ref) çıkarır."""
+    if not metin:
+        return {
+            "banka": "Bilinmeyen Kurum",
+            "tutar": 0.0,
+            "gonderen": "",
+            "alici": "",
+            "iban": "",
+            "tarih": "",
+            "ref_no": ""
+        }
+
+    metin_clean = metin.replace("\r", "")
+
+    # 1. Banka & Kripto Kurumu Tespiti
+    banka = "Banka / Finans Kurumu"
+    banka_haritasi = [
+        (r"(?i)garanti|bbva", "Garanti BBVA"),
+        (r"(?i)ziraat", "Ziraat Bankası"),
+        (r"(?i)vak[ıi]fbank|vak[ıi]f\s*bank", "Vakıfbank"),
+        (r"(?i)yap[ıi]\s*kredi|ykb", "Yapı Kredi"),
+        (r"(?i)i[şs]\s*bankas[ıi]|t[üu]rkiye\s*i[şs]", "İş Bankası"),
+        (r"(?i)akbank", "Akbank"),
+        (r"(?i)qnb|finansbank", "QNB Finansbank"),
+        (r"(?i)enpara", "Enpara"),
+        (r"(?i)denizbank", "Denizbank"),
+        (r"(?i)\bteb\b|t[üu]rk\s*ekonomi", "TEB"),
+        (r"(?i)kuveyt\s*t[üu]rk", "Kuveyt Türk"),
+        (r"(?i)halkbank", "Halkbank"),
+        (r"(?i)albaraka", "Albaraka Türk"),
+        (r"(?i)papara", "Papara"),
+        (r"(?i)hayhay", "Hayhay"),
+        (r"(?i)paycell", "Paycell"),
+        (r"(?i)tosla", "Tosla"),
+        (r"(?i)binance", "Binance (Kripto)"),
+        (r"(?i)paribu", "Paribu (Kripto)"),
+        (r"(?i)btcturk", "BtcTurk (Kripto)"),
+        (r"(?i)\bokx\b", "OKX (Kripto)"),
+        (r"(?i)bybit", "Bybit (Kripto)")
+    ]
+    for pat, b_isim in banka_haritasi:
+        if re.search(pat, metin_clean):
+            banka = b_isim
+            break
+
+    # 2. Tutar Tespiti
+    tutar = 0.0
+    # A) Etiketli tutar arama (Örn: "Tutar: 150.000,00 TL" veya "İşlem Tutarı 75.000 TL")
+    tutar_etiketli_pat = r'(?i)(?:i[şs]lem\s*tutar[ıi]|g[öo]nderilen\s*tutar|[öo]denen\s*tutar|transfer\s*tutar[ıi]|tutar[ıi]|tutar|miktar[ıi]|miktar|amount)\s*[:\s\-]*([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{1,2})?|[0-9]+(?:[.,][0-9]{1,2})?)\s*(?:TL|TRY|₺|USDT|USD|EUR)?'
+    m_tut = re.search(tutar_etiketli_pat, metin_clean)
+    if m_tut:
+        tutar = guvenliSayi(m_tut.group(1))
+
+    # B) TL / ₺ sembolü olan sayıları tara
+    if tutar <= 0:
+        sembollu_pat = r'([0-9]{1,3}(?:\.[0-9]{3})+(?:,[0-9]{1,2})?|[0-9]+(?:,[0-9]{1,2})?)\s*(?:TL|TRY|₺)'
+        m_sem = re.search(sembollu_pat, metin_clean)
+        if m_sem:
+            tutar = guvenliSayi(m_sem.group(1))
+
+    # C) Kripto USDT formatı (12,500.00 USDT)
+    if tutar <= 0:
+        kripto_pat = r'([0-9]{1,3}(?:,[0-9]{3})+(?:\.[0-9]{1,2})?|[0-9]+(?:\.[0-9]{1,2})?)\s*(?:USDT|USD)'
+        m_krip = re.search(kripto_pat, metin_clean)
+        if m_krip:
+            tutar = guvenliSayi(m_krip.group(1))
+
+    # D) Noktalı format fallback (150.000 veya 150.000,00)
+    if tutar <= 0:
+        noktali_pat = r'([0-9]{1,3}(?:\.[0-9]{3})+(?:,[0-9]{2})?)'
+        m_nok = re.findall(noktali_pat, metin_clean)
+        for cand in m_nok:
+            c_val = guvenliSayi(cand)
+            if c_val >= 100:
+                tutar = c_val
+                break
+
+    # 3. Gönderen Tespiti
+    gonderen = ""
+    gond_pat = r'(?i)(?:g[öo]nderen\s*ad[ıi]\s*soyad[ıi]|g[öo]nderen\s*ki[şs]i|g[öo]nderen|g[öo]nderici|hesap\s*sahibi|from)\s*[:\s\-]*([A-ZÇĞİÖŞÜa-zçğıöşü\s]{3,35})'
+    m_gond = re.search(gond_pat, metin_clean)
+    if m_gond:
+        gonderen = m_gond.group(1).split("\n")[0].strip()
+
+    # 4. Alıcı Tespiti
+    alici = ""
+    alic_pat = r'(?i)(?:al[ıi]c[ıi]\s*ad[ıi]\s*soyad[ıi]|al[ıi]c[ıi]\s*unvan[ıi]|al[ıi]c[ıi]|hedef\s*hesap|kime|to)\s*[:\s\-]*([A-ZÇĞİÖŞÜa-zçğıöşü\s]{3,35})'
+    m_alic = re.search(alic_pat, metin_clean)
+    if m_alic:
+        alici = m_alic.group(1).split("\n")[0].strip()
+
+    # 5. IBAN Tespiti
+    iban = ""
+    m_ib = re.search(r'(TR[0-9]{2}\s*(?:[0-9]{4}\s*){5}[0-9]{2})', metin_clean)
+    if m_ib:
+        iban = re.sub(r'\s+', '', m_ib.group(1))
+
+    # 6. Tarih & Saat Tespiti
+    tarih = ""
+    m_dt = re.search(r'([0-3]?[0-9][./-][0-1]?[0-9][./-][2][0][2-9][0-9](?:\s+[0-2]?[0-9]:[0-5][0-9](?::[0-5][0-9])?)?)', metin_clean)
+    if m_dt:
+        tarih = m_dt.group(1).strip()
+
+    # 7. Referans / Sorgu No Tespiti
+    ref_no = ""
+    ref_pat = r'(?i)(?:referans|ref|dekont|sorgu|i[şs]lem)\s*(?:no|numaras[ıi])?\s*[:\s\-]*([A-Za-z0-9]{6,30})'
+    m_ref = re.search(ref_pat, metin_clean)
+    if m_ref:
+        ref_no = m_ref.group(1).strip()
+
+    return {
+        "banka": banka,
+        "tutar": tutar,
+        "gonderen": gonderen,
+        "alici": alici,
+        "iban": iban,
+        "tarih": tarih,
+        "ref_no": ref_no
+    }
+
+def dekont_cari_eslestir(tum_veriler: List[List[str]], parsed_data: dict, zorunlu_cari: str = "") -> str:
+    """Dekonttan çıkan gönderen/alıcı bilgilerini tablodaki aktif carilerle eşleştirir."""
+    if zorunlu_cari:
+        s_idx, r_row, gercek_ad, _ = cari_satir_bul(tum_veriler, zorunlu_cari)
+        if gercek_ad:
+            return gercek_ad
+        return zorunlu_cari.upper()
+
+    aday_isimler = []
+    gond = parsed_data.get("gonderen", "").strip()
+    alic = parsed_data.get("alici", "").strip()
+    if gond:
+        aday_isimler.append(gond)
+        for token in gond.split():
+            if len(token) >= 3:
+                aday_isimler.append(token)
+    if alic:
+        aday_isimler.append(alic)
+        for token in alic.split():
+            if len(token) >= 3:
+                aday_isimler.append(token)
+
+    for cand in aday_isimler:
+        s_idx, r_row, gercek_ad, _ = cari_satir_bul(tum_veriler, cand)
+        if gercek_ad:
+            return gercek_ad
+
+    return ""
+
+def dekont_raporu_uret(parsed: dict, cari: str = "", chat_id: int = 0, user_id: int = 0, tum_veriler: Optional[List[List[str]]] = None) -> Tuple[str, dict]:
+    """Dekont detay kartı ve tek dokunuşla işlem butonları üretir."""
+    banka = parsed.get("banka", "Banka / Kurum")
+    tutar = parsed.get("tutar", 0.0)
+    gonderen = parsed.get("gonderen", "")
+    alici = parsed.get("alici", "")
+    iban = parsed.get("iban", "")
+    tarih = parsed.get("tarih", "")
+    ref_no = parsed.get("ref_no", "")
+
+    now = time.time()
+    with _PENDING_DEKONT_LOCK:
+        expired = [k for k, v in _PENDING_DEKONT_CACHE.items() if now - v.get("created_at", 0) > 3600]
+        for k in expired:
+            _PENDING_DEKONT_CACHE.pop(k, None)
+
+    token = uuid.uuid4().hex[:8]
+    with _PENDING_DEKONT_LOCK:
+        _PENDING_DEKONT_CACHE[token] = {
+            "banka": banka,
+            "tutar": tutar,
+            "gonderen": gonderen,
+            "alici": alici,
+            "iban": iban,
+            "tarih": tarih,
+            "ref_no": ref_no,
+            "cari": cari,
+            "chat_id": chat_id,
+            "user_id": user_id,
+            "created_at": now
+        }
+
+    iban_str = f"🏛️ <b>İBAN:</b> <code>{iban}</code>\n" if iban else ""
+    cari_emoji = grupEmojisiBul(cari) if cari else "❓"
+    cari_baslik = f"{cari_emoji} <b>{cari}</b>" if cari else "⚠️ <i>Henüz Seçilmedi (Aşağıdan Seçin)</i>"
+
+    if tutar > 0:
+        tutar_str = f"💰 <b>{paraFormatla(tutar)}</b>"
+    else:
+        tutar_str = "⚠️ <i>Okunamadı (Manuel Giriniz)</i>"
+
+    mesaj = (
+        f"📸 <b>AKILLI DEKONT &amp; EKRAN GÖRÜNTÜSÜ AYRIŞTIRILDI</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🏛️ <b>Kurum / Banka:</b> 🏦 <b>{banka}</b>\n"
+        f"💵 <b>Okunan Tutar:</b> {tutar_str}\n"
+        f"👤 <b>Gönderen:</b> <code>{gonderen or '-'}</code>\n"
+        f"📥 <b>Alıcı:</b> <code>{alici or '-'}</code>\n"
+        f"{iban_str}"
+        f"📅 <b>İşlem Tarihi:</b> <code>{tarih or '-'}</code>\n"
+        f"🔖 <b>Dekont Ref No:</b> <code>{ref_no or '-'}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🎯 <b>Hedef Cari:</b> {cari_baslik}\n\n"
+    )
+
+    if tutar <= 0:
+        mesaj += "💡 <i>Görselden net bir tutar okunamadığı için işlem butonları oluşturulamadı. Lütfen dekontu tekrar çekip gönderiniz.</i>"
+        klavye = {"inline_keyboard": [[{"text": "🗑️ Kapat", "callback_data": "mesaj_kapat"}]]}
+        return mesaj, klavye
+
+    if cari:
+        mesaj += "💡 <i>İşlemi onaylamak için aşağıdaki butonlardan birine dokununuz:</i>"
+        klavye = {
+            "inline_keyboard": [
+                [
+                    {"text": f"🟢 Kasaya Ekle (+{paraFormatla(tutar)})", "callback_data": f"dknt_k_{token}"},
+                    {"text": f"🔴 Ödeme Düş ({paraFormatla(tutar)})", "callback_data": f"dknt_o_{token}"}
+                ],
+                [
+                    {"text": "🔄 Farklı Cari Seç", "callback_data": f"dknt_c_{token}"},
+                    {"text": "🗑️ İptal / Kapat", "callback_data": "mesaj_kapat"}
+                ]
+            ]
+        }
+    else:
+        mesaj += "💡 <i>Dekontun işleneceği cariyi aşağıdaki listeden seçiniz:</i>"
+        cariler = []
+        if tum_veriler:
+            for r in tum_veriler[1:]:
+                if len(r) >= 2 and r[1].strip():
+                    c_ad = r[1].strip()
+                    if c_ad not in ["*", "-"] and "TOPLAM" not in c_ad.upper() and "FARK" not in c_ad.upper():
+                        cariler.append(c_ad)
+
+        cariler = cariler[:8]
+        rows = []
+        cur_row = []
+        with _PENDING_DEKONT_LOCK:
+            _PENDING_DEKONT_CACHE[token]["cariler_listesi"] = cariler
+
+        for idx, c in enumerate(cariler):
+            cur_row.append({"text": f"{grupEmojisiBul(c)} {c}", "callback_data": f"dknt_sc_{token}_{idx}"})
+            if len(cur_row) == 2:
+                rows.append(cur_row)
+                cur_row = []
+        if cur_row:
+            rows.append(cur_row)
+        rows.append([{"text": "🗑️ İptal / Kapat", "callback_data": "mesaj_kapat"}])
+        klavye = {"inline_keyboard": rows}
+
+    return mesaj, klavye
+
+def dekont_tara_komut_impl(msg: dict, args: list) -> Tuple[str, dict]:
+    """/dekont komutu yürütücüsü: Görseli bulur, OCR ile tarar ve onay kartını hazırlar."""
+    chat_id = msg.get("chat", {}).get("id") or 0
+    from_user = msg.get("from") or {}
+    user_id = from_user.get("id") or 0
+
+    file_id = extract_photo_file_id(msg)
+    if not file_id:
+        yardim_metni = (
+            "📸 <b>CFO AKILLI DEKONT &amp; EKRAN GÖRÜNTÜSÜ OKUYUCU (/dekont)</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "Banka veya kripto transfer dekontunu sisteme işletmenin <b>2 kolay yolu</b> vardır:\n\n"
+            "1️⃣ <b>Görseli Yüklerken (En Hızlı Yöntem):</b>\n"
+            "Fotoğrafı gönderirken altyazısına (caption) <code>/dekont</code> (veya <code>/dekont [Cari Adı]</code>) yazın.\n\n"
+            "2️⃣ <b>Daha Önce Atılmış Bir Dekonta:</b>\n"
+            "Gruptaki veya sohbetteki dekont görseline <b>Yanıt Verin (Reply)</b> ve <code>/dekont</code> yazın.\n\n"
+            "🏛️ <b>Desteklenen Kurumlar:</b>\n"
+            "• <b>Tüm Türk Bankaları:</b> Garanti BBVA, Ziraat, Vakıf, Akbank, İş Bankası, Yapı Kredi, QNB, Enpara, TEB, Denizbank, Kuveyt Türk vb.\n"
+            "• <b>Kripto Masası Ekranları:</b> Binance, Paribu, BtcTurk, OKX, Gate.io çekim ve transfer bildirimleri.\n"
+            "• <b>Ödeme Cüzdanları:</b> Papara, Hayhay, Tosla, Paycell.\n\n"
+            "💡 <i>Bot dekonttaki tutarı, bankayı ve göndereni otomatik tespit eder. Altına <b>[🟢 Kasaya Ekle]</b> ve <b>[🔴 Ödeme Düş]</b> butonları koyarak tek dokunuşla Excel'e işlemenizi sağlar!</i>"
+        )
+        klavye = {
+            "inline_keyboard": [
+                [{"text": "🗑️ Kapat", "callback_data": "mesaj_kapat"}]]
+        }
+        return yardim_metni, klavye
+
+    # Görseli indir
+    image_bytes = telegram_file_indir(file_id)
+    if not image_bytes:
+        hata_metni = (
+            "⚠️ <b>Dekont Görseli İndirilemedi!</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "Telegram sunucularından görsel verisi alınamadı. Lütfen görseli tekrar yüklemeyi deneyiniz."
+        )
+        return hata_metni, {"inline_keyboard": [[{"text": "🗑️ Kapat", "callback_data": "mesaj_kapat"}]]}
+
+    # OCR metnini çıkar
+    ocr_text = ocr_goruntu_tara(image_bytes)
+    if not ocr_text or not ocr_text.strip():
+        hata_metni = (
+            "⚠️ <b>Dekont Metni Okunamadı!</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "Görseldeki yazılar ve rakamlar tespit edilemedi. Olası sebepler:\n"
+            "• Görsel çözünürlüğü düşük veya bulanık olabilir.\n"
+            "• Dekont üzerindeki tutar veya banka bilgisi kırpılmış olabilir.\n\n"
+            "💡 <i>Lütfen net ve tam ekran bir dekont görseli ile tekrar deneyiniz.</i>"
+        )
+        return hata_metni, {"inline_keyboard": [[{"text": "🗑️ Kapat", "callback_data": "mesaj_kapat"}]]}
+
+    # Dekont verisini ayrıştır
+    parsed = dekont_verisi_ayristir(ocr_text)
+
+    # Parametre olarak cari verilmiş mi?
+    zorunlu_cari = ""
+    if args:
+        if not re.match(r'^\d', args[0]):
+            zorunlu_cari = args[0].strip()
+
+    # Excel verisini alarak cariyi eşleştir
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    tum_veriler = get_sheet_values_fast(sayfa)
+
+    # Grup bağlantısı kontrolü
+    baglantilar = app_state.get("GRUP_BAGLANTILARI", {})
+    if not zorunlu_cari and chat_id in baglantilar:
+        zorunlu_cari = baglantilar[chat_id].get("grup", "")
+
+    cari_eslesen = dekont_cari_eslestir(tum_veriler, parsed, zorunlu_cari)
+
+    # Raporu üret
+    return dekont_raporu_uret(parsed, cari_eslesen, chat_id, user_id, tum_veriler)
+
+# --- 🎙️ SESLİ MESAJ & DOĞAL DİL İŞLEM MOTORU (VOICE-TO-ACTION) ---
+
+_PENDING_VOICE_CACHE: Dict[str, dict] = {}
+_PENDING_VOICE_LOCK = threading.Lock()
+
+def turkce_sozel_sayi_coz(metin: str) -> float:
+    """Metin içindeki Türkçe sözlü veya rakamsal para tutarını tam doğrulukla çözer."""
+    if not metin:
+        return 0.0
+
+    metin_temiz = tr_lower(metin).replace("’", "'").replace("`", "'")
+
+    # 1. Rakam + Çarpan kontrolü (Örn: "150 bin", "2.5 milyon", "100k")
+    m_rakam_carp = re.search(r'([0-9]{1,3}(?:[.,][0-9]{1,3})*|[0-9]+)\s*(bin|milyon|milyar|k\b)', metin_temiz)
+    if m_rakam_carp:
+        raw_num = m_rakam_carp.group(1).strip()
+        carpan_str = m_rakam_carp.group(2)
+        try:
+            if "," in raw_num and "." in raw_num:
+                if raw_num.rfind(",") > raw_num.rfind("."):
+                    raw_num = raw_num.replace(".", "").replace(",", ".")
+                else:
+                    raw_num = raw_num.replace(",", "")
+            elif "," in raw_num:
+                raw_num = raw_num.replace(",", ".")
+            elif "." in raw_num:
+                parts = raw_num.split(".")
+                if len(parts) > 2:
+                    raw_num = raw_num.replace(".", "")
+                elif len(parts) == 2 and len(parts[1]) == 3 and int(parts[0]) >= 10:
+                    raw_num = raw_num.replace(".", "")
+            val = float(raw_num)
+            if carpan_str in ["bin", "k"]:
+                val *= 1000
+            elif carpan_str == "milyon":
+                val *= 1000000
+            elif carpan_str == "milyar":
+                val *= 1000000000
+            return float(val)
+        except Exception:
+            pass
+
+    # 2. Doğrudan standart sayı formatı (Örn: 50.000,00 veya 150000)
+    m_standart = re.search(r'([0-9]{1,3}(?:\.[0-9]{3})+(?:,[0-9]{2})?|[0-9]+(?:,[0-9]{2})?)', metin_temiz)
+    if m_standart:
+        v = guvenliSayi(m_standart.group(1))
+        if v > 0:
+            return v
+
+    # 3. Tamamen sözlü Türkçe sayılar (Örn: "yüz elli bin", "iki milyon", "yirmi beş bin")
+    kelimeler = re.findall(r'[a-zçğıöşü]+', metin_temiz)
+    rakamlar = {
+        "bir": 1, "iki": 2, "üç": 3, "uc": 3, "dört": 4, "dort": 4,
+        "beş": 5, "bes": 5, "altı": 6, "alti": 6, "yedi": 7, "sekiz": 8, "dokuz": 9
+    }
+    onluklar = {
+        "on": 10, "yirmi": 20, "otuz": 30, "kırk": 40, "kirk": 40,
+        "elli": 50, "altmış": 60, "altmis": 60, "yetmiş": 70, "yetmis": 70,
+        "seksen": 80, "doksan": 90
+    }
+
+    total = 0
+    current = 0
+    found_number = False
+
+    for k in kelimeler:
+        if k in rakamlar:
+            current += rakamlar[k]
+            found_number = True
+        elif k in onluklar:
+            current += onluklar[k]
+            found_number = True
+        elif k in ["yüz", "yuz"]:
+            current = (current if current > 0 else 1) * 100
+            found_number = True
+        elif k == "bin":
+            current = (current if current > 0 else 1) * 1000
+            total += current
+            current = 0
+            found_number = True
+        elif k == "milyon":
+            current = (current if current > 0 else 1) * 1000000
+            total += current
+            current = 0
+            found_number = True
+        elif k == "milyar":
+            current = (current if current > 0 else 1) * 1000000000
+            total += current
+            current = 0
+            found_number = True
+
+    total += current
+    if found_number and total > 0:
+        return float(total)
+
+    return 0.0
+
+def voice_audio_desifre_et(audio_bytes: bytes) -> str:
+    """Telegram ses kaydını (voice note / ogg opus) deşifre eder."""
+    if not audio_bytes:
+        return ""
+
+    # 1. Gemini Audio API Denemesi (Varsa)
+    gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if gemini_key:
+        try:
+            b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+            payload = {
+                "contents": [{
+                    "parts": [
+                        {"text": "Bu Türkçe ses kaydında geçen finansal talimatı ve konuşmayı eksiksiz metne dök. Başka açıklama ekleme, sadece konuşulan metni yaz."},
+                        {"inline_data": {"mime_type": "audio/ogg", "data": b64_audio}}
+                    ]
+                }]
+            }
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json", "User-Agent": "CFO-BOT/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=15) as response:
+                res = json.loads(response.read().decode("utf-8"))
+                candidates = res.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if parts:
+                        return parts[0].get("text", "").strip()
+        except Exception as e:
+            print(f"Gemini Voice deşifre uyarısı: {e}")
+
+    # 2. OpenAI Whisper API Denemesi (Varsa)
+    openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if openai_key:
+        try:
+            boundary = f"----WebKitFormBoundary{uuid.uuid4().hex}"
+            body = bytearray()
+            body.extend(f"--{boundary}\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\nwhisper-1\r\n".encode("utf-8"))
+            body.extend(f"--{boundary}\r\nContent-Disposition: form-data; name=\"language\"\r\n\r\ntr\r\n".encode("utf-8"))
+            body.extend(f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"voice.ogg\"\r\nContent-Type: audio/ogg\r\n\r\n".encode("utf-8"))
+            body.extend(audio_bytes)
+            body.extend(f"\r\n--{boundary}--\r\n".encode("utf-8"))
+
+            req = urllib.request.Request(
+                "https://api.openai.com/v1/audio/transcriptions",
+                data=bytes(body),
+                headers={
+                    "Content-Type": f"multipart/form-data; boundary={boundary}",
+                    "Authorization": f"Bearer {openai_key}",
+                    "User-Agent": "CFO-BOT/1.0"
+                }
+            )
+            with urllib.request.urlopen(req, timeout=15) as response:
+                res = json.loads(response.read().decode("utf-8"))
+                return res.get("text", "").strip()
+        except Exception as e:
+            print(f"OpenAI Whisper deşifre uyarısı: {e}")
+
+    return ""
+
+def sesli_islem_ayristir(metin: str, tum_veriler: List[List[str]], chat_id: int = 0) -> dict:
+    """Deşifre edilen ses metninden tutarı, işlem türünü ve hedef cariyi çıkarır."""
+    metin_temiz = (metin or "").strip()
+    metin_low = tr_lower(metin_temiz)
+
+    # 1. Tutar tespiti
+    tutar = turkce_sozel_sayi_coz(metin_temiz)
+
+    # 2. İşlem türü tespiti (Ödeme vs Kasa vs Masraf)
+    islem_turu = "kasa"
+    odeme_kelimeleri = ["ödeme", "odeme", "ödedik", "odedik", "çıktık", "ciktik", "çıkış", "cikis", "havale yaptık", "eft yaptık", "gönderdik", "gonderdik", "yolladık", "yolladik", "verildi", "ver"]
+    kasa_kelimeleri = ["kasa", "aldık", "aldik", "geldi", "yattı", "yatti", "tahsil", "tahsilat", "nakit aldık", "giriş", "giris", "ekle"]
+    masraf_kelimeleri = ["masraf", "gider", "harcama"]
+
+    if any(k in metin_low for k in masraf_kelimeleri):
+        islem_turu = "masraf"
+    elif any(k in metin_low for k in odeme_kelimeleri):
+        islem_turu = "odeme"
+    elif any(k in metin_low for k in kasa_kelimeleri):
+        islem_turu = "kasa"
+
+    # 3. Cari tespiti
+    eslesen_cari = ""
+    baglantilar = app_state.get("GRUP_BAGLANTILARI", {})
+    if chat_id in baglantilar:
+        eslesen_cari = baglantilar[chat_id].get("grup", "")
+
+    if not eslesen_cari and tum_veriler:
+        tokens = re.findall(r'[a-zçğıöşüA-ZÇĞİÖŞÜ0-9]+', metin_temiz)
+        for tok in tokens:
+            if len(tok) >= 3 and tok.lower() not in ["bin", "milyon", "kasa", "odeme", "ödeme", "yaptık", "ettik", "aldık", "geldi", "tutar"]:
+                s_idx, _, gercek_ad, _ = cari_satir_bul(tum_veriler, tok)
+                if gercek_ad:
+                    eslesen_cari = gercek_ad
+                    break
+
+    return {
+        "metin": metin_temiz,
+        "tutar": tutar,
+        "islem_turu": islem_turu,
+        "cari": eslesen_cari
+    }
+
+def sesli_islem_raporu_uret(parsed: dict, chat_id: int = 0, user_id: int = 0, tum_veriler: Optional[List[List[str]]] = None) -> Tuple[str, dict]:
+    """Sesli işlem detay kartı ve tek dokunuşla onay butonları üretir."""
+    metin = parsed.get("metin", "")
+    tutar = parsed.get("tutar", 0.0)
+    islem_turu = parsed.get("islem_turu", "kasa")
+    cari = parsed.get("cari", "")
+
+    now = time.time()
+    with _PENDING_VOICE_LOCK:
+        expired = [k for k, v in _PENDING_VOICE_CACHE.items() if now - v.get("created_at", 0) > 3600]
+        for k in expired:
+            _PENDING_VOICE_CACHE.pop(k, None)
+
+    token = uuid.uuid4().hex[:8]
+    with _PENDING_VOICE_LOCK:
+        _PENDING_VOICE_CACHE[token] = {
+            "metin": metin,
+            "tutar": tutar,
+            "islem_turu": islem_turu,
+            "cari": cari,
+            "chat_id": chat_id,
+            "user_id": user_id,
+            "created_at": now
+        }
+
+    cari_emoji = grupEmojisiBul(cari) if cari else "❓"
+    cari_str = f"{cari_emoji} <b>{cari}</b>" if cari else "⚠️ <i>Tespit Edilemedi (Aşağıdan Seçin)</i>"
+
+    if islem_turu == "odeme":
+        tur_etiket = "🔴 <b>Ödeme Çıkışı (Havale / Nakit)</b>"
+        onay_btn_text = f"🔴 Onayla & Ödemeye Yaz ({paraFormatla(tutar)})"
+        diger_tur_btn = "🟢 Kasaya Çevir"
+    elif islem_turu == "masraf":
+        tur_etiket = "📉 <b>Şirket Masraf / Gider Kalemi</b>"
+        onay_btn_text = f"📉 Onayla & Masrafa Yaz ({paraFormatla(tutar)})"
+        diger_tur_btn = "🟢 Kasaya Çevir"
+    else:
+        tur_etiket = "🟢 <b>Kasaya Giriş (Nakit / Tahsilat)</b>"
+        onay_btn_text = f"🟢 Onayla & Kasaya Yaz (+{paraFormatla(tutar)})"
+        diger_tur_btn = "🔴 Ödemeye Çevir"
+
+    tutar_str = f"💰 <b>{paraFormatla(tutar)}</b>" if tutar > 0 else "⚠️ <i>Tutar Algılanamadı</i>"
+
+    mesaj = (
+        f"🎙️ <b>SESLİ KOMUT ÇÖZÜMLENDİ (AI Voice-to-Action)</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🗣️ <b>Ses Dökümü:</b> «<i>{sanitize_html(metin)}</i>»\n\n"
+        f"👤 <b>Hedef Cari:</b> {cari_str}\n"
+        f"💵 <b>Algılanan Tutar:</b> {tutar_str}\n"
+        f"📌 <b>İşlem Türü:</b> {tur_etiket}\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+    )
+
+    if tutar <= 0:
+        mesaj += "💡 <i>Ses kaydından geçerli bir para tutarı anlaşılamadı. Lütfen tutarı belirterek tekrar ses kaydı atınız veya elle <code>/kasa</code> / <code>/odeme</code> yazınız.</i>"
+        klavye = {"inline_keyboard": [[{"text": "🗑️ Kapat", "callback_data": "mesaj_kapat"}]]}
+        return mesaj, klavye
+
+    if cari:
+        mesaj += "💡 <i>İşlemi tek tıkla onaylamak için aşağıdaki butona dokununuz:</i>"
+        klavye = {
+            "inline_keyboard": [
+                [{"text": onay_btn_text, "callback_data": f"voc_ok_{token}"}],
+                [
+                    {"text": f"🔄 Türü Değiştir ({diger_tur_btn})", "callback_data": f"voc_tog_{token}"},
+                    {"text": "👥 Cari Seç", "callback_data": f"voc_c_{token}"}
+                ],
+                [{"text": "🗑️ İptal / Kapat", "callback_data": "mesaj_kapat"}]
+            ]
+        }
+    else:
+        mesaj += "💡 <i>İşlemin yapılacağı cariyi aşağıdaki listeden seçiniz:</i>"
+        cariler = []
+        if tum_veriler:
+            for r in tum_veriler[1:]:
+                if len(r) >= 2 and r[1].strip():
+                    c_ad = r[1].strip()
+                    if c_ad not in ["*", "-"] and "TOPLAM" not in c_ad.upper() and "FARK" not in c_ad.upper():
+                        cariler.append(c_ad)
+        cariler_secim = cariler[:8]
+        with _PENDING_VOICE_LOCK:
+            _PENDING_VOICE_CACHE[token]["cariler_listesi"] = cariler_secim
+
+        rows = []
+        cur_row = []
+        for idx, c in enumerate(cariler_secim):
+            cur_row.append({"text": f"{grupEmojisiBul(c)} {c}", "callback_data": f"voc_sc_{token}_{idx}"})
+            if len(cur_row) == 2:
+                rows.append(cur_row)
+                cur_row = []
+        if cur_row:
+            rows.append(cur_row)
+        rows.append([{"text": "🗑️ İptal / Kapat", "callback_data": "mesaj_kapat"}])
+        klavye = {"inline_keyboard": rows}
+
+    return mesaj, klavye
+
+def ses_yardim_rehberi_uret() -> Tuple[str, dict]:
+    """Sesli mesaj operasyonu rehberini döker."""
+    rehber = (
+        "🎙️ <b>CFO SESLİ KOMUT OPERASYONU (Voice-to-Action)</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        "Klavyeden yazmaya gerek kalmadan doğrudan Telegram'dan ses kaydı göndererek işlem yapabilirsiniz!\n\n"
+        "🗣️ <b>Örnek Sesli Komutlar:</b>\n"
+        "• <i>«Ahmet Bey'e 150 bin ödeme geçtik»</i>\n"
+        "• <i>«Sacid'den iki yüz bin nakit aldık kasaya işle»</i>\n"
+        "• <i>«Tigır kasasına elli bin ekle»</i>\n"
+        "• <i>«Ofis mutfak masrafı 2500 lira harcandı»</i>\n\n"
+        "⚡ <b>Nasıl Çalışır?</b>\n"
+        "1️⃣ Sohbete veya bağlı gruba 3-5 saniyelik ses kaydı atın.\n"
+        "2️⃣ Bot sesi anında dinler, tutarı, cariyi ve işlem yönünü tespit eder.\n"
+        "3️⃣ Karşınıza çıkan <b>[✅ Onayla ve İşle]</b> butonuna dokunmanız yeterlidir!"
+    )
+    klavye = {"inline_keyboard": [[{"text": "🗑️ Kapat", "callback_data": "mesaj_kapat"}]]}
+    return rehber, klavye
+
+def sesli_mesaj_islem_impl(msg: dict) -> Tuple[str, dict]:
+    """Telegram ses kaydını indirir, deşifre eder ve onay kartına dönüştürür."""
+    chat_id = msg.get("chat", {}).get("id") or 0
+    from_user = msg.get("from") or {}
+    user_id = from_user.get("id") or 0
+
+    voice = msg.get("voice") or msg.get("audio") or {}
+    file_id = voice.get("file_id")
+    if not file_id:
+        return ses_yardim_rehberi_uret()
+
+    audio_bytes = telegram_file_indir(file_id)
+    if not audio_bytes:
+        return "⚠️ <b>Ses Kaydı İndirilemedi!</b>\nLütfen tekrar ses kaydı gönderiniz.", {"inline_keyboard": [[{"text": "🗑️ Kapat", "callback_data": "mesaj_kapat"}]]}
+
+    transkript = voice_audio_desifre_et(audio_bytes)
+    if not transkript:
+        hata_metni = (
+            "⚠️ <b>Ses Kaydı Çözümlenemedi!</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "Ses net anlaşılamadı veya yapay zeka ses motoruna ulaşılamadı.\n\n"
+            "💡 <i>Lütfen arka plan gürültüsü olmadan net konuşarak tekrar deneyiniz veya işlemi doğrudan <code>/kasa</code> / <code>/odeme</code> ile yazınız.</i>"
+        )
+        return hata_metni, {"inline_keyboard": [[{"text": "🗑️ Kapat", "callback_data": "mesaj_kapat"}]]}
+
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    tum_veriler = get_sheet_values_fast(sayfa)
+
+    parsed = sesli_islem_ayristir(transkript, tum_veriler, chat_id)
+    return sesli_islem_raporu_uret(parsed, chat_id, user_id, tum_veriler)
+
+# --- 🛡️ İBAN & ŞÜPHELİ HESAP KARA LİSTE İSTİHBARATI (/istihbarat) ---
+
+RISK_DATABASE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "blacklist_risk.json")
+_risk_db_lock = threading.Lock()
+
+def load_risk_db() -> Dict[str, dict]:
+    with _risk_db_lock:
+        if not os.path.exists(RISK_DATABASE_FILE):
+            return {}
+        try:
+            with open(RISK_DATABASE_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Risk veritabanı okuma hatası: {e}")
+            return {}
+
+def save_risk_db(data: Dict[str, dict]):
+    with _risk_db_lock:
+        try:
+            with open(RISK_DATABASE_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Risk veritabanı yazma hatası: {e}")
+
+def normalize_risk_key(deger: str) -> str:
+    if not deger:
+        return ""
+    return re.sub(r'[\s\-]+', '', str(deger)).strip().upper()
+
+def risk_kaydi_ekle(deger: str, durum: str = "KARA_LISTE", sebep: str = "Şüpheli İşlem / Bloke Riski", ekleyen: str = "Yönetici") -> Tuple[bool, str]:
+    norm_key = normalize_risk_key(deger)
+    if not norm_key or len(norm_key) < 4:
+        return False, "Geçersiz İBAN, cüzdan veya kayıt değeri!"
+
+    tur = "IBAN" if norm_key.startswith("TR") and len(norm_key) == 26 else ("CUZDAN" if norm_key.startswith("T") and len(norm_key) == 34 else "HESAP")
+    
+    db = load_risk_db()
+    db[norm_key] = {
+        "tur": tur,
+        "deger": norm_key,
+        "durum": durum.upper(),
+        "sebep": sebep.strip() or "Belirtilmedi",
+        "ekleyen": ekleyen,
+        "tarih": suankiZamaniAl().strftime("%d.%m.%Y | %H:%M:%S")
+    }
+    save_risk_db(db)
+    return True, f"Kayıt '{norm_key}' ({durum}) başarıyla risk istihbarat havuzuna eklendi."
+
+def risk_kaydi_sil(deger: str) -> Tuple[bool, str]:
+    norm_key = normalize_risk_key(deger)
+    db = load_risk_db()
+    if norm_key in db:
+        del db[norm_key]
+        save_risk_db(db)
+        return True, f"'{norm_key}' kaydı kara liste havuzundan kaldırıldı ve temizlendi."
+    return False, f"'{norm_key}' risk kayıtlarında bulunamadı."
+
+def risk_kaydi_sorgula(sorgu: str) -> Tuple[Optional[dict], str]:
+    norm_key = normalize_risk_key(sorgu)
+    if not norm_key:
+        return None, ""
+    db = load_risk_db()
+    if norm_key in db:
+        return db[norm_key], norm_key
+    for k, v in db.items():
+        if norm_key in k or k in norm_key:
+            return v, k
+    return None, norm_key
+
+def risk_raporu_uret(sorgu: str = "") -> Tuple[str, dict]:
+    """Risk istihbarat sorgusu veya genel risk havuzu paneli üretir."""
+    db = load_risk_db()
+    norm_sorgu = normalize_risk_key(sorgu)
+
+    if not norm_sorgu:
+        toplam = len(db)
+        kara_liste_sayisi = sum(1 for v in db.values() if v.get("durum") == "KARA_LISTE")
+        supheli_sayisi = sum(1 for v in db.values() if v.get("durum") != "KARA_LISTE")
+
+        mesaj = (
+            "🛡️ <b>CFO RİSK &amp; KARA LİSTE İSTİHBARAT HAVUZU</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"📊 <b>Toplam Risk Kaydı:</b> <b>{toplam} Adet</b>\n"
+            f"🔴 <b>Kara Liste (Yasaklı / Bloke Riski):</b> <b>{kara_liste_sayisi} Adet</b>\n"
+            f"🟡 <b>Şüpheli / İncelemedeki Hesaplar:</b> <b>{supheli_sayisi} Adet</b>\n\n"
+            "💡 <b>Nasıl Kullanılır?</b>\n"
+            "• <code>/istihbarat [İBAN veya Cüzdan]</code> : <i>Risk durumunu sorgular.</i>\n"
+            "• <code>/karalisteekle [İBAN/Cüzdan] [Sebep]</code> : <i>Yeni riskli hesap ekler.</i>\n"
+            "• <code>/karalistesil [İBAN/Cüzdan]</code> : <i>Kayıt siler / temize çıkarır.</i>\n"
+            "• <code>/karaliste</code> : <i>Tüm riskli hesapları interaktif listeler.</i>\n\n"
+            "⚠️ <i>Masanızın banka hesaplarının MASAK ve 5549 SK bloke riskine karşı korunmasını sağlar.</i>"
+        )
+        klavye = {
+            "inline_keyboard": [
+                [{"text": "📋 Tüm Riskli Hesapları Listele", "callback_data": "rsk_list_1"}],
+                [{"text": "🗑️ Kapat", "callback_data": "mesaj_kapat"}]
+            ]
+        }
+        return mesaj, klavye
+
+    kayit, bulunan_key = risk_kaydi_sorgula(norm_sorgu)
+    if kayit:
+        durum = kayit.get("durum", "KARA_LISTE")
+        sebep = kayit.get("sebep", "Şüpheli İşlem")
+        ekleyen = kayit.get("ekleyen", "Yönetici")
+        tarih = kayit.get("tarih", "-")
+        tur = kayit.get("tur", "HESAP")
+
+        if durum == "KARA_LISTE":
+            rozet = "🔴 <b>KARA LİSTE (YASAKLI / YÜKSEK RİSK)</b>"
+            uyari = "⛔ <b>KESİNLİKLE İŞLEM YAPILMAMALIDIR!</b>\nBu hesaba para transferi yapmak şirketin banka hesaplarında zincirleme bloke (5549 SK) riski doğurur!"
+        else:
+            rozet = "🟡 <b>ŞÜPHELİ / İZLEMEDEKİ HESAP</b>"
+            uyari = "⚠️ <b>DİKKATLE İŞLEM YAPINIZ!</b>\nHesap şüpheli olarak etiketlenmiştir, yönetici onayı alınız."
+
+        mesaj = (
+            "🚨 <b>RİSK İSTİHBARAT UYARISI!</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"📌 <b>Sorgulanan ({tur}):</b>\n<code>{bulunan_key}</code>\n\n"
+            f"⚠️ <b>Durum:</b> {rozet}\n"
+            f"📝 <b>Sebep / Not:</b> <i>{sanitize_html(sebep)}</i>\n"
+            f"👤 <b>Ekleyen:</b> <b>{sanitize_html(ekleyen)}</b>\n"
+            f"📅 <b>Kayıt Tarihi:</b> <code>{tarih}</code>\n\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"{uyari}"
+        )
+        klavye = {
+            "inline_keyboard": [
+                [{"text": "🗑️ Bu Kaydı Listeden Sil", "callback_data": f"rsk_del_{bulunan_key}"}],
+                [{"text": "📋 Tüm Risk Listesi", "callback_data": "rsk_list_1"}],
+                [{"text": "🗑️ Kapat", "callback_data": "mesaj_kapat"}]
+            ]
+        }
+        return mesaj, klavye
+    else:
+        mesaj = (
+            "🟢 <b>GÜVENLİK SORGUSU: TEMİZ</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            f"📌 <b>Sorgulanan Kayıt:</b>\n<code>{norm_sorgu}</code>\n\n"
+            "✅ <b>Sonuç:</b> Şirket kara liste veya şüpheli istihbarat havuzunda bu hesaba dair herhangi bir risk kaydı bulunamadı.\n\n"
+            "💡 <i>Eğer bu hesapta bir şüphe oluştuysa eklemek için:</i>\n"
+            f"<code>/karalisteekle {norm_sorgu} [Sebep]</code>"
+        )
+        klavye = {
+            "inline_keyboard": [
+                [{"text": "🔴 Kara Listeye Ekle", "callback_data": f"rsk_add_{norm_sorgu}"}],
+                [{"text": "🗑️ Kapat", "callback_data": "mesaj_kapat"}]
+            ]
+        }
+        return mesaj, klavye
+
+def risk_listesi_raporu_uret(sayfa_no: int = 1) -> Tuple[str, dict]:
+    """Riskli hesapları sayfalı butonlarla listeler."""
+    db = load_risk_db()
+    items = list(db.items())
+    if not items:
+        return "🛡️ <b>Risk İstihbarat Havuzu Boş</b>\nSistemde henüz kayıtlı kara liste veya şüpheli hesap bulunmamaktadır.", {"inline_keyboard": [[{"text": "🗑️ Kapat", "callback_data": "mesaj_kapat"}]]}
+
+    sayfa_basi = 5
+    toplam_sayfa = max(1, (len(items) + sayfa_basi - 1) // sayfa_basi)
+    sayfa_no = max(1, min(sayfa_no, toplam_sayfa))
+
+    start = (sayfa_no - 1) * sayfa_basi
+    end = start + sayfa_basi
+    gosterilen = items[start:end]
+
+    satirlar = []
+    for k, v in gosterilen:
+        durum_emoji = "🔴" if v.get("durum") == "KARA_LISTE" else "🟡"
+        satirlar.append(
+            f"{durum_emoji} <b>{v.get('tur', 'HESAP')}:</b> <code>{k}</code>\n"
+            f"📝 <i>{sanitize_html(v.get('sebep', '-'))}</i> ({v.get('tarih', '-')})"
+        )
+
+    mesaj = (
+        f"📋 <b>KARA LİSTE &amp; RİSKLİ HESAPLAR LİSTESİ ({sayfa_no}/{toplam_sayfa})</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        + "\n\n".join(satirlar) +
+        f"\n\n━━━━━━━━━━━━━━━━━━━━\n"
+        f"💡 <i>Silmek için: <code>/karalistesil [Hesap]</code></i>"
+    )
+
+    nav = []
+    if sayfa_no > 1:
+        nav.append({"text": "◀️ Önceki", "callback_data": f"rsk_list_{sayfa_no - 1}"})
+    if sayfa_no < toplam_sayfa:
+        nav.append({"text": "Sonraki ▶️", "callback_data": f"rsk_list_{sayfa_no + 1}"})
+
+    rows = []
+    if nav:
+        rows.append(nav)
+    rows.append([{"text": "🔄 Yenile", "callback_data": f"rsk_list_{sayfa_no}"}, {"text": "🗑️ Kapat", "callback_data": "mesaj_kapat"}])
+    return mesaj, {"inline_keyboard": rows}
 
 def guvenli_matematik_hesapla(expr: str) -> Optional[float]:
     """Kullanıcının gönderdiği matematiksel ifadeyi (+, -, *, /, %, parantez) AST ile güvenle çözer."""
@@ -8095,8 +9307,36 @@ def yukleme_adim_metni_uret(islem_tipi: str, yuzde: int) -> str:
             alt = "⏳ <i>Devir, kasa ve ödeme matrisi okunuyor...</i>"
         elif yuzde < 95:
             alt = "⏳ <i>Bilanço ve bakiye sıralaması hesaplanıyor...</i>"
+    elif any(k in t for k in ["dekont", "ocr", "tara", "slip", "fis"]):
+        baslik = "📸 <b>Akıllı Dekont &amp; Fiş OCR Taraması</b>"
+        if yuzde < 35:
+            alt = "⏳ <i>Görsel işleniyor ve optimize ediliyor...</i>"
+        elif yuzde < 70:
+            alt = "⏳ <i>Yapay zeka metin ve tutar alanlarını ayrıştırıyor...</i>"
+        elif yuzde < 95:
+            alt = "⏳ <i>Banka ve cari eşleştirmesi yapılıyor...</i>"
         else:
-            alt = "✅ <i>Analiz tamamlandı, iletiliyor...</i>"
+            alt = "✅ <i>Dekont ayrıştırıldı, hazırlanıyor...</i>"
+    elif any(k in t for k in ["ses", "sesli", "voice", "audio"]):
+        baslik = "🎙️ <b>Sesli Komut Analizi &amp; Deşifre</b>"
+        if yuzde < 35:
+            alt = "⏳ <i>Ses kaydı indiriliyor ve optimize ediliyor...</i>"
+        elif yuzde < 70:
+            alt = "⏳ <i>Yapay zeka konuşmayı metne döküyor...</i>"
+        elif yuzde < 95:
+            alt = "⏳ <i>Tutar, cari ve işlem türü ayrıştırılıyor...</i>"
+        else:
+            alt = "✅ <i>Sesli işlem hazırlandı, iletiliyor...</i>"
+    elif any(k in t for k in ["risk", "istihbarat", "karaliste"]):
+        baslik = "🛡️ <b>Kara Liste &amp; Risk İstihbarat Sorgusu</b>"
+        if yuzde < 35:
+            alt = "⏳ <i>Risk veri havuzu taranıyor...</i>"
+        elif yuzde < 70:
+            alt = "⏳ <i>İBAN ve cüzdan kayıtları denetleniyor...</i>"
+        elif yuzde < 95:
+            alt = "⏳ <i>5549 SK ve bloke riski analiz ediliyor...</i>"
+        else:
+            alt = "✅ <i>Güvenlik denetimi tamamlandı, iletiliyor...</i>"
     else:
         baslik = "⚡ <b>CFO İşlem Motoru</b>"
         if yuzde < 35:
@@ -8244,6 +9484,362 @@ def _process_telegram_update_core(update: dict):
                 "<i>Bot satırı otomatik oluşturur, formülleri bağlar ve hafızaya alır.</i>"
             )
             return
+
+        if data.startswith("tx_yenile_"):
+            cq_id = cq.get("id")
+            if cq_id:
+                try:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": "🔄 TxID bilgisi güncelleniyor..."})
+                except Exception:
+                    pass
+            tx_h = data.replace("tx_yenile_", "").strip()
+            metin, klavye = trc20_tx_raporu_uret(tx_h)
+            msg_id = cq.get("message", {}).get("message_id")
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+            else:
+                telegramMesajGonder(chat_id, metin, klavye)
+            return
+
+        if data.startswith("dknt_"):
+            cq_id = cq.get("id", "")
+            msg_id = cq.get("message", {}).get("message_id")
+
+            # A) Kasaya Ekle Onayı
+            if data.startswith("dknt_k_"):
+                token = data[7:]
+                with _PENDING_DEKONT_LOCK:
+                    item = _PENDING_DEKONT_CACHE.get(token)
+                if not item:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": "⚠️ Dekont işlemi bulunamadı veya süresi doldu.", "show_alert": True})
+                    return
+                cari = item.get("cari", "")
+                tutar = item.get("tutar", 0.0)
+                banka = item.get("banka", "Banka")
+                if not cari or tutar <= 0:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": "⚠️ Geçersiz cari veya tutar.", "show_alert": True})
+                    return
+
+                try:
+                    res_txt = hucreyeVeriYaz_impl(f"/kasa {cari} {tutar}", 4, "Kasa Ekleme", 1, chat_id)
+                    with _PENDING_DEKONT_LOCK:
+                        _PENDING_DEKONT_CACHE.pop(token, None)
+
+                    onay_mesaj = (
+                        f"✅ <b>DEKONT ONAYLANDI &amp; KASAYA EKLENDİ!</b>\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n"
+                        f"👤 <b>Cari:</b> {grupEmojisiBul(cari)} <b>{cari}</b>\n"
+                        f"💰 <b>İşlenen Tutar:</b> 🟢 <b>+{paraFormatla(tutar)}</b>\n"
+                        f"🏛️ <b>Banka / Kurum:</b> <b>{banka}</b>\n"
+                        f"📋 <b>İşlem Türü:</b> Kasaya Nakit/EFT Girişi\n"
+                        f"⏱️ <b>İşlem Saati:</b> <code>{suankiZamaniAl().strftime('%H:%M:%S')}</code>\n\n"
+                        f"📊 <i>İşlem Google Sheets tablosuna anında kaydedildi.</i>"
+                    )
+                    if msg_id:
+                        telegramMesajDuzenle(chat_id, msg_id, onay_mesaj, None)
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": f"✅ {cari} kasasına +{paraFormatla(tutar)} eklendi!"})
+                except Exception as e:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": f"❌ Hata: {str(e)}", "show_alert": True})
+                return
+
+            # B) Ödemeye Ekle Onayı
+            elif data.startswith("dknt_o_"):
+                token = data[7:]
+                with _PENDING_DEKONT_LOCK:
+                    item = _PENDING_DEKONT_CACHE.get(token)
+                if not item:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": "⚠️ Dekont işlemi bulunamadı veya süresi doldu.", "show_alert": True})
+                    return
+                cari = item.get("cari", "")
+                tutar = item.get("tutar", 0.0)
+                banka = item.get("banka", "Banka")
+                if not cari or tutar <= 0:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": "⚠️ Geçersiz cari veya tutar.", "show_alert": True})
+                    return
+
+                try:
+                    res_txt = hucreyeVeriYaz_impl(f"/odeme {cari} {tutar}", 5, "Ödeme Ekleme", 1, chat_id)
+                    with _PENDING_DEKONT_LOCK:
+                        _PENDING_DEKONT_CACHE.pop(token, None)
+
+                    onay_mesaj = (
+                        f"✅ <b>DEKONT ONAYLANDI &amp; ÖDEMEYE İŞLENDİ!</b>\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n"
+                        f"👤 <b>Cari:</b> {grupEmojisiBul(cari)} <b>{cari}</b>\n"
+                        f"💰 <b>İşlenen Tutar:</b> 🔴 <b>{paraFormatla(tutar)}</b>\n"
+                        f"🏛️ <b>Banka / Kurum:</b> <b>{banka}</b>\n"
+                        f"📋 <b>İşlem Türü:</b> Ödenen Çıkışı\n"
+                        f"⏱️ <b>İşlem Saati:</b> <code>{suankiZamaniAl().strftime('%H:%M:%S')}</code>\n\n"
+                        f"📊 <i>İşlem Google Sheets tablosuna anında kaydedildi.</i>"
+                    )
+                    if msg_id:
+                        telegramMesajDuzenle(chat_id, msg_id, onay_mesaj, None)
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": f"✅ {cari} ödemesine {paraFormatla(tutar)} işlendi!"})
+                except Exception as e:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": f"❌ Hata: {str(e)}", "show_alert": True})
+                return
+
+            # C) Farklı Cari Seçme Menüsü
+            elif data.startswith("dknt_c_"):
+                token = data[7:]
+                with _PENDING_DEKONT_LOCK:
+                    item = _PENDING_DEKONT_CACHE.get(token)
+                if not item:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": "⚠️ Dekont işlemi bulunamadı.", "show_alert": True})
+                    return
+
+                sh = get_spreadsheet()
+                sayfa = get_active_daily_sheet(sh)
+                tum_veriler = get_sheet_values_fast(sayfa)
+                cariler = []
+                for r in tum_veriler[1:]:
+                    if len(r) >= 2 and r[1].strip():
+                        c_ad = r[1].strip()
+                        if c_ad not in ["*", "-"] and "TOPLAM" not in c_ad.upper() and "FARK" not in c_ad.upper():
+                            cariler.append(c_ad)
+
+                cariler_listesi = cariler[:12]
+                with _PENDING_DEKONT_LOCK:
+                    item["cariler_listesi"] = cariler_listesi
+
+                rows = []
+                cur_row = []
+                for idx, c in enumerate(cariler_listesi):
+                    cur_row.append({"text": f"{grupEmojisiBul(c)} {c}", "callback_data": f"dknt_sc_{token}_{idx}"})
+                    if len(cur_row) == 2:
+                        rows.append(cur_row)
+                        cur_row = []
+                if cur_row:
+                    rows.append(cur_row)
+                rows.append([{"text": "◀️ Geri Dön", "callback_data": f"dknt_b_{token}"}])
+
+                secim_metni = (
+                    f"🎯 <b>Lütfen Dekontun İşleneceği Cariyi Seçin:</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💵 <b>Tutar:</b> <b>{paraFormatla(item.get('tutar', 0.0))}</b>\n"
+                    f"🏛️ <b>Banka:</b> <b>{item.get('banka', '')}</b>\n\n"
+                    f"👇 <i>Aşağıdaki aktif carilerden birine dokununuz:</i>"
+                )
+                if msg_id:
+                    telegramMesajDuzenle(chat_id, msg_id, secim_metni, {"inline_keyboard": rows})
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq_id})
+                return
+
+            # D) Cari Seçimi Yapıldı
+            elif data.startswith("dknt_sc_"):
+                parcalar = data.split("_")
+                if len(parcalar) >= 4:
+                    token = parcalar[2]
+                    try:
+                        c_idx = int(parcalar[3])
+                    except Exception:
+                        c_idx = -1
+                    with _PENDING_DEKONT_LOCK:
+                        item = _PENDING_DEKONT_CACHE.get(token)
+                    if item and "cariler_listesi" in item and 0 <= c_idx < len(item["cariler_listesi"]):
+                        secilen_cari = item["cariler_listesi"][c_idx]
+                        item["cari"] = secilen_cari
+                        metin, klavye = dekont_raporu_uret(item, secilen_cari, chat_id, user_id)
+                        if msg_id:
+                            telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+                        telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": f"🎯 Cari '{secilen_cari}' seçildi."})
+                        return
+
+            # E) Geri Dön
+            elif data.startswith("dknt_b_"):
+                token = data[7:]
+                with _PENDING_DEKONT_LOCK:
+                    item = _PENDING_DEKONT_CACHE.get(token)
+                if item:
+                    metin, klavye = dekont_raporu_uret(item, item.get("cari", ""), chat_id, user_id)
+                    if msg_id:
+                        telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq_id})
+                return
+
+        # --- 🎙️ SESLİ İŞLEM (VOICE) CALLBACKS ---
+        if data.startswith("voc_"):
+            cq_id = cq.get("id", "")
+            msg_id = cq.get("message", {}).get("message_id")
+
+            # A) Sesli İşlemi Onayla ve Yaz
+            if data.startswith("voc_ok_"):
+                token = data[7:]
+                with _PENDING_VOICE_LOCK:
+                    item = _PENDING_VOICE_CACHE.get(token)
+                if not item:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": "⚠️ Sesli işlem süresi doldu veya bulunamadı.", "show_alert": True})
+                    return
+
+                cari = item.get("cari", "")
+                tutar = item.get("tutar", 0.0)
+                islem_turu = item.get("islem_turu", "kasa")
+
+                if not cari or tutar <= 0:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": "⚠️ Geçersiz cari veya tutar.", "show_alert": True})
+                    return
+
+                try:
+                    if islem_turu == "odeme":
+                        hucreyeVeriYaz_impl(f"/odeme {cari} {tutar}", 5, "Ödeme Ekleme", 1, chat_id)
+                        tur_baslik = "🔴 Ödenen Çıkışı"
+                    elif islem_turu == "masraf":
+                        masrafEkle_impl(f"/masrafekle {cari} {tutar}")
+                        tur_baslik = "📉 Masraf Girişi"
+                    else:
+                        hucreyeVeriYaz_impl(f"/kasa {cari} {tutar}", 4, "Kasa Ekleme", 1, chat_id)
+                        tur_baslik = "🟢 Kasaya Ekleme"
+
+                    with _PENDING_VOICE_LOCK:
+                        _PENDING_VOICE_CACHE.pop(token, None)
+
+                    onay_mesaj = (
+                        f"✅ <b>SESLİ İŞLEM ONAYLANDI &amp; EXCEL'E YAZILDI!</b>\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n"
+                        f"👤 <b>Cari:</b> {grupEmojisiBul(cari)} <b>{cari}</b>\n"
+                        f"💰 <b>İşlenen Tutar:</b> <b>{paraFormatla(tutar)}</b>\n"
+                        f"📋 <b>İşlem Türü:</b> {tur_baslik}\n"
+                        f"⏱️ <b>İşlem Saati:</b> <code>{suankiZamaniAl().strftime('%H:%M:%S')}</code>\n\n"
+                        f"📊 <i>Kayıt Google Sheets ana kasa tablosuna başarıyla işlendi.</i>"
+                    )
+                    if msg_id:
+                        telegramMesajDuzenle(chat_id, msg_id, onay_mesaj, None)
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": f"✅ {cari} işlemine {paraFormatla(tutar)} yazıldı!"})
+                except Exception as e:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": f"❌ Hata: {str(e)}", "show_alert": True})
+                return
+
+            # B) İşlem Türünü Değiştir (Kasa <-> Ödeme)
+            elif data.startswith("voc_tog_"):
+                token = data[8:]
+                with _PENDING_VOICE_LOCK:
+                    item = _PENDING_VOICE_CACHE.get(token)
+                if item:
+                    item["islem_turu"] = "odeme" if item.get("islem_turu") == "kasa" else "kasa"
+                    metin, klavye = sesli_islem_raporu_uret(item, chat_id, user_id)
+                    if msg_id:
+                        telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": f"🔄 Tür '{item['islem_turu'].upper()}' olarak değiştirildi."})
+                return
+
+            # C) Cari Seçme Menüsü
+            elif data.startswith("voc_c_"):
+                token = data[6:]
+                with _PENDING_VOICE_LOCK:
+                    item = _PENDING_VOICE_CACHE.get(token)
+                if not item:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": "⚠️ İşlem bulunamadı.", "show_alert": True})
+                    return
+
+                sh = get_spreadsheet()
+                sayfa = get_active_daily_sheet(sh)
+                tum_veriler = get_sheet_values_fast(sayfa)
+                cariler = []
+                for r in tum_veriler[1:]:
+                    if len(r) >= 2 and r[1].strip():
+                        c_ad = r[1].strip()
+                        if c_ad not in ["*", "-"] and "TOPLAM" not in c_ad.upper() and "FARK" not in c_ad.upper():
+                            cariler.append(c_ad)
+
+                cariler_secim = cariler[:12]
+                with _PENDING_VOICE_LOCK:
+                    item["cariler_listesi"] = cariler_secim
+
+                rows = []
+                cur_row = []
+                for idx, c in enumerate(cariler_secim):
+                    cur_row.append({"text": f"{grupEmojisiBul(c)} {c}", "callback_data": f"voc_sc_{token}_{idx}"})
+                    if len(cur_row) == 2:
+                        rows.append(cur_row)
+                        cur_row = []
+                if cur_row:
+                    rows.append(cur_row)
+                rows.append([{"text": "◀️ Geri Dön", "callback_data": f"voc_b_{token}"}])
+
+                secim_metni = (
+                    f"🎯 <b>Lütfen Sesli İşlemin Yazılacağı Cariyi Seçin:</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💵 <b>Tutar:</b> <b>{paraFormatla(item.get('tutar', 0.0))}</b>\n\n"
+                    f"👇 <i>Aşağıdaki aktif carilerden birine dokununuz:</i>"
+                )
+                if msg_id:
+                    telegramMesajDuzenle(chat_id, msg_id, secim_metni, {"inline_keyboard": rows})
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq_id})
+                return
+
+            # D) Cari Seçildi
+            elif data.startswith("voc_sc_"):
+                parcalar = data.split("_")
+                if len(parcalar) >= 4:
+                    token = parcalar[2]
+                    try:
+                        c_idx = int(parcalar[3])
+                    except Exception:
+                        c_idx = -1
+                    with _PENDING_VOICE_LOCK:
+                        item = _PENDING_VOICE_CACHE.get(token)
+                    if item and "cariler_listesi" in item and 0 <= c_idx < len(item["cariler_listesi"]):
+                        secilen_cari = item["cariler_listesi"][c_idx]
+                        item["cari"] = secilen_cari
+                        metin, klavye = sesli_islem_raporu_uret(item, chat_id, user_id)
+                        if msg_id:
+                            telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+                        telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": f"🎯 Cari '{secilen_cari}' seçildi."})
+                        return
+
+            # E) Geri Dön
+            elif data.startswith("voc_b_"):
+                token = data[6:]
+                with _PENDING_VOICE_LOCK:
+                    item = _PENDING_VOICE_CACHE.get(token)
+                if item:
+                    metin, klavye = sesli_islem_raporu_uret(item, chat_id, user_id)
+                    if msg_id:
+                        telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq_id})
+                return
+
+        # --- 🛡️ RİSK & KARA LİSTE CALLBACKS ---
+        if data.startswith("rsk_"):
+            cq_id = cq.get("id", "")
+            msg_id = cq.get("message", {}).get("message_id")
+
+            # A) Risk Kaydı Sil
+            if data.startswith("rsk_del_"):
+                key = data[8:]
+                ok, res_msg = risk_kaydi_sil(key)
+                if ok:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": f"✅ '{key}' kaydı silindi!"})
+                    metin, klavye = risk_raporu_uret("")
+                    if msg_id:
+                        telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+                else:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": "⚠️ Kayıt bulunamadı.", "show_alert": True})
+                return
+
+            # B) Kara Listeye Ekle Butonu
+            elif data.startswith("rsk_add_"):
+                key = data[8:]
+                u_ad = from_user.get("first_name", "") or str(user_id)
+                risk_kaydi_ekle(key, "KARA_LISTE", "Manuel Güvenlik İşareti", u_ad)
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": f"🚨 '{key}' kara listeye alındı!"})
+                metin, klavye = risk_raporu_uret(key)
+                if msg_id:
+                    telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+                return
+
+            # C) Sayfalı Liste
+            elif data.startswith("rsk_list_"):
+                p_str = data[9:]
+                try:
+                    p_num = int(p_str)
+                except Exception:
+                    p_num = 1
+                metin, klavye = risk_listesi_raporu_uret(p_num)
+                if msg_id:
+                    telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+                telegram_api("answerCallbackQuery", {"callback_query_id": cq_id})
+                return
 
         # 2. Kurucuya özel varlık sorgulama
         if data.startswith("t_yenile_"):
@@ -8711,7 +10307,7 @@ def _process_telegram_update_core(update: dict):
             pass
         return
 
-    if "message" in update and ("text" in update["message"] or "caption" in update["message"]):
+    if "message" in update and ("text" in update["message"] or "caption" in update["message"] or "voice" in update["message"] or "audio" in update["message"]):
         msg = update["message"]
         chat_id = msg.get("chat", {}).get("id") or 0
         chat_title = msg.get("chat", {}).get("title", "")
@@ -8719,6 +10315,14 @@ def _process_telegram_update_core(update: dict):
         user_id = from_user.get("id") or msg.get("sender_chat", {}).get("id") or 0
         text = (msg.get("text") or msg.get("caption") or "").strip()
         is_group = chat_id < 0
+
+        # Sesli Mesaj Yakalama (Voice & Audio)
+        if "voice" in msg or "audio" in msg:
+            if not yetkili_mi(user_id):
+                yetkisiz_uyari_gonder(chat_id, user_id, "⛔ <b>Yetkisiz İşlem:</b> Sesli komut gönderme yetkisi sadece şirket yöneticilerine aittir.")
+                return
+            islemi_analiz_bildirimiyle_yap(chat_id, sesli_mesaj_islem_impl, msg, goster_bildirim=True, islem_tipi="sesli")
+            return
 
         if not text.startswith("/"):
             # Özel sohbette 'kasa ...' veya 'durum ...' gibi komutların başına / koyulmadan yazılmasını tolere et
@@ -8765,7 +10369,7 @@ def _process_telegram_update_core(update: dict):
             izinli_komutlar = u_info.get("allowed_commands", set())
             uname = u_info.get("username", f"<code>{user_id}</code>")
             
-            if ana_komut not in izinli_komutlar and ana_komut not in ["/start", "/menu", "/menü", "/rehber", "/komutlar", "/yardim", "/yardım", "/yetkiler", "/rolum", "/yetkim"]:
+            if ana_komut not in izinli_komutlar and ana_komut not in ["/start", "/menu", "/menü", "/rehber", "/komutlar", "/yardim", "/yardım", "/yetkiler", "/rolum", "/yetkim", "/tx", "/txid", "/hash", "/dekont", "/tara", "/oku", "/fis", "/slip", "/dekontoku", "/ses", "/sesli", "/istihbarat", "/risk", "/karaliste", "/karalisteekle", "/karalistesil"]:
                 yetkisiz_uyari_gonder(
                     chat_id,
                     user_id,
@@ -8927,6 +10531,53 @@ def _process_telegram_update_core(update: dict):
             return
         elif ana_komut in ["/qr", "/tronqr", "/tron", "/cuzdan", "/cüzdan", "/adres"]:
             cuzdanQrUret_impl(chat_id, text)
+        elif ana_komut in ["/tx", "/txid", "/hash", "/txsorgula", "/tetheronay", "/tethercek"]:
+            p_args = text.split()[1:]
+            tx_param = " ".join(p_args).strip() if p_args else ""
+            islemi_analiz_bildirimiyle_yap(chat_id, trc20_tx_sorgula_impl, tx_param, goster_bildirim=bool(tx_param), islem_tipi="tx")
+        elif ana_komut in ["/dekont", "/tara", "/oku", "/fis", "/slip", "/dekontoku"]:
+            p_args = text.split()[1:]
+            has_photo = bool(extract_photo_file_id(msg))
+            islemi_analiz_bildirimiyle_yap(chat_id, dekont_tara_komut_impl, msg, p_args, goster_bildirim=has_photo, islem_tipi="dekont")
+        elif ana_komut in ["/ses", "/sesli", "/voice"]:
+            metin, klavye = ses_yardim_rehberi_uret()
+            telegramMesajGonder(chat_id, metin, klavye)
+            return
+        elif ana_komut in ["/istihbarat", "/risk", "/guvenliksorgu"]:
+            p_args = text.split()[1:]
+            sorgu_deger = " ".join(p_args).strip() if p_args else ""
+            islemi_analiz_bildirimiyle_yap(chat_id, risk_raporu_uret, sorgu_deger, goster_bildirim=bool(sorgu_deger), islem_tipi="risk")
+            return
+        elif ana_komut in ["/karalisteekle", "/riskekle", "/blokle"]:
+            if not yetkili_mi(user_id):
+                yetkisiz_uyari_gonder(chat_id, user_id, "⛔ <b>Yetkisiz İşlem:</b> Kara listeye kayıt ekleme yetkisi sadece şirket yöneticilerine aittir.")
+                return
+            p_args = text.split()[1:]
+            if not p_args:
+                telegramMesajGonder(chat_id, "⚠️ <b>Kullanım:</b> <code>/karalisteekle [İBAN/Cüzdan] [Sebep]</code>\n<i>Örnek: <code>/karalisteekle TR12000620... MASAK Şüpheli</code></i>")
+                return
+            deger = p_args[0].strip()
+            sebep = " ".join(p_args[1:]).strip() if len(p_args) > 1 else "Şüpheli İşlem / Bloke Riski"
+            u_ad = from_user.get("first_name", "") or str(user_id)
+            ok, res_metin = risk_kaydi_ekle(deger, "KARA_LISTE", sebep, u_ad)
+            metin, klavye = risk_raporu_uret(deger)
+            telegramMesajGonder(chat_id, f"✅ <b>Kayıt Başarıyla Eklendi!</b>\n\n{metin}", klavye)
+            return
+        elif ana_komut in ["/karalistesil", "/risksil", "/temizle"]:
+            if not yetkili_mi(user_id):
+                yetkisiz_uyari_gonder(chat_id, user_id, "⛔ <b>Yetkisiz İşlem:</b> Kara listeden kayıt silme yetkisi sadece şirket yöneticilerine aittir.")
+                return
+            p_args = text.split()[1:]
+            if not p_args:
+                telegramMesajGonder(chat_id, "⚠️ <b>Kullanım:</b> <code>/karalistesil [İBAN/Cüzdan]</code>")
+                return
+            deger = p_args[0].strip()
+            ok, res_metin = risk_kaydi_sil(deger)
+            telegramMesajGonder(chat_id, f"ℹ️ {res_metin}")
+            return
+        elif ana_komut in ["/karaliste", "/riskler", "/risklistesi"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, risk_listesi_raporu_uret, 1, goster_bildirim=True, islem_tipi="risk")
+            return
         elif ana_komut in ["/panel", "/webpanel"]:
             if not yetkili_mi(user_id):
                 yetkisiz_uyari_gonder(
