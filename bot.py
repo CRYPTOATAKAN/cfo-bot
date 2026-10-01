@@ -37,6 +37,49 @@ def sanitize_html(text: Any) -> str:
         return ""
     return html.escape(str(text), quote=False)
 
+def safe_html_truncate(text: str, max_length: int = 4000, suffix: str = "\n...") -> str:
+    """
+    Metni HTML etiketlerinin bütünlüğünü bozmadan güvenli bir şekilde keser.
+    Açık kalan HTML etiketlerini (<b>, <code>, <i>, <s>, <u>, <pre>, <a> vb.)
+    ters sırada otomatik kapatır. Böylece Telegram'ın 'can't parse entities: Unclosed tag'
+    hatası fırlatmasını ve formatlamayı bozmasını kesin olarak engeller.
+    """
+    if not text or len(text) <= max_length:
+        return text or ""
+
+    target_len = max_length - len(suffix)
+    if target_len <= 0:
+        return text[:max_length]
+
+    # İlk kaba kesim
+    truncated = text[:target_len]
+
+    # Eğer tam bir HTML tag ortasında kesildiyse (örn: '<co' veya '<code'), o yarım tag'i geriye doğru temizle
+    last_open_angle = truncated.rfind('<')
+    last_close_angle = truncated.rfind('>')
+    if last_open_angle > last_close_angle:
+        truncated = truncated[:last_open_angle]
+
+    # Kapanmamış etiketleri tespit et
+    tag_regex = re.compile(r'<\s*(/)?\s*([a-zA-Z0-9]+)(?:\s+[^>]*)?>')
+    open_tags = []
+    for match in tag_regex.finditer(truncated):
+        is_closing = bool(match.group(1))
+        tag_name = match.group(2).lower()
+        if is_closing:
+            if open_tags and open_tags[-1] == tag_name:
+                open_tags.pop()
+            elif tag_name in open_tags:
+                open_tags.reverse()
+                open_tags.remove(tag_name)
+                open_tags.reverse()
+        else:
+            open_tags.append(tag_name)
+
+    closing_tags = ''.join([f'</{tag}>' for tag in reversed(open_tags)])
+    return truncated + suffix + closing_tags
+
+
 def sanitize_sheet_cell_value(val: Any) -> Any:
     """
     Google Sheets / Excel CSV/Formula Injection Koruması:
@@ -357,6 +400,11 @@ def _append_close_button_if_needed(reply_markup):
 def telegramMesajGonder(chat_id, metin: str, reply_markup=None, kapat_butonu_ekle: bool = True):
     if kapat_butonu_ekle:
         reply_markup = _append_close_button_if_needed(reply_markup)
+    
+    # Telegram 4096 karakter sınırına karşı HTML güvenli koruma
+    if len(metin) > 4096:
+        metin = safe_html_truncate(metin, max_length=4000)
+
     payload = {"chat_id": chat_id, "text": metin, "parse_mode": "HTML"}
     if reply_markup:
         payload["reply_markup"] = reply_markup
@@ -383,9 +431,9 @@ def telegramMesajDuzenle(chat_id, message_id, metin: str, reply_markup=None, kap
     if reply_markup is not None and kapat_butonu_ekle:
         reply_markup = _append_close_button_if_needed(reply_markup)
     
-    # 1. Telegram 4096 karakter sınırına karşı koruma
+    # 1. Telegram 4096 karakter sınırına karşı HTML güvenli koruma
     if len(metin) > 4096:
-        metin = metin[:4080] + "\n..."
+        metin = safe_html_truncate(metin, max_length=4000)
 
     payload = {"chat_id": chat_id, "message_id": message_id, "text": metin, "parse_mode": "HTML"}
     if reply_markup is not None:
@@ -2238,67 +2286,53 @@ def rehber_kategori_metni(kategori: str) -> str:
             "📚 <b>TÜM SİSTEM KOMUTLARI</b>\n"
             "━━━━━━━━━━━━━━━\n\n"
             "🏢 <b>KASA VE OPERASYON</b>\n"
-            "• <code>/kasa</code> : Canlı durum fişi döker.\n"
-            "• <code>/kasa [Grup] [Tutar]</code> : Kasaya nakit ekler.\n"
-            "• <code>/kasasil [Grup] [Tutar]</code> : Kasadan tutar siler.\n"
-            "• <code>/odeme [Grup] [Tutar]</code> : Ödenen tutarı işler.\n"
-            "• <code>/odemesil [Grup] [Tutar]</code> : Ödenen tutardan düşer.\n"
+            "• <code>/kasa</code> / <code>/kasasil</code> : Kasaya nakit ekler veya siler.\n"
+            "• <code>/odeme</code> / <code>/odemesil</code> : Ödenen tutarı işler veya düşer.\n"
+            "• <code>/devir</code> / <code>/devirsil</code> : Devir bakiyesi ekler veya düşer.\n"
             "• <code>/virman [Kaynak] [Hedef] [Tutar]</code> : 🔄 Cari kasa transferi.\n"
-            "• <code>/devir [Grup] [Tutar]</code> : Devir bakiyesi ekler.\n"
-            "• <code>/devirsil [Grup] [Tutar]</code> : Devirden siler.\n"
-            "• <code>/toplu</code> : ⚡ Çoklu hızlı işlem (+, -, Ö, D, M).\n"
-            "• <code>/cariler</code> : 📋 Aktif carileri interaktif butonlarla listeler.\n"
-            "• <code>/cariekle [Cari]</code> : ➕ Telegram'dan yeni cari satırı açar.\n"
-            "• <code>/paylas [Cari]</code> : 💬 Kopyalanabilir bakiye kartı.\n"
-            "• <code>/hareketler [Cari]</code> : 📜 Günlük tüm işlem ve formül dökümü.\n"
-            "• <code>/masrafekle [Kalem] [Tutar]</code> : Masraf işler.\n"
-            "• <code>/masrafsil [Kalem] [Tutar]</code> : Masraf siler/düşer.\n"
-            "• <code>/masraf</code> : Günlük masraf listesini döker.\n"
-            "• <code>/gerial</code> : En son işlemleri geri alır (Stack Undo).\n"
-            "• <code>/not [Metin]</code> : Şirket hafızasına not kaydeder.\n"
-            "• <code>/notlar</code> : Kaydedilmiş son notları listeler.\n\n"
+            "• <code>/toplu</code> : ⚡ Hızlı çoklu işlem (+, -, Ö, D, M).\n"
+            "• <code>/cariler</code> / <code>/cariekle</code> : 📋 Aktif cariler ve yeni cari açma.\n"
+            "• <code>/paylas</code> / <code>/hareketler</code> : Bakiye özeti ve işlem dökümü.\n"
+            "• <code>/masraf</code> / <code>/masrafekle</code> / <code>/masrafsil</code> : Gider yönetimi.\n"
+            "• <code>/gerial</code> : ↩️ Son işlemi geri alır (Undo).\n"
+            "• <code>/not</code> / <code>/notlar</code> : Şirket not defteri ve hafızası.\n\n"
             "👥 <b>GRUP VE CARİ EŞLEŞTİRME</b>\n"
-            "• <code>/grupbagla [Grup]</code> : Grubu Excel satırına bağlar.\n"
-            "• <code>/grupkopar</code> : Grubun Excel bağlantısını kaldırır.\n"
-            "• <code>/gruplar</code> : Bağlı grupları listeler.\n"
-            "• <code>/senkron</code> / <code>/grupguncelle</code> : 🔄 Excel isimlerini eşitle.\n"
-            "• <code>/duyuru [Metin]</code> : 📢 Bağlı cari gruplarına duyuru geçer.\n\n"
-            "👨💻 <b>GELİŞTİRİCİ &amp; DEVOPS ARAÇLARI</b>\n"
-            "• <code>/id</code> / <code>/myid</code> : 🆔 Telegram ID görüntüleme.\n"
-            "• <code>/yetkiler</code> / <code>/rolum</code> : 🔐 Kullanıcı yetki ve rol sorgulama.\n"
-            "• <code>/guvenlik</code> : 🛡️ Siber güvenlik ve sistem denetimi.\n"
-            "• <code>/panel</code> / <code>/panellink</code> : 🌐 CFO Web Dashboard linki.\n"
-            "• <code>/kuyruk</code> : ⚡ Google Sheets FIFO kuyruğu ve gecikme.\n"
-            "• <code>/kurtar</code> : 🛡️ Sheets kurtarma (DLQ) işlemlerini zorlar.\n"
-            "• <code>/apidurum</code> / <code>/health</code> : 🩺 API sağlık testi.\n"
-            "• <code>/cache</code> / <code>/flush</code> : 🧹 Önbellek tazeleme.\n"
-            "• <code>/logs [n]</code> : 📋 Son sistem loglarını listeleme.\n"
-            "• <code>/backup</code> / <code>/yedek</code> : 📦 Bilanço JSON yedeği alma.\n"
-            "• <code>/status</code> : ⚙️ Sistem Uptime ve metrik raporu.\n"
-            "• <code>/reload</code> : 🔄 Canlı konfigürasyon tazeleme.\n\n"
-            "🔐 <b>FİNANSAL GÜVENLİK VE DENETİM</b>\n"
-            "• <code>/anomali</code> : 🚨 Olağandışı finansal sapma tespiti.\n"
-            "• <code>/mutabakat</code> : 🔎 Dünkü Kalan vs Bugünkü Devir denetimi.\n"
-            "• <code>/limit [Tutar]</code> : Tekil işlem limiti belirleme.\n"
-            "• <code>/kilitle [Grup]</code> / <code>/kilitac</code> : Cari kasa dondurma/açma.\n"
-            "• <code>/audit [Grup]</code> : Matematiksel bakiye denetimi.\n"
-            "• <code>/alarm [Grup] [Tutar]</code> : Kritik bakiye uyarısı.\n"
-            "• <code>/simule [DolarKuru]</code> : Kur stres testi simülasyonu.\n\n"
-            "📊 <b>RAPORLAR VE İBAN YÖNETİMİ</b>\n"
-            "• <code>/tarih [GG.AA.YYYY]</code> : 📅 Geçmiş gün bilançosu / cari fişi.\n"
-            "• <code>/komisyon [Tutar] [%]</code> : ✂️ Anlık komisyon ve kâr hesaplama.\n"
-            "• <code>/ai</code> / <code>/analiz</code> : 🤖 Yapay Zeka Finans Analisti.\n"
-            "• <code>/indir [Cari]</code> / <code>/csvekstre</code> : 📥 Ekstre Excel/CSV indirme.\n"
-            "• <code>/akilliiban [Cari]</code> / <code>/ototahsis</code> : 🎯 Akıllı İBAN dağıtıcı.\n"
-            "• <code>/tahsisliibanlar</code> : 📋 Tüm tahsisli İBAN listesi ve temizlik.\n"
-            "• <code>/synciban</code> : 🔄 İBAN migrasyonu ve senkronizasyonu.\n"
-            "• <code>/hedef</code> : 🎯 Canlı ciro hedefi ve ilerleme çubuğu.\n"
-            "• <code>/trend</code> : 📈 Haftalık büyüme trendi.\n"
-            "• <code>/dashboard</code> : 📱 Görsel canlı finans kartı.\n"
+            "• <code>/grupbagla</code> / <code>/grupkopar</code> : Grubu Excel'e bağlar / kaldırır.\n"
+            "• <code>/gruplar</code> / <code>/senkron</code> : Bağlı gruplar ve Excel eşitleme.\n"
+            "• <code>/duyuru [Metin]</code> : 📢 Bağlı gruplara duyuru geçer.\n\n"
+            "📊 <b>RAPORLAR VE ANALİZ</b>\n"
+            "• <code>/ozet</code> / <code>/rapor</code> : Genel bilanço ve detaylı cari dökümü.\n"
             "• <code>/bakiye</code> / <code>/borclular</code> / <code>/alacaklar</code> : Bakiye sıralaması.\n"
-            "• <code>/iban</code> / <code>/hesaplar</code> / <code>/sablon</code> / <code>/ibantahsis</code> / <code>/ibanbosalt</code> : İBAN yönetimi.\n"
-            "• <code>/kur</code> / <code>/kurfark</code> / <code>/arbitraj</code> / <code>/doviz</code> / <code>/portfoy</code> : Piyasa kurları.\n"
-            "• <code>/adminler</code> / <code>/adminekle</code> / <code>/adminsil</code> / <code>/kapanis</code> : Yönetici ayarları."
+            "• <code>/ai</code> / <code>/analiz</code> : 🤖 Yapay Zeka Finans Analisti.\n"
+            "• <code>/anomali</code> : 🚨 Finansal anomali ve risk tespiti.\n"
+            "• <code>/dashboard</code> : 📱 Görsel finans dashboard kartı.\n"
+            "• <code>/hedef</code> / <code>/trend</code> : 🎯 Ciro hedefi ve haftalık büyüme.\n"
+            "• <code>/indir</code> / <code>/csvekstre</code> : 📥 Ekstre Excel/CSV indirme.\n"
+            "• <code>/tarih</code> / <code>/ekstre</code> : Geçmiş gün ve cari hesap dökümü.\n"
+            "• <code>/mutabakat</code> : 🔎 Dünkü Kalan vs Bugünkü Devir kontrolü.\n"
+            "• <code>/yenigun</code> / <code>/kapanis</code> : Gün devri ve gün sonu kapanışı.\n\n"
+            "🪙 <b>KRİPTO, DÖVİZ VE İBAN</b>\n"
+            "• <code>/kur</code> / <code>/canlikur</code> : Canlı borsa ve Kapalıçarşı kurları.\n"
+            "• <code>/kurfark</code> / <code>/arbitraj</code> : ⚡ Harem Dolar vs Kripto makas analizi.\n"
+            "• <code>/doviz</code> / <code>/portfoy</code> : 💱 Döviz çevirici ve şirket portföyü.\n"
+            "• <code>/komisyon [Tutar] [%]</code> : ✂️ Komisyon, net kâr ve döviz hesabı.\n"
+            "• <code>/iban</code> / <code>/hesaplar</code> : Şirket İBAN ve grup hesap listesi.\n"
+            "• <code>/akilliiban</code> / <code>/ototahsis</code> : 🎯 Otomatik boş İBAN bağlama.\n"
+            "• <code>/tahsisliibanlar</code> / <code>/ibantemizle</code> : Tahsisli İBAN yönetimi.\n"
+            "• <code>/sablon</code> / <code>/ibancoz</code> : Ödeme şablonu ve MOD-97 İBAN kontrolü.\n"
+            "• <code>/t [Cüzdan]</code> / <code>/qr</code> : 🏛️ Canlı TRC-20 rezervi ve ödeme QR kodu.\n\n"
+            "🛡️ <b>YÖNETİCİ, GÜVENLİK VE DEVOPS</b>\n"
+            "• <code>/id</code> / <code>/yetkiler</code> : 🆔 Telegram ID ve yetki sorgulama.\n"
+            "• <code>/panel</code> / <code>/panellink</code> : 🌐 CFO Web Dashboard linki.\n"
+            "• <code>/adminler</code> / <code>/adminekle</code> / <code>/adminsil</code> : Yönetici kadrosu.\n"
+            "• <code>/limit [Tutar]</code> : Tekil işlem limiti belirleme.\n"
+            "• <code>/kilitle</code> / <code>/kilitac</code> : Cari kasayı dondurma / açma.\n"
+            "• <code>/alarm</code> / <code>/audit</code> : Kritik bakiye uyarısı ve bakiye denetimi.\n"
+            "• <code>/simule [Kur]</code> : Kur stres testi simülasyonu.\n"
+            "• <code>/guvenlik</code> / <code>/apidurum</code> : 🩺 Sistem güvenlik ve API sağlık testi.\n"
+            "• <code>/kuyruk</code> / <code>/kurtar</code> : ⚡ Sheets kuyruğu ve DLQ kurtarma.\n"
+            "• <code>/backup</code> / <code>/yedek</code> : 📦 Bilanço JSON yedeği alma.\n"
+            "• <code>/status</code> / <code>/reload</code> / <code>/cache</code> : Sistem metrikleri ve önbellek."
         )
 
 def rehber_metni():
@@ -8655,13 +8689,13 @@ def _process_telegram_update_core(update: dict):
             pass
         return
 
-    if "message" in update and "text" in update["message"]:
+    if "message" in update and ("text" in update["message"] or "caption" in update["message"]):
         msg = update["message"]
         chat_id = msg.get("chat", {}).get("id") or 0
         chat_title = msg.get("chat", {}).get("title", "")
         from_user = msg.get("from") or {}
         user_id = from_user.get("id") or msg.get("sender_chat", {}).get("id") or 0
-        text = msg.get("text", "").strip()
+        text = (msg.get("text") or msg.get("caption") or "").strip()
         is_group = chat_id < 0
 
         if not text.startswith("/"):
