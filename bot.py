@@ -6555,29 +6555,54 @@ def metinCevir_impl(gelenMetin: str) -> str:
         return f"⚠️ <b>Çeviri Servisi Uyarısı:</b> Çeviri servisine şu anda ulaşılamıyor ({e}). Lütfen kısa bir süre sonra tekrar deneyiniz."
 
 # --- YENİ GÜN DEVİR İŞLEMİ (GRUP BAZLI G ➔ C AKTARIMI & D, E SIFIRLAMA) ---
-def yenigun_baslat_mesaji():
+def yenigun_hedef_tarih_hesapla(kaynak_baslik: str, override_tarih: Optional[str] = None) -> str:
+    """
+    Yeni gün devri için açılacak hedef sayfa adını (tarihini) belirler.
+    Kullanıcı özel bir tarih belirtmediyse:
+    - Öncelikli olarak YEREL TÜRKİYE SAATİNE (suankiZamaniAl()) bakar.
+    - Şirket 2 günde bir veya haftasonu/tatil sonrası devir yapıyorsa (yerel tarih kaynak sayfadan büyükse),
+      doğrudan bugünün yerel tarihini (GG.AA.YYYY) hedef tarih olarak belirler.
+    - Eğer kaynak sayfa tarihi zaten bugünün tarihiyle aynıysa (veya ilerisindeyse),
+      kaynak sayfaya +1 gün ekleyerek yarının tarihini hedefler.
+    """
+    if override_tarih and re.match(r'^\d{2}\.\d{2}\.\d{4}$', override_tarih.strip()):
+        return override_tarih.strip()
+
+    yerel_now = suankiZamaniAl()
+    yerel_tarih = yerel_now.strftime("%d.%m.%Y")
+
+    if re.match(r'^\d{2}\.\d{2}\.\d{4}$', kaynak_baslik.strip()):
+        try:
+            kaynak_dt = datetime.datetime.strptime(kaynak_baslik.strip(), "%d.%m.%Y")
+            # Eğer yerel tarih kaynak sayfadan ileri bir tarihse (Örn: kaynak 01.10.2026, yerel 03.10.2026)
+            if yerel_now.date() > kaynak_dt.date():
+                return yerel_tarih
+            else:
+                # Aktif sayfa zaten bugün veya ileri bir tarih ise bir sonraki güne devret
+                return (kaynak_dt + datetime.timedelta(days=1)).strftime("%d.%m.%Y")
+        except Exception:
+            return yerel_tarih
+
+    return yerel_tarih
+
+def yenigun_baslat_mesaji(hedef_tarih_override: Optional[str] = None):
     sh = get_spreadsheet()
     kaynak_sayfa = get_active_daily_sheet(sh)
     
-    # Dinamik İleri Tarih: Son sayfa adına +1 gün ekle
-    hedef_tarih = suankiZamaniAl().strftime("%d.%m.%Y")
-    if re.match(r'^\d{2}\.\d{2}\.\d{4}$', kaynak_sayfa.title):
-        try:
-            d_obj = datetime.datetime.strptime(kaynak_sayfa.title, "%d.%m.%Y")
-            hedef_tarih = (d_obj + datetime.timedelta(days=1)).strftime("%d.%m.%Y")
-        except Exception: pass
+    # Yerel Türkiye Tarihi Bazlı Dinamik Hedef Tarih Belirleme
+    hedef_tarih = yenigun_hedef_tarih_hesapla(kaynak_sayfa.title, hedef_tarih_override)
 
     klavye = {
         "inline_keyboard": [
-            [{"text": "🔄 Masrafları Temizle & Yeni Güne Geç", "callback_data": "yenigun_onay_sil"}],
-            [{"text": "📋 Masrafları Koru & Yeni Güne Geç", "callback_data": "yenigun_onay_tut"}],
+            [{"text": "🔄 Masrafları Temizle & Yeni Güne Geç", "callback_data": f"yenigun_onay_sil_{hedef_tarih}"}],
+            [{"text": "📋 Masrafları Koru & Yeni Güne Geç", "callback_data": f"yenigun_onay_tut_{hedef_tarih}"}],
             [{"text": "❌ İptal Et", "callback_data": "yenigun_iptal"}]
         ]
     }
     return (
         f"🌅 <b>YENİ GÜN DEVİR İŞLEMİ ➔ {hedef_tarih}</b>\n━━━━━━━━━━\n\n"
         f"📁 <b>Kaynak Sayfa:</b> <code>{kaynak_sayfa.title}</code>\n"
-        f"📅 <b>Açılacak Yeni Sayfa:</b> <code>{hedef_tarih}</code>\n\n"
+        f"📅 <b>Açılacak Yeni Sayfa:</b> <code>{hedef_tarih}</code> <i>(Yerel Tarih Baz Alındı)</i>\n\n"
         "1. Dünkü <b>Kalan Kasa</b> (G sütunu) tutarları (+/- işaretleri ve kuruşları korunarak) yeni günün <b>Devir/Borç</b> (C sütunu) hanesine aktarılacaktır.\n"
         "2. <b>Güncel Kasa</b> (D) ve <b>Ödenen</b> (E) sütunları sıfırlanacaktır (2-42. Satırlar).\n"
         "3. <b>G45 Kalan Fark:</b> Dünün G45 nihai kapanış bakiyesi (+/- korunarak) yeni günün <code>=FARK+F43-J43</code> formülüne otomatik aktarılacaktır.\n\n"
@@ -6585,18 +6610,13 @@ def yenigun_baslat_mesaji():
         klavye
     )
 
-def yenigun_gerceklestir_impl(masraflari_sil: bool) -> str:
+def yenigun_gerceklestir_impl(masraflari_sil: bool, hedef_tarih_override: Optional[str] = None) -> str:
     sh = get_spreadsheet()
     kaynak_sayfa = get_active_daily_sheet(sh)
     
-    # 1. Dinamik İleri Tarih Hesaplama (+1 Gün)
-    hedef_yeni_tarih = suankiZamaniAl().strftime("%d.%m.%Y")
-    if re.match(r'^\d{2}\.\d{2}\.\d{4}$', kaynak_sayfa.title):
-        try:
-            d_obj = datetime.datetime.strptime(kaynak_sayfa.title, "%d.%m.%Y")
-            hedef_yeni_tarih = (d_obj + datetime.timedelta(days=1)).strftime("%d.%m.%Y")
-        except Exception: pass
-        
+    # 1. Dinamik Hedef Tarih Hesaplama (Yerel Tarih Bazlı)
+    hedef_yeni_tarih = yenigun_hedef_tarih_hesapla(kaynak_sayfa.title, hedef_tarih_override)
+    
     # 2. Eğer hedef sayfa adı önceden bozuk/yarım açılmışsa temizle
     try:
         mevcut_sayfa = sh.worksheet(hedef_yeni_tarih)
@@ -8390,7 +8410,7 @@ def _process_telegram_update_core(update: dict):
                 pass
             metin, klavye = yenigun_baslat_mesaji()
             telegramMesajGonder(chat_id, metin, klavye)
-        elif data == "yenigun_onay_sil":
+        elif data == "yenigun_onay_sil" or data.startswith("yenigun_onay_sil_"):
             if not yetkili_mi(user_id):
                 yetkisiz_uyari_gonder(chat_id, user_id, "⛔ <b>Yetkisiz İşlem:</b> Yeni gün devir işlemini onaylama yetkisi sadece <b>Şirket Yöneticilerine ve Kurucuya</b> aittir.")
                 try:
@@ -8402,8 +8422,9 @@ def _process_telegram_update_core(update: dict):
                 telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", ""), "text": "⏳ Yeni gün devri başlatılıyor..."})
             except Exception:
                 pass
-            islemi_analiz_bildirimiyle_yap(chat_id, yenigun_gerceklestir_impl, True)
-        elif data == "yenigun_onay_tut":
+            t_override = data.replace("yenigun_onay_sil", "").lstrip("_").strip() or None
+            islemi_analiz_bildirimiyle_yap(chat_id, yenigun_gerceklestir_impl, True, t_override)
+        elif data == "yenigun_onay_tut" or data.startswith("yenigun_onay_tut_"):
             if not yetkili_mi(user_id):
                 yetkisiz_uyari_gonder(chat_id, user_id, "⛔ <b>Yetkisiz İşlem:</b> Yeni gün devir işlemini onaylama yetkisi sadece <b>Şirket Yöneticilerine ve Kurucuya</b> aittir.")
                 try:
@@ -8415,7 +8436,8 @@ def _process_telegram_update_core(update: dict):
                 telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", ""), "text": "⏳ Yeni gün devri başlatılıyor..."})
             except Exception:
                 pass
-            islemi_analiz_bildirimiyle_yap(chat_id, yenigun_gerceklestir_impl, False)
+            t_override = data.replace("yenigun_onay_tut", "").lstrip("_").strip() or None
+            islemi_analiz_bildirimiyle_yap(chat_id, yenigun_gerceklestir_impl, False, t_override)
         elif data == "yenigun_iptal":
             try:
                 telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", ""), "text": "❌ İptal edildi"})
@@ -9076,7 +9098,9 @@ def _process_telegram_update_core(update: dict):
         elif ana_komut in ["/guvenlik", "/security", "/auditbot"]:
             islemi_analiz_bildirimiyle_yap(chat_id, sistem_guvenlik_raporu_impl, user_id, goster_bildirim=True)
         elif ana_komut == "/yenigun":
-            metin, klavye = yenigun_baslat_mesaji()
+            args = komut_parcalari[1:]
+            t_override = args[0].strip() if (args and re.match(r'^\d{2}\.\d{2}\.\d{4}$', args[0].strip())) else None
+            metin, klavye = yenigun_baslat_mesaji(t_override)
             telegramMesajGonder(chat_id, metin, klavye)
         elif ana_komut in ["/kasasil", "/kasacikar", "/kasaçıkar"]:
             islemi_analiz_bildirimiyle_yap(chat_id, hucreyeVeriYaz_impl, text, 4, "Kasa Silme", -1, chat_id)
