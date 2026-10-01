@@ -1876,7 +1876,7 @@ def toplu_duyuru_yayinla_callback(draft_id: str, hedef_filtre: str, gonderen_id:
     
     rapor = (
         f"📢 <b>TOPLU DUYURU RAPORU</b>\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"🎯 <b>Hedef Kitle:</b> <b>{hedef_aciklama}</b>\n"
         f"✅ <b>Başarılı Gönderim:</b> <b>{len(basarili_gruplar)} Grup</b>\n"
     )
@@ -1890,7 +1890,7 @@ def toplu_duyuru_yayinla_callback(draft_id: str, hedef_filtre: str, gonderen_id:
         )
         
     rapor += (
-        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"⏰ <b>Saat:</b> <code>{saat_tarih}</code>\n"
         f"💡 <i>Duyuru başarıyla seçilen gruplara iletilmiştir.</i>"
     )
@@ -2019,16 +2019,16 @@ def grup_kasa_analiz_fisi_uret(grup_ham: str) -> Tuple[str, Optional[dict]]:
 
     mesaj = (
         f"📊 <b>[ {gercek_grup_adi.upper()} ] GÜNCEL KASA ANALİZİ</b>\n"
-        f"━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"📅 Tarih: {tarih_str} | ⏰ Saat: {saat_str}\n"
-        f"━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"🔄 Önceki Devir: {paraFormatla(devir)}\n"
         f"💰 Eklenen Kasa: {paraFormatla(kasa)}\n"
         f"💸 Yapılan Ödeme: {paraFormatla(odenen)}\n"
         f"✂️ Kesinti/Masraf: {paraFormatla(komisyon)}\n"
-        f"━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"🏦 <b>NET KALAN TL: {paraFormatla(kalan)}</b>\n"
-        f"━━━━━━━━━━━━━━━"
+        f"━━━━━━━━━━"
     )
 
     _prune_taslaklar()
@@ -2078,7 +2078,7 @@ def menuKlavyesiOlustur(isGroup: bool):
 def rehber_ana_metni() -> str:
     return (
         "📚 <b>CFO BOT AKILLI KOMUT REHBERİ</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━\n"
+        "━━━━━━━━━━\n"
         "Şirketinizin finans, kasa, masraf ve döviz operasyonlarını 7/24 kesintisiz yönetebilirsiniz.\n\n"
         "👇 <b>Detaylı bilgi ve örnek kullanımlar için bir kategori seçin:</b>"
     )
@@ -2115,7 +2115,7 @@ def rehber_kategori_metni(kategori: str) -> str:
     if kategori == "kasa":
         return (
             "🏢 <b>KASA VE ÖDEME İŞLEMLERİ</b>\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "━━━━━━━━━━━\n\n"
             "• <code>/kasa</code> : <i>Bağlı Telegram grubunda tek tuşla canlı kasa durum fişini döker.</i>\n"
             "• <code>/kasa [Tutar]</code> veya <code>/kasaekle [Tutar]</code> : <i>Bağlı grupta doğrudan kasaya nakit ekler (Örn: /kasa 3744753).</i>\n"
             "• <code>/kasa [Grup] [Tutar]</code> : <i>Belirtilen gruba nakit ekler (Örn: /kasa SACİD 500.000).</i>\n"
@@ -11308,8 +11308,9 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         <!-- HEADER -->
         <div class="header">
             <div class="logo-area">
-                <div class="logo-icon" title="CFO Sovereign Shield - Finansal Güvenlik & Kasa Hakimiyeti">
-                    <img src="/cfo_emblem.jpg" alt="CFO" onerror="this.onerror=null; this.parentElement.innerHTML='<svg viewBox=\'0 0 100 100\' width=\'38\' height=\'38\' fill=\'none\'><polygon points=\'50,5 90,26 90,74 50,95 10,74 10,26\' fill=\'%230e1a2b\' stroke=\'%2310b981\' stroke-width=\'4\'/><polygon points=\'50,22 75,36 75,64 50,78 25,64 25,36\' fill=\'none\' stroke=\'%23fbbf24\' stroke-width=\'3\'/><path d=\'M30 62 L45 47 L56 56 L72 38 M72 38 H60 M72 38 V50\' stroke=\'%2334d399\' stroke-width=\'4.5\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/></svg>';">
+                <div class="logo-icon" id="main-cfo-logo" onclick="cycleCfoEmblem()" title="Tıklayarak AI Amblemini Değiştirin (1: Sovereign Kalkan, 2: Cyborg Robot, 3: Kuantum Heksagon)" style="cursor:pointer; position:relative; user-select:none;">
+                    <img id="cfo-emblem-img" src="/cfo_emblem.jpg" alt="CFO AI" onerror="this.onerror=null; this.parentElement.innerHTML='<svg viewBox=\'0 0 100 100\' width=\'38\' height=\'38\' fill=\'none\'><polygon points=\'50,5 90,26 90,74 50,95 10,74 10,26\' fill=\'%230e1a2b\' stroke=\'%2310b981\' stroke-width=\'4\'/><polygon points=\'50,22 75,36 75,64 50,78 25,64 25,36\' fill=\'none\' stroke=\'%23fbbf24\' stroke-width=\'3\'/><path d=\'M30 62 L45 47 L56 56 L72 38 M72 38 H60 M72 38 V50\' stroke=\'%2334d399\' stroke-width=\'4.5\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/></svg>';">
+                    <span style="position:absolute; bottom:-3px; right:-3px; background:linear-gradient(135deg, #10b981, #065f46); color:#ffffff; font-size:7.5px; font-weight:900; border-radius:3px; padding:1px 3.5px; pointer-events:none; border:1px solid rgba(255,255,255,0.4); box-shadow:0 0 6px rgba(16,185,129,0.8); line-height:1;">AI</span>
                 </div>
                 <div class="title">
                     <h1>CFO CANLI FİNANS PANELİ</h1>
@@ -11392,8 +11393,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <!-- 0. CFO AI FİNANSAL YÖNETİCİ BRİFİNGİ -->
             <div class="cfo-ai-card" id="cfo-ai-brief-card">
                 <div class="cfo-ai-header">
-                    <div class="cfo-ai-title-box">
-                        <span class="ai-sparkle-icon">🤖</span>
+                    <div class="cfo-ai-title-box" style="display:flex; align-items:center; gap:10px;">
+                        <img src="/cfo_emblem_2.jpg" alt="CFO AI Advisor" style="width:36px; height:36px; border-radius:10px; border:1px solid rgba(56,189,248,0.5); object-fit:cover; box-shadow:0 0 12px rgba(56,189,248,0.35);" onerror="this.onerror=null; this.outerHTML='<span class=\'ai-sparkle-icon\'>🤖</span>';">
                         <div>
                             <div class="cfo-ai-badge">CFO AI ADVISOR</div>
                             <h3 class="cfo-ai-heading">YÖNETİCİ BRİFİNGİ & STRATEJİK İÇGÖRÜ</h3>
@@ -14107,9 +14108,56 @@ CFO Canlı Finans Sistemi`;
             showToast('Varsayılan Aurora temasına dönüldü.', 'info');
         }
 
+        // ==================== YENİ NESİL AI AMBLEM YÖNETİCİSİ ====================
+        const CFO_EMBLEMS = [
+            { id: 1, src: '/cfo_emblem_1.jpg', name: 'Sovereign AI Shield', badge: '🛡️', desc: 'Obsidyen Kalkan & AI Beyin Çekirdeği' },
+            { id: 2, src: '/cfo_emblem_2.jpg', name: 'CFO AI Cyborg Executive', badge: '🤖', desc: 'Fütüristik Kripto/Finans Android Robot' },
+            { id: 3, src: '/cfo_emblem_3.jpg', name: 'Hexagon Quantum AI Core', badge: '💎', desc: 'Kuantum Mikroçip & Heksagon Finans Rozeti' }
+        ];
+
+        function initCfoEmblem() {
+            try {
+                const saved = localStorage.getItem('cfo_selected_emblem');
+                const idx = saved !== null ? parseInt(saved, 10) : 0;
+                const emblem = CFO_EMBLEMS[idx] || CFO_EMBLEMS[0];
+                const img = document.getElementById('cfo-emblem-img');
+                if (img) {
+                    img.src = emblem.src;
+                    img.alt = emblem.name;
+                }
+            } catch(e) {
+                console.warn('Emblem init uyarısı:', e);
+            }
+        }
+
+        function cycleCfoEmblem() {
+            try {
+                let saved = localStorage.getItem('cfo_selected_emblem');
+                let idx = saved !== null ? (parseInt(saved, 10) + 1) % CFO_EMBLEMS.length : 1;
+                localStorage.setItem('cfo_selected_emblem', idx);
+                const emblem = CFO_EMBLEMS[idx];
+                const img = document.getElementById('cfo-emblem-img');
+                if (img) {
+                    img.style.transition = 'transform 0.22s ease-in-out, opacity 0.18s ease';
+                    img.style.transform = 'scale(0.8) rotate(15deg)';
+                    img.style.opacity = '0.5';
+                    setTimeout(() => {
+                        img.src = emblem.src;
+                        img.alt = emblem.name;
+                        img.style.transform = 'scale(1) rotate(0deg)';
+                        img.style.opacity = '1';
+                    }, 150);
+                }
+                showToast(`${emblem.badge} Aktif AI Amblemi: <b>${emblem.name}</b>`, 'info');
+            } catch(e) {
+                console.warn('Emblem switch hatası:', e);
+            }
+        }
+
         // Başlat
         initBackgroundTheme();
         updateControlButtonsUI();
+        initCfoEmblem();
 
         // 1. Sunucu Tarafı İlk Veri Varsa ANINDA Render Et (0 Gecikme)
         if (serverInitialData && serverInitialData.tarih) {
@@ -14434,10 +14482,22 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
             self._send_response_data(200, "application/json; charset=utf-8", res_bytes, extra_headers={"Cache-Control": "no-cache"})
             return
         
-        if parsed.path in ("/cfo_emblem.jpg", "/logo.png", "/cfo_emblem.png", "/favicon.ico"):
-            img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cfo_emblem.jpg")
+        emblem_files = {
+            "/cfo_emblem.jpg": "cfo_emblem.jpg",
+            "/cfo_emblem_1.jpg": "cfo_emblem_1.jpg",
+            "/cfo_emblem_2.jpg": "cfo_emblem_2.jpg",
+            "/cfo_emblem_3.jpg": "cfo_emblem_3.jpg",
+            "/logo.png": "cfo_emblem.jpg",
+            "/cfo_emblem.png": "cfo_emblem.jpg",
+            "/favicon.ico": "cfo_emblem.jpg"
+        }
+        if parsed.path in emblem_files:
+            target_fn = emblem_files[parsed.path]
+            img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), target_fn)
             if not os.path.exists(img_path):
-                img_path = "cfo_emblem.jpg"
+                img_path = target_fn
+            if not os.path.exists(img_path):
+                img_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cfo_emblem.jpg")
             if os.path.exists(img_path):
                 try:
                     with open(img_path, "rb") as f:
