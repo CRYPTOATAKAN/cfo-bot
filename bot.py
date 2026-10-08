@@ -548,17 +548,21 @@ def get_iban_sheet(sh=None, force_refresh=False) -> gspread.Worksheet:
 
         # 2. Sayfa yoksa yeni 'IBANLAR' sayfasını oluştur
         try:
-            ws = sh.add_worksheet(title=IBAN_SAYFASI, rows=500, cols=10)
+            ws = sh.add_worksheet(title=IBAN_SAYFASI, rows=500, cols=15)
         except Exception:
             try:
                 ws = sh.worksheet(IBAN_SAYFASI)
             except Exception:
                 ws = sh.sheet1
 
-        # Başlık satırını ekle (2 Bloklu İBAN Düzeni: Sol Blok A-D, Sağ Blok F-H)
-        headers = ["HESAP KODU", "ŞABLON METNİ", "", "TAHSİS EDİLEN CARİ / DURUM", "", "HESAP KODU", "ŞABLON METNİ", "TAHSİS EDİLEN CARİ / DURUM"]
+        # Başlık satırını ekle (3 Bloklu İBAN Düzeni: Sol Blok A-D, Orta Blok F-H, Sağ Blok J-L)
+        headers = [
+            "HESAP KODU", "ŞABLON METNİ", "", "TAHSİS EDİLEN CARİ / DURUM", "",
+            "HESAP KODU", "ŞABLON METNİ", "TAHSİS EDİLEN CARİ / DURUM", "",
+            "HESAP KODU", "ŞABLON METNİ", "TAHSİS EDİLEN CARİ / DURUM"
+        ]
         try:
-            ws.update("A1:H1", [headers])
+            ws.update("A1:L1", [headers])
         except Exception:
             pass
 
@@ -605,6 +609,7 @@ def sync_iban_migration(sh=None, iban_ws=None, force=False) -> Tuple[int, int]:
         
         sol_hesaplar = {}  # norm -> (row_idx, cari)
         sag_hesaplar = {}  # norm -> (row_idx, cari)
+        blok3_hesaplar = {}  # norm -> (row_idx, cari)
         
         sol_max_row = 1
         sag_max_row = 1
@@ -631,6 +636,13 @@ def sync_iban_migration(sh=None, iban_ws=None, force=False) -> Tuple[int, int]:
                     cari = r[6].strip() if len(r) > 6 else ""
                     sag_hesaplar[norm] = (idx, cari)
                     sag_max_row = max(sag_max_row, idx)
+
+            # 3. Blok (Col J: 9 Hesap, Col L: 11 Cari)
+            if len(r) > 9 and r[9].strip() and r[9].strip().upper() != "HESAP KODU":
+                norm = normalize_hesap_kodu(r[9].strip())
+                if norm:
+                    cari = r[11].strip() if len(r) > 11 else ""
+                    blok3_hesaplar[norm] = (idx, cari)
 
         daily_ws = get_active_daily_sheet(sh)
         if not daily_ws or daily_ws.title == iban_ws.title:
@@ -662,6 +674,13 @@ def sync_iban_migration(sh=None, iban_ws=None, force=False) -> Tuple[int, int]:
                         update_sheet_matrix_memory(iban_ws.title, r_idx, 8, cari)
                         iban_ws.update_cell(r_idx, 8, cari)
                         sag_hesaplar[h_norm] = (r_idx, cari)
+                        guncellenen += 1
+                elif h_norm in blok3_hesaplar:
+                    r_idx, m_cari = blok3_hesaplar[h_norm]
+                    if cari and not m_cari:
+                        update_sheet_matrix_memory(iban_ws.title, r_idx, 12, cari)
+                        iban_ws.update_cell(r_idx, 12, cari)
+                        blok3_hesaplar[h_norm] = (r_idx, cari)
                         guncellenen += 1
                 else:
                     sol_max_row += 1
@@ -700,6 +719,13 @@ def sync_iban_migration(sh=None, iban_ws=None, force=False) -> Tuple[int, int]:
                         update_sheet_matrix_memory(iban_ws.title, r_idx, 4, cari)
                         iban_ws.update_cell(r_idx, 4, cari)
                         sol_hesaplar[h_norm] = (r_idx, cari)
+                        guncellenen += 1
+                elif h_norm in blok3_hesaplar:
+                    r_idx, m_cari = blok3_hesaplar[h_norm]
+                    if cari and not m_cari:
+                        update_sheet_matrix_memory(iban_ws.title, r_idx, 12, cari)
+                        iban_ws.update_cell(r_idx, 12, cari)
+                        blok3_hesaplar[h_norm] = (r_idx, cari)
                         guncellenen += 1
                 else:
                     sag_max_row += 1
@@ -2246,7 +2272,7 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/ibancoz [İBAN]</code> : <i>İBAN'ı doğrular (MOD-97), bankasını bulur ve temiz format üretir.</i>\n"
             "• <code>/t [Cüzdan]</code> : 🏛️ <i>Canlı TRC-20 rezerv ve TL karşılığı (Sadece Kurucu).</i>\n"
             "• <code>/qr [Cüzdan]</code> : ⚡ <i>Hızlı ödeme QR kodu üretir ve borsa analizi yapar.</i>\n"
-            "• <code>/tx [Hash]</code> : ⚡ <i>Canlı TRC-20 USDT transfer teyidi ve TxID doğrulama.</i>"
+            "• <code>/tx [Hash]</code> veya <code>/tx [Ağ] [Hash]</code> : 🌐 <i>Çoklu Kripto Ağı Tx Doğrulama (Tron TRC-20, BSC BEP-20, ETH ERC-20, Bitcoin, Arbitrum, Polygon anlık transfer ve bakiye teyidi).</i>"
         )
     elif kategori == "admin":
         return (
@@ -2328,7 +2354,7 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/akilliiban</code> / <code>/ototahsis</code> : 🎯 Otomatik boş İBAN bağlama.\n"
             "• <code>/tahsisliibanlar</code> / <code>/ibantemizle</code> : Tahsisli İBAN yönetimi.\n"
             "• <code>/sablon</code> / <code>/ibancoz</code> : Ödeme şablonu ve MOD-97 İBAN kontrolü.\n"
-            "• <code>/t [Cüzdan]</code> / <code>/qr</code> / <code>/tx [Hash]</code> : 🏛️ TRC-20 rezervi, QR kod ve canlı TxID teyidi.\n\n"
+            "• <code>/t [Cüzdan]</code> / <code>/qr</code> / <code>/tx [Hash]</code> : 🌐 Çoklu Kripto Ağı Tx Doğrulama (Tron, BSC, ETH, BTC, Arb, Poly).\n\n"
             "🛡️ <b>YÖNETİCİ, GÜVENLİK VE DEVOPS</b>\n"
             "• <code>/istihbarat</code> / <code>/karaliste</code> : 🛡️ Kara liste & şüpheli hesap istihbaratı.\n"
             "• <code>/karalisteekle</code> / <code>/karalistesil</code> : Riskli hesap ekleme / silme.\n"
@@ -4414,7 +4440,105 @@ def cuzdanQrUret_impl(chat_id: int, komut_metni: str):
         if not res2.get("ok"):
             telegramMesajGonder(chat_id, caption, klavye)
 
-# --- TRON (TRC-20) CANLI TXID / HASH TRANSFER DOĞRULAMA ---
+# --- 🌐 ÇOKLU KRİPTO AĞI (MULTI-CHAIN: TRON, BSC, ETH, BTC, ARB, POLY) TX DOĞRULAMA MOTORU ---
+
+SUPPORTED_CRYPTO_CHAINS = {
+    "tron": {
+        "name": "TRON (TRC-20)",
+        "emoji": "🔴",
+        "native": "TRX",
+        "explorer_tx": "https://tronscan.org/#/transaction/{hash}",
+        "explorer_name": "Tronscan",
+        "type": "tron"
+    },
+    "bsc": {
+        "name": "BSC / BNB Smart Chain (BEP-20)",
+        "emoji": "🟡",
+        "native": "BNB",
+        "explorer_tx": "https://bscscan.com/tx/{hash}",
+        "explorer_name": "BscScan",
+        "type": "evm",
+        "rpcs": [
+            "https://binance.llamarpc.com",
+            "https://bsc-dataseed.binance.org",
+            "https://rpc.ankr.com/bsc",
+            "https://bsc.publicnode.com"
+        ],
+        "usdt_contract": "0x55d398326f99059ff775485246999027b3197955".lower(),
+        "usdt_decimals": 18
+    },
+    "eth": {
+        "name": "Ethereum (ERC-20)",
+        "emoji": "💎",
+        "native": "ETH",
+        "explorer_tx": "https://etherscan.io/tx/{hash}",
+        "explorer_name": "Etherscan",
+        "type": "evm",
+        "rpcs": [
+            "https://eth.llamarpc.com",
+            "https://cloudflare-eth.com",
+            "https://rpc.ankr.com/eth",
+            "https://ethereum.publicnode.com"
+        ],
+        "usdt_contract": "0xdac17f958d2ee523a2206206994597c13d831ec7".lower(),
+        "usdt_decimals": 6
+    },
+    "arbitrum": {
+        "name": "Arbitrum One",
+        "emoji": "🔵",
+        "native": "ETH",
+        "explorer_tx": "https://arbiscan.io/tx/{hash}",
+        "explorer_name": "Arbiscan",
+        "type": "evm",
+        "rpcs": [
+            "https://arbitrum.llamarpc.com",
+            "https://arb1.arbitrum.io/rpc"
+        ],
+        "usdt_contract": "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9".lower(),
+        "usdt_decimals": 6
+    },
+    "polygon": {
+        "name": "Polygon (PoS)",
+        "emoji": "🟣",
+        "native": "POL",
+        "explorer_tx": "https://polygonscan.com/tx/{hash}",
+        "explorer_name": "Polygonscan",
+        "type": "evm",
+        "rpcs": [
+            "https://polygon.llamarpc.com",
+            "https://rpc.ankr.com/polygon",
+            "https://polygon.publicnode.com"
+        ],
+        "usdt_contract": "0xc2132d05d31c914a87c6611c10748aeb04b58e8f".lower(),
+        "usdt_decimals": 6
+    },
+    "btc": {
+        "name": "Bitcoin (BTC)",
+        "emoji": "₿",
+        "native": "BTC",
+        "explorer_tx": "https://mempool.space/tx/{hash}",
+        "explorer_name": "Mempool.space",
+        "type": "btc"
+    }
+}
+
+KNOWN_EVM_TOKENS = {
+    # BSC
+    "0x55d398326f99059ff775485246999027b3197955": ("USDT", 18),
+    "0xe9e7cea3dedca5984780bafc599bd69add087d56": ("BUSD", 18),
+    "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d": ("USDC", 18),
+    # ETH
+    "0xdac17f958d2ee523a2206206994597c13d831ec7": ("USDT", 6),
+    "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": ("USDC", 6),
+    "0x6b175474e89094c44da98b954eedeac495271d0f": ("DAI", 18),
+    # Polygon
+    "0xc2132d05d31c914a87c6611c10748aeb04b58e8f": ("USDT", 6),
+    "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359": ("USDC", 6),
+    # Arbitrum
+    "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9": ("USDT", 6),
+    "0xaf88d065e77c8cc2239327c5edb3a432268e5831": ("USDC", 6)
+}
+
 def get_tron_tx_info(tx_hash: str) -> Optional[dict]:
     """Tronscan resmi API üzerinden TxID / Hash detaylarını çeker."""
     clean_hash = tx_hash.strip().lower()
@@ -4433,173 +4557,519 @@ def get_tron_tx_info(tx_hash: str) -> Optional[dict]:
                 return None
             return d
     except Exception as e:
-        print(f"Tronscan tx sorgulama hatası ({clean_hash}): {e}")
         return None
 
-def trc20_tx_raporu_uret(tx_input: str) -> Tuple[str, dict]:
-    """TRON (TRC-20) TxID / Hash doğrulama raporu ve interaktif butonlar üretir."""
-    # 64 karakterli hex hash'i tespit et (link, metin veya temiz hash içinden)
-    m = re.search(r'([a-fA-F0-9]{64})', tx_input)
+def get_evm_tx_info(chain: str, tx_hash: str) -> Optional[dict]:
+    """EVM tabanlı ağlarda (BSC, Ethereum, Polygon, Arbitrum) JSON-RPC ile Tx detaylarını sorgular."""
+    conf = SUPPORTED_CRYPTO_CHAINS.get(chain)
+    if not conf or "rpcs" not in conf:
+        return None
+
+    h = tx_hash.strip().lower()
+    if not h.startswith("0x"):
+        h = "0x" + h
+
+    payload = json.dumps([
+        {"jsonrpc": "2.0", "method": "eth_getTransactionByHash", "params": [h], "id": 1},
+        {"jsonrpc": "2.0", "method": "eth_getTransactionReceipt", "params": [h], "id": 2}
+    ]).encode("utf-8")
+
+    for rpc_url in conf["rpcs"]:
+        try:
+            req = urllib.request.Request(
+                rpc_url,
+                data=payload,
+                headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"}
+            )
+            with urllib.request.urlopen(req, timeout=5) as res:
+                data = json.loads(res.read().decode("utf-8"))
+                if isinstance(data, list):
+                    tx_obj = next((item.get("result") for item in data if item.get("id") == 1), None)
+                    rc_obj = next((item.get("result") for item in data if item.get("id") == 2), None)
+                    if tx_obj and isinstance(tx_obj, dict):
+                        return {"tx": tx_obj, "receipt": rc_obj or {}, "chain": chain}
+        except Exception:
+            continue
+    return None
+
+def get_btc_tx_info(tx_hash: str) -> Optional[dict]:
+    """Bitcoin (BTC) ağında mempool.space veya blockchain.info üzerinden Tx detaylarını çeker."""
+    clean_hash = tx_hash.strip().lower()
+    if clean_hash.startswith("0x"):
+        clean_hash = clean_hash[2:]
+
+    # 1. Mempool.space
+    url = f"https://mempool.space/api/tx/{clean_hash}"
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=5) as res:
+            d = json.loads(res.read().decode("utf-8"))
+            if d and isinstance(d, dict) and "txid" in d:
+                return d
+    except Exception:
+        pass
+
+    # 2. Blockchain.info Fallback
+    fb_url = f"https://blockchain.info/rawtx/{clean_hash}?format=json"
+    req_fb = urllib.request.Request(fb_url, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urllib.request.urlopen(req_fb, timeout=5) as res:
+            d = json.loads(res.read().decode("utf-8"))
+            if d and isinstance(d, dict) and "hash" in d:
+                return {
+                    "txid": d.get("hash"),
+                    "status": {
+                        "confirmed": bool(d.get("block_height")),
+                        "block_height": d.get("block_height", 0),
+                        "block_time": d.get("time", 0)
+                    },
+                    "fee": d.get("fee", 0),
+                    "vin": [{"prevout": {"scriptpubkey_address": inp.get("prev_out", {}).get("addr", "")}} for inp in d.get("inputs", [])],
+                    "vout": [{"scriptpubkey_address": out.get("addr", ""), "value": out.get("value", 0)} for out in d.get("out", [])]
+                }
+    except Exception:
+        pass
+    return None
+
+def parse_crypto_tx_input(tx_input: str) -> Tuple[Optional[str], str]:
+    """Tx parametresinden zincir adını ve 64/66 karakterli hash'i ayrıştırır."""
+    if not tx_input:
+        return None, ""
+    
+    txt = tx_input.strip()
+    if txt.startswith("/"):
+        txt = re.sub(r'^/[a-zA-Z0-9_]+\s*', '', txt).strip()
+    
+    # 1. Explorer URL Tespiti
+    if "tronscan.org" in txt:
+        m = re.search(r'([a-fA-F0-9]{64})', txt)
+        return "tron", (m.group(1).lower() if m else "")
+    elif "bscscan.com" in txt:
+        m = re.search(r'(0x[a-fA-F0-9]{64}|[a-fA-F0-9]{64})', txt)
+        return "bsc", (m.group(1).lower() if m else "")
+    elif "etherscan.io" in txt:
+        m = re.search(r'(0x[a-fA-F0-9]{64}|[a-fA-F0-9]{64})', txt)
+        return "eth", (m.group(1).lower() if m else "")
+    elif "arbiscan.io" in txt:
+        m = re.search(r'(0x[a-fA-F0-9]{64}|[a-fA-F0-9]{64})', txt)
+        return "arbitrum", (m.group(1).lower() if m else "")
+    elif "polygonscan.com" in txt:
+        m = re.search(r'(0x[a-fA-F0-9]{64}|[a-fA-F0-9]{64})', txt)
+        return "polygon", (m.group(1).lower() if m else "")
+    elif "mempool.space" in txt or "blockchain.com" in txt:
+        m = re.search(r'([a-fA-F0-9]{64})', txt)
+        return "btc", (m.group(1).lower() if m else "")
+
+    # 2. Ön Ek Anahtar Kelime Tespiti (Örn: "/tx bsc 0x...", "/tx eth ...", "/tx btc ...")
+    parts = txt.split(None, 1)
+    prefix_chain = None
+    if len(parts) == 2:
+        k = tr_lower(parts[0]).strip()
+        if k in ["bsc", "bep20", "binance", "bnb"]:
+            prefix_chain = "bsc"
+        elif k in ["eth", "erc20", "ethereum"]:
+            prefix_chain = "eth"
+        elif k in ["btc", "bitcoin"]:
+            prefix_chain = "btc"
+        elif k in ["tron", "trx", "trc20"]:
+            prefix_chain = "tron"
+        elif k in ["arb", "arbitrum"]:
+            prefix_chain = "arbitrum"
+        elif k in ["poly", "polygon", "matic"]:
+            prefix_chain = "polygon"
+        
+        if prefix_chain:
+            txt = parts[1].strip()
+
+    # 3. Hash Çıkarımı
+    m = re.search(r'(0x[a-fA-F0-9]{64}|[a-fA-F0-9]{64})', txt)
     if not m:
+        return prefix_chain, ""
+    
+    clean_h = m.group(1).lower()
+    return prefix_chain, clean_h
+
+def build_multi_chain_tx_keyboard(current_chain: str, tx_hash: str) -> dict:
+    conf = SUPPORTED_CRYPTO_CHAINS.get(current_chain, SUPPORTED_CRYPTO_CHAINS["tron"])
+    explorer_url = conf["explorer_tx"].format(hash=tx_hash)
+    explorer_name = conf["explorer_name"]
+    clean_h = tx_hash.lower()
+
+    row1 = [
+        {"text": f"🔍 {explorer_name}", "url": explorer_url},
+        {"text": "🔄 Yeniden Sorgula", "callback_data": f"tx_yenile_{current_chain}_{clean_h}"}
+    ]
+    row2 = [
+        {"text": "🔴 Tron", "callback_data": f"tx_chain_tron_{clean_h}"},
+        {"text": "🟡 BSC", "callback_data": f"tx_chain_bsc_{clean_h}"},
+        {"text": "💎 ETH", "callback_data": f"tx_chain_eth_{clean_h}"}
+    ]
+    row3 = [
+        {"text": "₿ Bitcoin", "callback_data": f"tx_chain_btc_{clean_h}"},
+        {"text": "🔵 Arbitrum", "callback_data": f"tx_chain_arbitrum_{clean_h}"},
+        {"text": "🟣 Polygon", "callback_data": f"tx_chain_polygon_{clean_h}"}
+    ]
+    row4 = [
+        {"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}
+    ]
+    return {"inline_keyboard": [row1, row2, row3, row4]}
+
+def multi_chain_tx_raporu_uret(tx_input: str, force_chain: Optional[str] = None) -> Tuple[str, dict]:
+    """Çoklu Kripto Ağı (Tron, BSC, Ethereum, Bitcoin, Arbitrum, Polygon) TxID doğrulama raporu üretir."""
+    chain_pref, clean_hash = parse_crypto_tx_input(tx_input)
+    if not clean_hash:
         yardim_metni = (
             "🔍 <b>CANLI KRİPTO TRANSFER DOĞRULAMA (TxID)</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            "TRON (TRC-20) ağındaki USDT ve TRX transferlerini anında doğrulamak için:\n\n"
-            "👉 <code>/tx [İşlem Hash veya Tronscan Linki]</code>\n\n"
+            "Aşağıdaki tüm blok zincirlerinde USDT ve kripto transferlerini anında doğrular:\n"
+            "• 🔴 <b>TRON:</b> USDT (TRC-20) &amp; TRX\n"
+            "• 🟡 <b>BSC:</b> USDT (BEP-20), BUSD &amp; BNB\n"
+            "• 💎 <b>ETHEREUM:</b> USDT (ERC-20), USDC &amp; ETH\n"
+            "• ₿ <b>BITCOIN:</b> BTC (Mempool &amp; On-chain)\n"
+            "• 🔵 <b>ARBITRUM:</b> USDT &amp; ETH (Arbitrum One)\n"
+            "• 🟣 <b>POLYGON:</b> USDT &amp; POL/MATIC\n\n"
+            "👉 <b>Kullanım Şekilleri:</b>\n"
+            "• <code>/tx [İşlem Hash veya Explorer Linki]</code> <i>(Otomatik Ağ Tespiti)</i>\n"
+            "• <code>/tx bsc [Hash]</code> <i>(Doğrudan BSC ağında ara)</i>\n"
+            "• <code>/tx eth [Hash]</code> <i>(Doğrudan Ethereum ağında ara)</i>\n"
+            "• <code>/tx btc [Hash]</code> <i>(Doğrudan Bitcoin ağında ara)</i>\n"
+            "• <code>/tx tron [Hash]</code> <i>(Doğrudan Tron ağında ara)</i>\n\n"
             "📌 <b>Örnek Kullanım:</b>\n"
             "• <code>/tx c7490f23d069b12beff262a3f80c651e44280cf1e29e94477c7324eb2913f06b</code>\n"
-            "• <code>/tx https://tronscan.org/#/transaction/c7490f23...</code>\n\n"
-            "💡 <i>İşlem tutarı, gönderen/alıcı cüzdan, borsa etiketi, ağ onay durumu ve şirket kasasına ulaşıp ulaşmadığı anında teyit edilir.</i>"
+            "• <code>/tx 0x55d398326f99059ff775485246999027b3197955...</code>\n\n"
+            "💡 <i>İşlem tutarı, gönderen/alıcı cüzdan, ağ onay durumu, ağ masrafı, canlı TL karşılığı ve kara liste güvenlik kontrolü anında teyit edilir.</i>"
         )
         klavye = {
             "inline_keyboard": [
-                [{"text": "🌐 Tronscan Explorer", "url": "https://tronscan.org"}],
+                [
+                    {"text": "🔴 Tronscan", "url": "https://tronscan.org"},
+                    {"text": "🟡 BscScan", "url": "https://bscscan.com"},
+                    {"text": "💎 Etherscan", "url": "https://etherscan.io"}
+                ],
+                [
+                    {"text": "₿ Mempool", "url": "https://mempool.space"},
+                    {"text": "🔵 Arbiscan", "url": "https://arbiscan.io"},
+                    {"text": "🟣 Polygonscan", "url": "https://polygonscan.com"}
+                ],
                 [{"text": "🗑️ Kapat", "callback_data": "mesaj_kapat"}]
             ]
         }
         return yardim_metni, klavye
 
-    tx_hash = m.group(1).lower()
-    tx_data = get_tron_tx_info(tx_hash)
+    target_chain = force_chain or chain_pref
+    found_chain = None
+    tx_data = None
 
-    if not tx_data:
+    # 1. Belirli bir ağ seçildiyse doğrudan o ağı sorgula
+    if target_chain:
+        if target_chain == "tron":
+            tx_data = get_tron_tx_info(clean_hash)
+            if tx_data: found_chain = "tron"
+        elif target_chain in ["bsc", "eth", "arbitrum", "polygon"]:
+            tx_data = get_evm_tx_info(target_chain, clean_hash)
+            if tx_data: found_chain = target_chain
+        elif target_chain == "btc":
+            tx_data = get_btc_tx_info(clean_hash)
+            if tx_data: found_chain = "btc"
+
+    # 2. Otomatik Ağ Tespiti (Akıllı Sıralama)
+    if not found_chain:
+        if clean_hash.startswith("0x"):
+            # EVM öncelikli: BSC -> ETH -> ARBITRUM -> POLYGON -> TRON
+            for c in ["bsc", "eth", "arbitrum", "polygon"]:
+                evm_d = get_evm_tx_info(c, clean_hash)
+                if evm_d:
+                    found_chain = c
+                    tx_data = evm_d
+                    break
+            if not found_chain:
+                tron_d = get_tron_tx_info(clean_hash[2:])
+                if tron_d:
+                    found_chain = "tron"
+                    tx_data = tron_d
+        else:
+            # 64-hex: TRON öncelikli -> BTC -> BSC -> ETH
+            tron_d = get_tron_tx_info(clean_hash)
+            if tron_d:
+                found_chain = "tron"
+                tx_data = tron_d
+            else:
+                btc_d = get_btc_tx_info(clean_hash)
+                if btc_d:
+                    found_chain = "btc"
+                    tx_data = btc_d
+                else:
+                    for c in ["bsc", "eth"]:
+                        evm_d = get_evm_tx_info(c, "0x" + clean_hash)
+                        if evm_d:
+                            found_chain = c
+                            tx_data = evm_d
+                            break
+
+    # 3. Hiçbir ağda bulunamadıysa hata raporu
+    if not found_chain or not tx_data:
+        active_c_name = SUPPORTED_CRYPTO_CHAINS.get(target_chain, {}).get("name", "blok zincirinde") if target_chain else "blok zincirinde"
         hata_metni = (
             "⚠️ <b>İşlem Blok Zincirinde Bulunamadı!</b>\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
-            f"🔗 <b>Aranan TxID:</b>\n<code>{tx_hash}</code>\n\n"
-            "🔍 <i>Bu işlem TRON ağında henüz tespit edilemedi. Olası sebepler:</i>\n"
+            f"🔗 <b>Aranan TxID:</b>\n<code>{clean_hash}</code>\n\n"
+            f"🔍 <i>Bu işlem {active_c_name} henüz tespit edilemedi. Olası sebepler:</i>\n"
             "• Transfer henüz yeni yollandıysa ağa düşmesi <b>5-15 saniye</b> sürebilir.\n"
-            "• Girilen TxID hatalı veya başka bir ağa (BSC, Ethereum) ait olabilir.\n\n"
-            "💡 <i>Lütfen birkaç saniye bekleyip 'Yeniden Sorgula' butonuna basınız.</i>"
+            "• Girilen TxID hatalı veya başka bir ağa (BSC, Tron, Ethereum, Bitcoin) ait olabilir.\n\n"
+            "💡 <i>Lütfen aşağıdaki butonlardan ağı değiştirip tekrar sorgulayınız veya birkaç saniye bekleyip 'Yeniden Sorgula' butonuna basınız.</i>"
         )
-        klavye = {
-            "inline_keyboard": [
-                [
-                    {"text": "🔍 Tronscan Web'de Aç", "url": f"https://tronscan.org/#/transaction/{tx_hash}"},
-                    {"text": "🔄 Yeniden Sorgula", "callback_data": f"tx_yenile_{tx_hash}"}
-                ],
-                [{"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}]
-            ]
-        }
+        klavye = build_multi_chain_tx_keyboard(target_chain or "tron", clean_hash)
         return hata_metni, klavye
 
-    # Veri çözümleme
-    contract_ret = str(tx_data.get("contractRet", "")).upper()
-    confirmed = bool(tx_data.get("confirmed", False))
-    revert = bool(tx_data.get("revert", False))
-    block = tx_data.get("block") or tx_data.get("blockNumber") or "-"
-    
-    timestamp_ms = tx_data.get("timestamp") or tx_data.get("block_timestamp") or 0
-    if timestamp_ms:
-        dt_obj = datetime.datetime.fromtimestamp(timestamp_ms / 1000.0, TR_TZ)
-        tarih_saat = dt_obj.strftime("%d.%m.%Y | %H:%M:%S")
+    # 4. Bulunan Ağın Raporunu Üret
+    try:
+        _, usdt_try_kur = get_borsa_kurlari_listesi()
+    except Exception:
+        usdt_try_kur = 34.50
+    company_wallet = (VARSAYILAN_TRC20_ADRES or "").strip().lower()
+
+    if found_chain == "tron":
+        # TRON (TRC-20) Çözümleme
+        contract_ret = str(tx_data.get("contractRet", "")).upper()
+        confirmed = bool(tx_data.get("confirmed", False))
+        revert = bool(tx_data.get("revert", False))
+        block = tx_data.get("block") or tx_data.get("blockNumber") or "-"
+        
+        timestamp_ms = tx_data.get("timestamp") or tx_data.get("block_timestamp") or 0
+        if timestamp_ms:
+            dt_obj = datetime.datetime.fromtimestamp(timestamp_ms / 1000.0, TR_TZ)
+            tarih_saat = dt_obj.strftime("%d.%m.%Y | %H:%M:%S")
+        else:
+            tarih_saat = "-"
+
+        cost = tx_data.get("cost", {})
+        fee_sun = cost.get("energy_fee", 0) + cost.get("net_fee", 0) or tx_data.get("fee", 0)
+        fee_trx = fee_sun / 1_000_000.0
+        energy_used = cost.get("energy_usage_total", 0)
+        fee_fmt = f"{fee_trx:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        fee_str = f"{fee_fmt} TRX"
+        if energy_used > 0:
+            fee_str += f" (~{energy_used:,} Enerji)"
+
+        transfers = tx_data.get("trc20TransferInfo") or []
+        if transfers:
+            t = transfers[0]
+            token_symbol = str(t.get("symbol", "USDT")).upper()
+            decimals = int(t.get("decimals", 6))
+            raw_amt = float(t.get("amount_str", 0))
+            amount = raw_amt / (10 ** decimals)
+            from_addr = t.get("from_address") or tx_data.get("ownerAddress", "")
+            to_addr = t.get("to_address", "")
+        elif tx_data.get("contractData", {}).get("amount"):
+            token_symbol = "TRX"
+            amount = float(tx_data["contractData"]["amount"]) / 1_000_000.0
+            from_addr = tx_data.get("ownerAddress", "")
+            to_addr = tx_data.get("toAddress", "")
+        else:
+            token_symbol = "USDT"
+            amount = float(tx_data.get("amount", 0))
+            from_addr = tx_data.get("ownerAddress", "")
+            to_addr = tx_data.get("toAddress", "")
+
+        if (contract_ret == "SUCCESS" or not contract_ret) and confirmed and not revert:
+            durum_rozet = "🟢 <b>BAŞARILI &amp; ONAYLANDI (CONFIRMED)</b>"
+        elif contract_ret == "SUCCESS" and not confirmed:
+            durum_rozet = "🟡 <b>AĞDA BEKLİYOR (UNCONFIRMED / PENDING)</b>"
+        elif contract_ret in ["FAIL", "REVERT"] or revert:
+            durum_rozet = "🔴 <b>BAŞARISIZ / İPTAL (FAILED / REVERTED)</b>"
+        else:
+            durum_rozet = f"⚪ <b>{contract_ret or 'İŞLENDİ'}</b>"
+
+        from_entity = detect_wallet_entity(from_addr) if from_addr else ""
+        to_entity = detect_wallet_entity(to_addr) if to_addr else ""
+        header_title = "⚡ <b>TRC-20 KRİPTO TRANSFER DOĞRULAMA (TxID)</b>"
+
+    elif found_chain in ["bsc", "eth", "arbitrum", "polygon"]:
+        # EVM (BSC / ETH / ARB / POLYGON) Çözümleme
+        conf = SUPPORTED_CRYPTO_CHAINS[found_chain]
+        tx = tx_data["tx"]
+        receipt = tx_data.get("receipt") or {}
+        st = receipt.get("status")
+        if st in ["0x1", 1, True, "1"]:
+            durum_rozet = "🟢 <b>BAŞARILI &amp; ONAYLANDI (CONFIRMED)</b>"
+        elif st in ["0x0", 0, False, "0"]:
+            durum_rozet = "🔴 <b>BAŞARISIZ / İPTAL (FAILED / REVERTED)</b>"
+        else:
+            durum_rozet = "🟡 <b>AĞDA BEKLİYOR (UNCONFIRMED / PENDING)</b>"
+
+        bn = receipt.get("blockNumber") or tx.get("blockNumber")
+        block = int(bn, 16) if (isinstance(bn, str) and bn.startswith("0x")) else (bn or "-")
+        tarih_saat = datetime.datetime.now(TR_TZ).strftime("%d.%m.%Y | %H:%M:%S")
+
+        gas_used = int(receipt.get("gasUsed", "0x0"), 16) if isinstance(receipt.get("gasUsed"), str) else (receipt.get("gasUsed") or 0)
+        gas_price_raw = receipt.get("effectiveGasPrice") or tx.get("gasPrice", "0x0")
+        gas_price = int(gas_price_raw, 16) if isinstance(gas_price_raw, str) else (gas_price_raw or 0)
+        fee_native = (gas_used * gas_price) / (10 ** 18)
+        fee_str = f"{fee_native:.6f} {conf['native']}"
+
+        logs = receipt.get("logs") or []
+        erc20_match = None
+        for log in logs:
+            topics = log.get("topics") or []
+            if topics and len(topics) >= 3 and topics[0].lower() == "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef":
+                c_addr = (log.get("address") or "").lower()
+                f_a = "0x" + topics[1][-40:].lower()
+                t_a = "0x" + topics[2][-40:].lower()
+                d_hex = log.get("data", "0x0")
+                try:
+                    v_raw = int(d_hex, 16)
+                except Exception:
+                    v_raw = 0
+                erc20_match = (c_addr, f_a, t_a, v_raw)
+                break
+
+        if erc20_match:
+            c_addr, from_addr, to_addr, val_raw = erc20_match
+            if c_addr in KNOWN_EVM_TOKENS:
+                token_symbol, decimals = KNOWN_EVM_TOKENS[c_addr]
+            elif c_addr == conf.get("usdt_contract"):
+                token_symbol, decimals = "USDT", conf.get("usdt_decimals", 18)
+            else:
+                token_symbol = "USDT" if "usdt" in c_addr else "TOKEN"
+                decimals = conf.get("usdt_decimals", 18)
+            amount = val_raw / (10 ** decimals)
+        elif tx.get("input", "").startswith("0xa9059cbb"):
+            c_addr = (tx.get("to") or "").lower()
+            from_addr = (tx.get("from") or "").lower()
+            to_addr = "0x" + tx["input"][34:74].lower()
+            try:
+                val_raw = int(tx["input"][74:138], 16)
+            except Exception:
+                val_raw = 0
+            if c_addr in KNOWN_EVM_TOKENS:
+                token_symbol, decimals = KNOWN_EVM_TOKENS[c_addr]
+            elif c_addr == conf.get("usdt_contract"):
+                token_symbol, decimals = "USDT", conf.get("usdt_decimals", 18)
+            else:
+                token_symbol = "USDT"
+                decimals = conf.get("usdt_decimals", 18)
+            amount = val_raw / (10 ** decimals)
+        else:
+            token_symbol = conf["native"]
+            from_addr = (tx.get("from") or "").lower()
+            to_addr = (tx.get("to") or "").lower()
+            val_wei = int(tx.get("value", "0x0"), 16) if isinstance(tx.get("value"), str) else (tx.get("value") or 0)
+            amount = val_wei / (10 ** 18)
+
+        from_entity = ""
+        to_entity = ""
+        header_title = f"{conf['emoji']} <b>{conf['name'].upper()} TRANSFER DOĞRULAMA (TxID)</b>"
+
     else:
-        tarih_saat = "-"
+        # BITCOIN (BTC) Çözümleme
+        status = tx_data.get("status") or {}
+        confirmed = bool(status.get("confirmed", False))
+        durum_rozet = "🟢 <b>BAŞARILI &amp; ONAYLANDI (CONFIRMED)</b>" if confirmed else "🟡 <b>MEMPOOL'DA BEKLİYOR (0 ONAY)</b>"
+        block = status.get("block_height") or "-"
+        b_time = status.get("block_time") or 0
+        if b_time:
+            dt_obj = datetime.datetime.fromtimestamp(b_time, TR_TZ)
+            tarih_saat = dt_obj.strftime("%d.%m.%Y | %H:%M:%S")
+        else:
+            tarih_saat = datetime.datetime.now(TR_TZ).strftime("%d.%m.%Y | %H:%M:%S")
 
-    # Masraf
-    cost = tx_data.get("cost", {})
-    fee_sun = cost.get("energy_fee", 0) + cost.get("net_fee", 0) or tx_data.get("fee", 0)
-    fee_trx = fee_sun / 1_000_000.0
-    energy_used = cost.get("energy_usage_total", 0)
-    fee_fmt = f"{fee_trx:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-    fee_str = f"{fee_fmt} TRX"
-    if energy_used > 0:
-        fee_str += f" (~{energy_used:,} Enerji)"
+        fee_sat = tx_data.get("fee", 0)
+        fee_btc = fee_sat / 100_000_000.0
+        fee_str = f"{fee_btc:.8f} BTC ({fee_sat:,} sat)"
 
-    # Transfer detayları
-    transfers = tx_data.get("trc20TransferInfo") or []
-    if transfers:
-        t = transfers[0]
-        token_symbol = str(t.get("symbol", "USDT")).upper()
-        decimals = int(t.get("decimals", 6))
-        raw_amt = float(t.get("amount_str", 0))
-        amount = raw_amt / (10 ** decimals)
-        from_addr = t.get("from_address") or tx_data.get("ownerAddress", "")
-        to_addr = t.get("to_address", "")
-    elif tx_data.get("contractData", {}).get("amount"):
-        token_symbol = "TRX"
-        amount = float(tx_data["contractData"]["amount"]) / 1_000_000.0
-        from_addr = tx_data.get("ownerAddress", "")
-        to_addr = tx_data.get("toAddress", "")
-    else:
-        token_symbol = "USDT"
-        amount = float(tx_data.get("amount", 0))
-        from_addr = tx_data.get("ownerAddress", "")
-        to_addr = tx_data.get("toAddress", "")
+        token_symbol = "BTC"
+        vouts = tx_data.get("vout") or []
+        vins = tx_data.get("vin") or []
+        from_addr = vins[0].get("prevout", {}).get("scriptpubkey_address", "-") if vins else "-"
+        if vouts:
+            to_addr = vouts[0].get("scriptpubkey_address", "-")
+            amount = vouts[0].get("value", 0) / 100_000_000.0
+        else:
+            to_addr = "-"
+            amount = 0.0
 
-    # Durum rozeti
-    if (contract_ret == "SUCCESS" or not contract_ret) and confirmed and not revert:
-        durum_rozet = "🟢 <b>BAŞARILI &amp; ONAYLANDI (CONFIRMED)</b>"
-    elif contract_ret == "SUCCESS" and not confirmed:
-        durum_rozet = "🟡 <b>AĞDA BEKLİYOR (UNCONFIRMED / PENDING)</b>"
-    elif contract_ret in ["FAIL", "REVERT"] or revert:
-        durum_rozet = "🔴 <b>BAŞARISIZ / İPTAL (FAILED / REVERTED)</b>"
-    else:
-        durum_rozet = f"⚪ <b>{contract_ret or 'İŞLENDİ'}</b>"
+        from_entity = ""
+        to_entity = ""
+        header_title = "₿ <b>BITCOIN (BTC) TRANSFER DOĞRULAMA (TxID)</b>"
 
-    # TL Karşılık hesabı
+    # TL Karşılık Hesabı
     tl_metni = ""
-    amt_fmt = f"{amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     if token_symbol == "USDT" and amount > 0:
-        try:
-            _, usdt_try_kur = get_borsa_kurlari_listesi()
-            if usdt_try_kur > 0:
-                tl_tutar = amount * usdt_try_kur
-                tl_metni = f"\n🇹🇷 <i>Yaklaşık Karşılık: <b>{paraFormatla(tl_tutar)}</b> (1 USDT ≈ {usdt_try_kur:,.2f} ₺)</i>"
-        except Exception:
-            pass
+        tl_tutar = amount * usdt_try_kur
+        tl_metni = f"\n🇹🇷 <i>Yaklaşık Karşılık: <b>{paraFormatla(tl_tutar)}</b> (1 USDT ≈ {usdt_try_kur:,.2f} ₺)</i>"
+    elif token_symbol == "BTC" and amount > 0:
+        btc_p = _last_crypto_tickers_cache.get("BTCUSDT", {}).get("price", 65000.0)
+        tl_tutar = amount * btc_p * usdt_try_kur
+        tl_metni = f"\n🇹🇷 <i>Yaklaşık Karşılık: <b>{paraFormatla(tl_tutar)}</b> (1 BTC ≈ {btc_p:,.0f} $)</i>"
+    elif token_symbol in ["BNB", "ETH"] and amount > 0:
+        c_key = f"{token_symbol}USDT"
+        p = _last_crypto_tickers_cache.get(c_key, {}).get("price", 600.0 if token_symbol == "BNB" else 2600.0)
+        tl_tutar = amount * p * usdt_try_kur
+        tl_metni = f"\n🇹🇷 <i>Yaklaşık Karşılık: <b>{paraFormatla(tl_tutar)}</b> (1 {token_symbol} ≈ {p:,.2f} $)</i>"
 
     # Şirket kasası eşleşmesi kontrolü
-    company_wallet = (VARSAYILAN_TRC20_ADRES or "").strip().lower()
     to_notu = ""
     from_notu = ""
-    if to_addr and to_addr.lower() == company_wallet:
+    if to_addr and company_wallet and to_addr.lower() == company_wallet:
         to_notu = "\n🏢 <b>Şirket Kasası:</b> 🟢 <i>Giriş Şirket Ana Rezerv Cüzdanımıza Yapıldı! ✅</i>"
-    elif from_addr and from_addr.lower() == company_wallet:
+    elif from_addr and company_wallet and from_addr.lower() == company_wallet:
         from_notu = "\n🏢 <b>Şirket Kasası:</b> 📤 <i>Şirket Ana Rezerv Cüzdanımızdan Gönderildi!</i>"
 
-    # Borsa / kurum istihbaratı
-    from_entity = detect_wallet_entity(from_addr) if from_addr else ""
-    to_entity = detect_wallet_entity(to_addr) if to_addr else ""
     if from_entity:
         from_notu += f"\n{from_entity}"
     if to_entity and not to_notu:
         to_notu += f"\n{to_entity}"
 
+    # Kara Liste & Şüpheli Hesap İstihbarat Kontrolü
+    risk_notu = ""
+    risk_from, _ = risk_kaydi_sorgula(from_addr)
+    risk_to, _ = risk_kaydi_sorgula(to_addr)
+    if risk_from:
+        risk_notu += f"\n🚨 <b>GÜVENLİK ALARMI: Gönderen Cüzdan Kara Listede!</b> <i>({risk_from.get('sebep', 'Şüpheli')})</i>\n"
+    if risk_to:
+        risk_notu += f"\n🚨 <b>GÜVENLİK ALARMI: Alıcı Cüzdan Kara Listede!</b> <i>({risk_to.get('sebep', 'Şüpheli')})</i>\n"
+
     block_str = f"{block:,}" if isinstance(block, int) else str(block)
+    if token_symbol == "BTC":
+        amt_fmt = f"{amount:.8f}"
+    elif token_symbol in ["BNB", "ETH"]:
+        amt_fmt = f"{amount:.4f}"
+    else:
+        amt_fmt = f"{amount:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+    blok_etiketi = "Blok Yüksekliği" if found_chain == "btc" else "Blok Numarası"
 
     mesaj = (
-        f"⚡ <b>TRC-20 KRİPTO TRANSFER DOĞRULAMA (TxID)</b>\n"
+        f"{header_title}\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"📌 <b>İşlem Durumu:</b> {durum_rozet}\n"
         f"📅 <b>Tarih &amp; Saat:</b> <code>{tarih_saat}</code>\n"
-        f"🧱 <b>Blok Numarası:</b> <code>{block_str}</code>\n\n"
+        f"🧱 <b>{blok_etiketi}:</b> <code>{block_str}</code>\n\n"
         f"💵 <b>TRANSFER EDİLEN TUTAR:</b>\n"
         f"💰 <b>{amt_fmt} {token_symbol}</b>{tl_metni}\n\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"📤 <b>Gönderen (From):</b>\n<code>{from_addr}</code>{from_notu}\n\n"
-        f"📥 <b>Alıcı (To):</b>\n<code>{to_addr}</code>{to_notu}\n\n"
+        f"📥 <b>Alıcı (To):</b>\n<code>{to_addr}</code>{to_notu}\n"
+        f"{risk_notu}"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"⛽ <b>Ağ Masrafı (Fee):</b> <code>{fee_str}</code>\n"
-        f"🔗 <b>TxID (Hash):</b>\n<code>{tx_hash}</code>"
+        f"🔗 <b>TxID (Hash):</b>\n<code>{clean_hash}</code>"
     )
 
-    klavye = {
-        "inline_keyboard": [
-            [
-                {"text": "🔍 Tronscan Explorer", "url": f"https://tronscan.org/#/transaction/{tx_hash}"},
-                {"text": "🔄 Yeniden Sorgula", "callback_data": f"tx_yenile_{tx_hash}"}
-            ],
-            [
-                {"text": "🗑️ Mesajı Kapat", "callback_data": "mesaj_kapat"}
-            ]
-        ]
-    }
+    klavye = build_multi_chain_tx_keyboard(found_chain, clean_hash)
     return mesaj, klavye
 
-def trc20_tx_sorgula_impl(param: str) -> Tuple[str, dict]:
+def trc20_tx_raporu_uret(tx_input: str) -> Tuple[str, dict]:
+    """Geriye dönük tam uyumluluk: Doğrudan çoklu ağ doğrulayıcısını çalıştırır."""
+    return multi_chain_tx_raporu_uret(tx_input)
+
+def multi_chain_tx_sorgula_impl(param: str) -> Tuple[str, dict]:
     """Telegram üzerinden TxID sorgusunu çalıştırır."""
-    return trc20_tx_raporu_uret(param)
+    return multi_chain_tx_raporu_uret(param)
+
+def trc20_tx_sorgula_impl(param: str) -> Tuple[str, dict]:
+    """Geriye dönük takma ad."""
+    return multi_chain_tx_raporu_uret(param)
 
 # --- AKILLI DEKONT & EKRAN GÖRÜNTÜSÜ OKUYUCU (OCR ENGINE) ---
 
@@ -5911,7 +6381,7 @@ def ibanCozumle_impl(ham_metin: str) -> str:
         temiz_hedef = re.sub(r'[^A-Z0-9]', '', iban_raw)
         
         for row in veriler[1:]:
-            # 1. IBANLAR Sayfası (Col 0: Hesap Kodu, Col 1: Şablon, Col 3: Cari)
+            # 1. IBANLAR Sayfası Sol Blok (Col A: 0 Hesap Kodu, Col B: 1 Şablon, Col D: 3 Cari)
             if len(row) > 0 and row[0].strip() and row[0].strip() != "HESAP KODU":
                 h_ad = row[0].strip()
                 sablon = row[1].strip() if len(row) > 1 else ""
@@ -5920,14 +6390,32 @@ def ibanCozumle_impl(ham_metin: str) -> str:
                 if ib_clean and (temiz_hedef in ib_clean or ib_clean.endswith(temiz_hedef) or temiz_hedef.endswith(ib_clean)):
                     sirket_durumu = f"🏢 <b>ŞİRKET İÇİ HESAP!</b> (Hesap: <code>{h_ad}</code>" + (f" - Cari: <b>{cari}</b>" if cari else " - 🟢 <b>Boşta</b>") + ")"
                     break
-            # 2. Legacy Sol Blok Fallback
+            # 2. IBANLAR Sayfası Orta Blok (Col F: 5 Hesap Kodu, Col G: 6 Şablon, Col H: 7 Cari)
+            if len(row) > 5 and row[5].strip() and row[5].strip() != "HESAP KODU":
+                h_ad = row[5].strip()
+                sablon = row[6].strip() if len(row) > 6 else ""
+                cari = row[7].strip() if len(row) > 7 else ""
+                ib_clean = re.sub(r'[^A-Z0-9]', '', (h_ad + " " + sablon).upper())
+                if ib_clean and (temiz_hedef in ib_clean or ib_clean.endswith(temiz_hedef) or temiz_hedef.endswith(ib_clean)):
+                    sirket_durumu = f"🏢 <b>ŞİRKET İÇİ HESAP!</b> (Hesap: <code>{h_ad}</code>" + (f" - Cari: <b>{cari}</b>" if cari else " - 🟢 <b>Boşta</b>") + ")"
+                    break
+            # 3. IBANLAR Sayfası Sağ/3. Blok (Col J: 9 Hesap Kodu, Col K: 10 Şablon, Col L: 11 Cari)
+            if len(row) > 9 and row[9].strip() and row[9].strip() != "HESAP KODU":
+                h_ad = row[9].strip()
+                sablon = row[10].strip() if len(row) > 10 else ""
+                cari = row[11].strip() if len(row) > 11 else ""
+                ib_clean = re.sub(r'[^A-Z0-9]', '', (h_ad + " " + sablon).upper())
+                if ib_clean and (temiz_hedef in ib_clean or ib_clean.endswith(temiz_hedef) or temiz_hedef.endswith(ib_clean)):
+                    sirket_durumu = f"🏢 <b>ŞİRKET İÇİ HESAP!</b> (Hesap: <code>{h_ad}</code>" + (f" - Cari: <b>{cari}</b>" if cari else " - 🟢 <b>Boşta</b>") + ")"
+                    break
+            # 4. Legacy Sol Blok Fallback
             if len(row) > 11 and row[11].strip():
                 ib1 = re.sub(r'[^A-Z0-9]', '', row[11].strip().upper())
                 if ib1 and (ib1 == temiz_hedef or temiz_hedef.endswith(ib1) or ib1.endswith(temiz_hedef)):
                     not1 = row[14].strip() if len(row) > 14 else ""
                     sirket_durumu = f"🏢 <b>ŞİRKET İÇİ HESAP!</b> (CYL/HSY: <code>{row[11].strip()}</code>" + (f" - Cari: <b>{not1}</b>" if not1 else " - 🟢 <b>Boşta</b>") + ")"
                     break
-            # 3. Legacy Sağ Blok Fallback
+            # 5. Legacy Sağ Blok Fallback
             if len(row) > 15 and row[15].strip():
                 ib2 = re.sub(r'[^A-Z0-9]', '', row[15].strip().upper())
                 if ib2 and (ib2 == temiz_hedef or temiz_hedef.endswith(ib2) or ib2.endswith(temiz_hedef)):
@@ -5987,6 +6475,15 @@ def ibanListesiGetir_impl() -> str:
         elif len(row) > 4 and row[4].strip() and row[4].strip().upper() != "HESAP KODU":
             h_kod = row[4].strip()
             cari = row[6].strip() if len(row) > 6 else ""
+            if not cari:
+                bosta.append(f"🔹 <code>{h_kod}</code>")
+            else:
+                dolu.append(f"🔹 👤 <b>{cari}:</b> <code>{h_kod}</code>")
+
+        # Sağ/3. Blok on İBANLAR (Col J: 9 Hesap, Col L: 11 Cari)
+        if len(row) > 9 and row[9].strip() and row[9].strip().upper() != "HESAP KODU":
+            h_kod = row[9].strip()
+            cari = row[11].strip() if len(row) > 11 else ""
             if not cari:
                 bosta.append(f"🔹 <code>{h_kod}</code>")
             else:
@@ -6099,6 +6596,14 @@ def sync_iban_update(hesap_kodu: str, cari_adi: str = ""):
                     update_sheet_matrix_memory(iban_ws.title, idx, 7, cari_temiz)
                     iban_ws.update_cell(idx, 7, cari_temiz)
                     break
+
+            # 3. Blok (Col J: 9 Hesap, Col L: 11 Cari / 1-based Col 12)
+            if len(row) > 9 and row[9].strip():
+                h_ad = row[9].strip()
+                if normalize_hesap_kodu(h_ad) == aranan_norm or (len(aranan_norm) >= 3 and (normalize_hesap_kodu(h_ad).startswith(aranan_norm) or aranan_norm in normalize_hesap_kodu(h_ad))):
+                    update_sheet_matrix_memory(iban_ws.title, idx, 12, cari_temiz)
+                    iban_ws.update_cell(idx, 12, cari_temiz)
+                    break
     except Exception as e:
         print(f"İBAN sayfa güncelleme uyarısı: {e}")
 
@@ -6202,6 +6707,14 @@ def iban_sablon_bul(veriler=None, aranan_kod: str = ""):
                 cari = row[6].strip() if len(row) > 6 else ""
                 return idx, h_ad, sablon, cari
 
+        # 3. Blok (Col J: 9 Hesap, Col K: 10 Şablon, Col L: 11 Cari)
+        if len(row) > 9 and row[9].strip() and row[9].strip().upper() != "HESAP KODU":
+            h_ad = row[9].strip()
+            if normalize_hesap_kodu(h_ad) == aranan_norm:
+                sablon = row[10].strip() if len(row) > 10 else ""
+                cari = row[11].strip() if len(row) > 11 else ""
+                return idx, h_ad, sablon, cari
+
     # 2. İBANLAR Sayfası - BAŞLANGIÇ / İÇERME
     for idx, row in enumerate(iban_veriler, start=1):
         if len(row) > 0 and row[0].strip() and row[0].strip().upper() != "HESAP KODU":
@@ -6226,6 +6739,15 @@ def iban_sablon_bul(veriler=None, aranan_kod: str = ""):
             if len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm):
                 sablon = row[5].strip() if len(row) > 5 else ""
                 cari = row[6].strip() if len(row) > 6 else ""
+                return idx, h_ad, sablon, cari
+
+        # 3. Blok (Col J: 9 Hesap, Col K: 10 Şablon, Col L: 11 Cari)
+        if len(row) > 9 and row[9].strip() and row[9].strip().upper() != "HESAP KODU":
+            h_ad = row[9].strip()
+            h_norm = normalize_hesap_kodu(h_ad)
+            if len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm):
+                sablon = row[10].strip() if len(row) > 10 else ""
+                cari = row[11].strip() if len(row) > 11 else ""
                 return idx, h_ad, sablon, cari
 
     # 3. İBANLAR Sayfası - ESNEK TOKEN
@@ -6254,6 +6776,14 @@ def iban_sablon_bul(veriler=None, aranan_kod: str = ""):
                 if _iban_token_match(letters, num, h_ad):
                     sablon = row[5].strip() if len(row) > 5 else ""
                     cari = row[6].strip() if len(row) > 6 else ""
+                    return idx, h_ad, sablon, cari
+
+            # 3. Blok (Col J: 9 Hesap, Col K: 10 Şablon, Col L: 11 Cari)
+            if len(row) > 9 and row[9].strip() and row[9].strip().upper() != "HESAP KODU":
+                h_ad = row[9].strip()
+                if _iban_token_match(letters, num, h_ad):
+                    sablon = row[10].strip() if len(row) > 10 else ""
+                    cari = row[11].strip() if len(row) > 11 else ""
                     return idx, h_ad, sablon, cari
 
     # 4. Legacy 2-Blok Format Fallback (Günlük Sayfa)
@@ -6350,7 +6880,7 @@ def iban_sablon_getir_impl(komut_metni: str, chat_id: int = 0):
     if len(kodlar) == 1:
         res = tek_sablon_getir_impl(kodlar[0], sayfa, veriler, chat_id)
         if not res:
-            return f"⚠️ <b>Şablon Bulunamadı!</b>\nExcel tablosunda '<b>{kodlar[0]}</b>' hesabına ait bir ödeme şablonu bulunamadı.\n\n💡 <i>Mevcut hesaplar: CYL 1-5, HSY 1-10, HSY EMLAK 1-16, ARS EMLAK 1-17, SRGL 1-10</i>"
+            return f"⚠️ <b>Şablon Bulunamadı!</b>\nExcel tablosunda '<b>{kodlar[0]}</b>' hesabına ait bir ödeme şablonu bulunamadı.\n\n💡 <i>Mevcut tüm hesapları ve durumlarını görmek için: <code>/iban</code></i>"
         return res
 
     # 2. TOPLU SORGULAMA (Ayrı ayrı mesajlar olarak iletilir)
@@ -6419,6 +6949,13 @@ def iban_hesap_bul(veriler: List[List[str]] = None, aranan_kod: str = ""):
                 mevcut_cari = row[6].strip() if len(row) > 6 else ""
                 return idx, 7, h_ad, mevcut_cari, True
 
+        # 3. Blok (Col J: 9 Hesap, Col L: 11 Cari / 1-based Col 12)
+        if len(row) > 9 and row[9].strip() and row[9].strip().upper() != "HESAP KODU":
+            h_ad = row[9].strip()
+            if normalize_hesap_kodu(h_ad) == aranan_norm:
+                mevcut_cari = row[11].strip() if len(row) > 11 else ""
+                return idx, 12, h_ad, mevcut_cari, True
+
     # 2. Aşama: İBANLAR Sayfası - BAŞLANGIÇ / İÇERME
     for idx, row in enumerate(iban_veriler, start=1):
         if len(row) > 0 and row[0].strip() and row[0].strip().upper() != "HESAP KODU":
@@ -6441,6 +6978,14 @@ def iban_hesap_bul(veriler: List[List[str]] = None, aranan_kod: str = ""):
             if len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm):
                 mevcut_cari = row[6].strip() if len(row) > 6 else ""
                 return idx, 7, h_ad, mevcut_cari, True
+
+        # 3. Blok (Col J: 9 Hesap, Col L: 11 Cari / 1-based Col 12)
+        if len(row) > 9 and row[9].strip() and row[9].strip().upper() != "HESAP KODU":
+            h_ad = row[9].strip()
+            h_norm = normalize_hesap_kodu(h_ad)
+            if len(aranan_norm) >= 3 and (h_norm.startswith(aranan_norm) or aranan_norm in h_norm):
+                mevcut_cari = row[11].strip() if len(row) > 11 else ""
+                return idx, 12, h_ad, mevcut_cari, True
 
     # 3. Aşama: İBANLAR Sayfası - ESNEK TOKEN
     match_digits = re.findall(r'\d+', aranan_norm)
@@ -6466,6 +7011,13 @@ def iban_hesap_bul(veriler: List[List[str]] = None, aranan_kod: str = ""):
                 if _iban_token_match(letters, num, h_ad):
                     mevcut_cari = row[6].strip() if len(row) > 6 else ""
                     return idx, 7, h_ad, mevcut_cari, True
+
+            # 3. Blok (Col J: 9 Hesap, Col L: 11 Cari / 1-based Col 12)
+            if len(row) > 9 and row[9].strip() and row[9].strip().upper() != "HESAP KODU":
+                h_ad = row[9].strip()
+                if _iban_token_match(letters, num, h_ad):
+                    mevcut_cari = row[11].strip() if len(row) > 11 else ""
+                    return idx, 12, h_ad, mevcut_cari, True
 
     # 4. Aşama: Legacy 2-Blok Formatı Fallback
     daily_veriler = veriler
@@ -6673,6 +7225,16 @@ def grup_aktif_ibanlar_raporu_uret(grup_adi: str = "", chat_id: int = 0) -> Tupl
                 iban_str = m_iban.group(0).replace(" ", "") if m_iban else ""
                 _ekle_tahsisli(h_ad, "", iban_str, idx, 7)
 
+        # 3. Blok on İBANLAR (Col J: 9 Hesap, Col K: 10 Şablon, Col L: 11 Cari / 1-based Col 12)
+        if len(row) > 11 and row[11].strip() and row[9].strip().upper() != "HESAP KODU":
+            c = row[11].strip()
+            if normalize_text(c) == hedef_norm:
+                h_ad = row[9].strip() if len(row) > 9 else ""
+                h_sablon = row[10].strip() if len(row) > 10 else ""
+                m_iban = re.search(r'TR\d{2}\s?(?:\d{4}\s?){5}\d{2}', h_sablon.upper())
+                iban_str = m_iban.group(0).replace(" ", "") if m_iban else ""
+                _ekle_tahsisli(h_ad, "", iban_str, idx, 12)
+
         # 3. Tekli Dikey Liste Fallback (Col D: 3 Cari)
         if len(row) > 3 and row[3].strip() and not (len(row) > 4 and row[4].strip()) and row[0].strip().upper() != "HESAP KODU":
             c = row[3].strip()
@@ -6784,7 +7346,7 @@ def tum_tahsisli_ibanlar_raporu_uret() -> Tuple[str, dict]:
     tahsisli_hesaplar = []
 
     for idx, row in enumerate(veriler, start=1):
-        if (len(row) > 0 and row[0].strip().upper() == "HESAP KODU") or (len(row) > 5 and row[5].strip().upper() == "HESAP KODU"):
+        if (len(row) > 0 and row[0].strip().upper() == "HESAP KODU") or (len(row) > 5 and row[5].strip().upper() == "HESAP KODU") or (len(row) > 9 and row[9].strip().upper() == "HESAP KODU"):
             continue
 
         # 1. Sol Blok on İBANLAR (Col A: 0 Hesap, Col D: 3 Cari)
@@ -6842,6 +7404,22 @@ def tum_tahsisli_ibanlar_raporu_uret() -> Tuple[str, dict]:
                 "satir": idx,
                 "col": 7
             })
+
+        # 3. Blok on İBANLAR (Col J: 9 Hesap, Col K: 10 Şablon, Col L: 11 Cari)
+        if len(row) > 11 and is_valid_cari_name(row[11]):
+            cari = row[11].strip()
+            h_ad = row[9].strip() if len(row) > 9 else ""
+            h_sablon = row[10].strip() if len(row) > 10 else ""
+            m_iban = re.search(r'TR\d{2}\s?(?:\d{4}\s?){5}\d{2}', h_sablon.upper())
+            iban_str = m_iban.group(0).replace(" ", "") if m_iban else ""
+            if h_ad:
+                tahsisli_hesaplar.append({
+                    "hesap": h_ad,
+                    "cari": cari,
+                    "iban": iban_str,
+                    "satir": idx,
+                    "col": 12
+                })
 
     tarih_str = suankiZamaniAl().strftime("%d.%m.%Y")
     saat_str = suankiZamaniAl().strftime("%H:%M")
@@ -6905,7 +7483,7 @@ def tum_tahsisli_ibanlari_temizle_impl() -> str:
         updated_rows = [list(r) for r in iban_vals]
 
         for idx, row in enumerate(updated_rows, start=1):
-            if (len(row) > 0 and row[0].strip().upper() == "HESAP KODU") or (len(row) > 5 and row[5].strip().upper() == "HESAP KODU"):
+            if (len(row) > 0 and row[0].strip().upper() == "HESAP KODU") or (len(row) > 5 and row[5].strip().upper() == "HESAP KODU") or (len(row) > 9 and row[9].strip().upper() == "HESAP KODU"):
                 continue
 
             # Sol Blok (Col D: index 3 / 1-based col 4)
@@ -6944,9 +7522,19 @@ def tum_tahsisli_ibanlari_temizle_impl() -> str:
                     pass
                 cleared_count += 1
 
+            # 3. Blok (Col L: index 11 / 1-based col 12)
+            if len(row) > 11 and is_valid_cari_name(row[11]):
+                row[11] = ""
+                update_sheet_matrix_memory(iban_ws.title, idx, 12, "")
+                try:
+                    iban_ws.update_cell(idx, 12, "")
+                except Exception:
+                    pass
+                cleared_count += 1
+
         if cleared_count > 0:
             try:
-                iban_ws.update(f"A1:H{len(updated_rows)}", updated_rows)
+                iban_ws.update(f"A1:L{len(updated_rows)}", updated_rows)
             except Exception:
                 pass
 
@@ -7614,6 +8202,19 @@ def akilli_iban_dagit_impl(komut_metni: str, chat_id: int = 0) -> Tuple[str, Opt
                     "sablon": h_sablon,
                     "satir": idx,
                     "col": 8
+                })
+
+        # 3. Blok (Col J: 9 Hesap, Col K: 10 Şablon, Col L: 11 Cari)
+        if len(row) > 9 and row[9].strip() and row[9].strip().upper() != "HESAP KODU":
+            h_ad = row[9].strip()
+            c_val = row[11].strip() if len(row) > 11 else ""
+            if not c_val or c_val.upper() in ["BOŞTA", "BOSTA", "-", "YOK"]:
+                h_sablon = row[10].strip() if len(row) > 10 else ""
+                bostaki_hesaplar.append({
+                    "hesap": h_ad,
+                    "sablon": h_sablon,
+                    "satir": idx,
+                    "col": 12
                 })
 
     if not bostaki_hesaplar:
@@ -9485,6 +10086,26 @@ def _process_telegram_update_core(update: dict):
             )
             return
 
+        if data.startswith("tx_chain_"):
+            cq_id = cq.get("id")
+            rem = data.replace("tx_chain_", "").strip()
+            parts = rem.split("_", 1)
+            target_chain = parts[0] if len(parts) > 1 else None
+            tx_h = parts[1] if len(parts) > 1 else rem
+            if cq_id:
+                try:
+                    c_name = SUPPORTED_CRYPTO_CHAINS.get(target_chain, {}).get("name", target_chain)
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": f"🔄 {c_name} ağı sorgulanıyor..."})
+                except Exception:
+                    pass
+            metin, klavye = multi_chain_tx_raporu_uret(tx_h, force_chain=target_chain)
+            msg_id = cq.get("message", {}).get("message_id")
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+            else:
+                telegramMesajGonder(chat_id, metin, klavye)
+            return
+
         if data.startswith("tx_yenile_"):
             cq_id = cq.get("id")
             if cq_id:
@@ -9492,8 +10113,14 @@ def _process_telegram_update_core(update: dict):
                     telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": "🔄 TxID bilgisi güncelleniyor..."})
                 except Exception:
                     pass
-            tx_h = data.replace("tx_yenile_", "").strip()
-            metin, klavye = trc20_tx_raporu_uret(tx_h)
+            rem = data.replace("tx_yenile_", "").strip()
+            force_c = None
+            for c_key in SUPPORTED_CRYPTO_CHAINS.keys():
+                if rem.startswith(f"{c_key}_"):
+                    force_c = c_key
+                    rem = rem[len(c_key)+1:]
+                    break
+            metin, klavye = multi_chain_tx_raporu_uret(rem, force_chain=force_c)
             msg_id = cq.get("message", {}).get("message_id")
             if msg_id:
                 telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
@@ -10534,7 +11161,7 @@ def _process_telegram_update_core(update: dict):
         elif ana_komut in ["/tx", "/txid", "/hash", "/txsorgula", "/tetheronay", "/tethercek"]:
             p_args = text.split()[1:]
             tx_param = " ".join(p_args).strip() if p_args else ""
-            islemi_analiz_bildirimiyle_yap(chat_id, trc20_tx_sorgula_impl, tx_param, goster_bildirim=bool(tx_param), islem_tipi="tx")
+            islemi_analiz_bildirimiyle_yap(chat_id, multi_chain_tx_sorgula_impl, tx_param, goster_bildirim=bool(tx_param), islem_tipi="tx")
         elif ana_komut in ["/dekont", "/tara", "/oku", "/fis", "/slip", "/dekontoku"]:
             p_args = text.split()[1:]
             has_photo = bool(extract_photo_file_id(msg))
