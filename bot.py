@@ -16654,6 +16654,16 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self._send_response_data(200, "text/plain", b"")
 
+    def do_HEAD(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path in ("/health", "/healthz", "/ping", "/"):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+        else:
+            self.do_GET()
+
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path in ["/api/webhook", "/webhook/sheets", "/webhook"]:
@@ -16809,7 +16819,8 @@ class LiveDashboardHandler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         
         # Cloud Health Check Probe (Northflank, Kubernetes, Docker)
-        if parsed.path in ("/health", "/healthz", "/ping"):
+        u_agent = self.headers.get("User-Agent", "").lower()
+        if parsed.path in ("/health", "/healthz", "/ping") or (parsed.path == "/" and any(p in u_agent for p in ("kube-probe", "googlehc", "envoy", "northflank", "go-http-client"))):
             res_bytes = json.dumps({
                 "status": "healthy",
                 "service": "cfo-bot",
