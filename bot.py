@@ -125,30 +125,39 @@ def _load_dotenv_if_exists():
 _load_dotenv_if_exists()
 
 # --- AYARLAR & SABİTLER ---
-_DEFAULT_BOT_TOKEN_ENC = "ODYyOTc1NjQ2MjpBQUVVTVpYbU1zcXNhSGtta0E5SlBlTC1FSVd2dkZGUXNHcw=="
+# Telegram bot tokenı koda GÖMÜLMEZ. Sadece TELEGRAM_BOT_TOKEN ortam değişkeninden
+# (Northflank Environment / yerelde git'e gönderilmeyen .env dosyası) okunur.
 
 def _resolve_working_telegram_token() -> str:
-    """Aktif ve çalışan Telegram tokenını belirler. Eski/iptal edilmiş tokenları otomatik eleyip çalışan tokene geçer."""
-    candidates = []
+    """
+    TELEGRAM_BOT_TOKEN ortam değişkenini okur ve başlangıçta getMe ile doğrular.
+    Doğrulama sonucu sadece loglanır; token asla başka bir değerle değiştirilmez.
+    """
     env_t = (os.environ.get("TELEGRAM_BOT_TOKEN") or "").strip()
-    if env_t:
-        candidates.append(env_t)
-    default_t = base64.b64decode(_DEFAULT_BOT_TOKEN_ENC).decode("utf-8")
-    if default_t not in candidates:
-        candidates.append(default_t)
+    if not env_t:
+        print("[Telegram HATA]: TELEGRAM_BOT_TOKEN ortam değişkeni tanımlı değil! Northflank > Environment bölümüne ekleyin.")
+        return ""
 
-    for tok in candidates:
+    for _ in range(3):
         try:
-            req = urllib.request.Request(f"https://api.telegram.org/bot{tok}/getMe")
-            with urllib.request.urlopen(req, timeout=3) as r:
-                res = json.loads(r.read().decode())
-                if res.get("ok"):
-                    return tok
+            req = urllib.request.Request(f"https://api.telegram.org/bot{env_t}/getMe")
+            with urllib.request.urlopen(req, timeout=8) as r:
+                if json.loads(r.read().decode()).get("ok"):
+                    return env_t
+        except urllib.error.HTTPError as he:
+            if he.code in (401, 404):
+                print(f"[Telegram HATA]: TELEGRAM_BOT_TOKEN Telegram tarafından reddedildi (HTTP {he.code}). Token iptal edilmiş veya hatalı olabilir; BotFather'dan kontrol edin.")
+                return env_t
         except Exception:
-            continue
-    return default_t
+            pass
+        time.sleep(0.5)
+
+    print("[Telegram UYARI]: Başlangıçta getMe doğrulanamadı (ağ/zaman aşımı). Ortam değişkenindeki token ile devam ediliyor.")
+    return env_t
 
 TELEGRAM_TOKEN = _resolve_working_telegram_token()
+if TELEGRAM_TOKEN:
+    print(f"[Telegram]: Aktif bot ID: {TELEGRAM_TOKEN.split(':')[0]}")
 KURUCU_ID = int(os.environ.get("KURUCU_ID", "8395730761"))
 SPREADSHEET_ID = os.environ.get("SPREADSHEET_ID", "1Gim_-YSb_TtODclXiZ0hnx2WDsc-RCW9CD51LeVNOaI")
 WEB_APP_URL = os.environ.get("WEB_APP_URL", "https://site--cfo-bot-servis--drx8qvjbw8cw.code.run")
@@ -17522,6 +17531,9 @@ def run_profil_guvenlik_loop():
 
 # --- MAIN LOOP (LONG POLLING WITH THREAD POOL) ---
 if __name__ == "__main__":
+    if not TELEGRAM_TOKEN:
+        # Token yoksa botu ve dashboard'u başlatma (dashboard gizli anahtarları tokendan türetilir)
+        raise SystemExit("[Telegram HATA]: TELEGRAM_BOT_TOKEN tanımlı olmadan bot başlatılamaz.")
     threading.Thread(target=run_dashboard_server, daemon=True).start()
     threading.Thread(target=run_kapanis_scheduler, daemon=True).start()
     threading.Thread(target=run_sheets_autosync_loop, daemon=True).start()
