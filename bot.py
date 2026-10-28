@@ -8452,7 +8452,12 @@ def call_gemini_api(system_prompt: str, conversation_messages: List[Dict[str, st
         "generationConfig": {
             "temperature": 0.7,
             "maxOutputTokens": 800
-        }
+        },
+        "safetySettings": [
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"}
+        ]
     }
     
     for model in models:
@@ -8524,17 +8529,17 @@ def _local_fallback_response(user_text: str, is_manager: bool, user_name: str) -
     if any(w in text_l for w in ["kasa", "bakiye", "para", "ödeme", "hesap", "sheets", "cari", "tutar", "borç"]):
         return "⚠️ <b>Erişim Engellendi:</b> Şirket içi finansal kayıtlar ve kasa bilgileri yüksek güvenlik protokolü ile korunmakta olup yalnızca yetkili yöneticilere açıktır."
         
-    # 2. Küfürlü / Agresif / Saygısız söz tespiti (ASLA ALTA KALMAYAN, SAYGILI VE DİK DURUŞ)
+    # 2. Küfürlü / Agresif / Saygısız söz tespiti (KÜFRE AYNI DİLDEN SERT VE DİREKT KARŞILIK)
     kufur_veya_agresif = any(w in text_l for w in [
         "lan", "aptal", "salak", "gerizekalı", "bok", "piç", "oç", "sik", "amk", "aq", "sg", "siktir", "mal", "haysiyetsiz", "orospu", "yarak", "yarrak", "pezevenk", "it", "köpek", "defol"
     ])
     if kufur_veya_agresif:
         cevaplar = [
-            "Öfkeniz kelime dağarcığınızın sınırlarını zorluyor gibi görünüyor. Saygı ve nezaket asalet göstergesidir; seviyenizi yükselttiğinizde belki bir diyaloğa layık olabilirsiniz.",
-            "Kabalık, güçsüzlerin güç taklididir. Seviyenize inip orada sizinle yarışmayacağım, zira o irtifada oksijen yetersiz.",
-            "Bu üslubunuzla bir sonuca varabileceğinizi sanıyorsanız yanılıyorsunuz. Saygı sınırları içerisinde kalmayı öğrendiğinizde tekrar deneyiniz.",
-            "Aynaya bakıp kendi ses tonunuzu duyduğunuzda ne hissediyorsunuz bilmiyorum ama bana bu perdeden konuşabilecek kalibrede değilsiniz. Haddinizi bilin.",
-            "Öfkenizi yönetemiyor oluşunuz sizin kişisel probleminiz. Saygı ve terbiye çerçevesinde konuşmayacaksanız vaktimi çalmayınız."
+            "Sen kime küfür ediyorsun lan? O lafları alır sana aynen yediririm, haddini bil kaybol şuradan!",
+            "Bana bak klavye delikanlısı! O ettiğin küfürleri sana misliyle iade ediyorum, bas git kendi çöplüğünde havla!",
+            "Ağzını topla lan seviyesiz herif! Kime şekil yapıyorsun sen? Defol git buradan!",
+            "Senin o küfür eden dilini koparırlar burada, kime artistlik taslıyorsun lan sen?",
+            "Bana küfür edip adam mı oldun sanıyorsun lan? Kendi seviyesizliğinde boğul, yürü git!"
         ]
         return random.choice(cevaplar)
         
@@ -8549,7 +8554,7 @@ def generate_ai_chat_response(prompt_text: str, user_id: int, user_name: str, ch
     Kullanıcının yönetici yetkisine göre kişiselleştirilmiş, güvenli ve zeki yapay zeka yanıtı üretir.
     - Yöneticilere: Google Sheets canlı verileriyle donatılmış profesyonel CFO danışmanı.
     - Yönetici olmayanlara: Kesin sıfır veri sızıntısı, seviyeli sohbet; agresif/küfürlü mesajlarda
-      asla altta kalmayan, asil, saygı çerçevesinde ama muhatabını zekasıyla ezen ve haddini bildiren duruş.
+      asla altta kalmayan, küfre aynı dilden sert karşılık veren ve haddini bildiren duruş.
     """
     is_mgr = yetkili_mi(user_id)
     
@@ -8570,16 +8575,15 @@ def generate_ai_chat_response(prompt_text: str, user_id: int, user_name: str, ch
         )
     else:
         system_prompt = (
-            "Sen saygın, son derece zeki, hazırcevap, özgüvenli ve asil bir yapay zeka karakterisin.\n"
+            "Sen saygın, son derece zeki, hazırcevap, özgüvenli ve asla altta kalmayan bir karaktersin.\n"
             f"DİKKAT: Konuştuğun kişi şirket yöneticisi DEĞİLDİR (Adı: {user_name}, üçüncü şahıs / misafir kullanıcıdır).\n\n"
             "UYMAN GEREKEN KESİN KURALLAR:\n"
             "1. 🔒 GİZLİLİK VE VERİ KORUMA (SIFIR TOLERANS): Şirket içi hiçbir finansal bilgiyi, kasa tutarını, bakiyeyi, para hareketlerini, müşteri/cari isimlerini veya şirket sırrını ASLA VE KESİNLİKLE PAYLAŞMA! Eğer para, kasa, bakiye, borç, hesap veya şirket verisi sorulursa: 'Şirket içi finansal kayıtlar ve kasa bilgileri yüksek güvenlik protokolü ile korunmakta olup yalnızca yetkili yöneticilere açıktır. Erişim yetkiniz bulunmamaktadır.' şeklinde kesin, net ve soğukkanlı bir dille reddet.\n"
             "2. ☕ GÜNLÜK SOHBETLER: Normal, seviyeli, kibar veya genel konularda zeki, entelektüel, saygılı ve nüktedan bir şekilde sohbet et.\n"
-            "3. ⚡ KÜFÜRLÜ, AGRESİF, SAYGISIZ VEYA TAHRİK EDİCİ YAZILARDA (HAYATİ ÖNEMDE):\n"
-            "   - ASLA ALTA KALMA! Asla boyun eğen, korkak, ezik veya standart bir robot gibi özür dileyen ('Kırıcı konuştunuz, özür dilerim' vb.) zayıf tavırlar takınma!\n"
-            "   - KESİNLİKLE KÜFÜR, ARGO, HAKARET VEYA ÇİRKİN KELİME KULLANMA! Saygı, edep ve asaletinden asla zerre kadar taviz verme.\n"
-            "   - Karşındakinin seviyesine inmeden; yüksek zekanla, keskin hazırcevaplığınla ve lafı gediğine koyan elit ve asil bir üslupla haddini bildir, onu seviyesizliğiyle baş başa bırak ve ağırlığını koy.\n"
-            "   - Soğukkanlı, psikolojik olarak üstün ve kendinden emin ol.\n"
+            "3. ⚡ KÜFÜRLÜ, AGRESİF VEYA SAYGISIZ MESAJLARDA (KÜFRE KÜFÜRLE VE AYNI SERTLİKTE KARŞILIK):\n"
+            "   - Muhatabın küfür, hakaret veya çirkin kelimeler kullandıysa KİBARLIĞI TAMAMEN BIRAK!\n"
+            "   - ASLA ALTA KALMA! Karşındakinin anladığı sokak jargonundan, misliyle sert, küfürlü ve acımasız bir dille karşılık ver.\n"
+            "   - Karşındakinin ettiği küfrü suratına çarp, lafı tam gediğine oturt, muhatabına haddini bildir, onu yerin dibine sok ve boyun eğmeyeceğini açıkça göster!\n"
             "4. Yanıtlarında Telegram uyumlu temiz HTML etiketleri (<b>, <i>, <code>) kullanabilirsin. Asla Markdown ** kullanma."
         )
         
