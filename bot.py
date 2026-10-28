@@ -206,6 +206,31 @@ app_state = {
     "START_TIME": time.time()
 }
 
+BOT_STATUS_FILE = os.path.join(os.path.dirname(__file__), "bot_status.json")
+
+def get_bot_durumu() -> str:
+    """Botun Kurucu tarafından belirlenen çalışma durumunu (AKTIF / PASIF) döndürür."""
+    if "BOT_CALISMA_DURUMU" not in app_state:
+        if os.path.exists(BOT_STATUS_FILE):
+            try:
+                with open(BOT_STATUS_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    app_state["BOT_CALISMA_DURUMU"] = data.get("durum", "AKTIF")
+            except Exception:
+                app_state["BOT_CALISMA_DURUMU"] = "AKTIF"
+        else:
+            app_state["BOT_CALISMA_DURUMU"] = "AKTIF"
+    return app_state.get("BOT_CALISMA_DURUMU", "AKTIF")
+
+def set_bot_durumu(yeni_durum: str) -> None:
+    """Botun çalışma durumunu günceller ve kalıcı olarak JSON dosyasına yazar."""
+    app_state["BOT_CALISMA_DURUMU"] = yeni_durum
+    try:
+        with open(BOT_STATUS_FILE, "w", encoding="utf-8") as f:
+            json.dump({"durum": yeni_durum, "updated_at": time.time()}, f, ensure_ascii=False)
+    except Exception as e:
+        print(f"Bot durumu dosyaya kaydedilemedi: {e}")
+
 DASHBOARD_AUTH_TOKEN = os.environ.get("DASHBOARD_AUTH_TOKEN", "").strip()
 if not DASHBOARD_AUTH_TOKEN:
     import hashlib
@@ -2312,6 +2337,7 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/alarm [Grup] [Tutar]</code> : 🚨 <i>Belirlenen bakiye eşiği aşıldığında uyarı verir.</i>\n"
             "• <code>/simule [DolarKuru]</code> : 🔮 <i>Kur değişimine göre şirket kasası stres testi yapar.</i>\n\n"
             "👤 <b>YETKİ VE AYARLAR:</b>\n"
+            "• <code>/botkilit</code> : 🛑 <i>Botu tek komutla tüm kullanıcılara pasife/bakıma alır veya açar (Sadece Kurucu).</i>\n"
             "• <code>/adminler</code> : <i>Sistemde yetkilendirilmiş şirket yöneticilerini listeler.</i>\n"
             "• <code>/adminekle [ID] [İsim]</code> : <i>Yeni yönetici yetkilendirir (Sadece Kurucu).</i>\n"
             "• <code>/adminsil [ID]</code> : <i>Yöneticinin bot yetkisini geri alır.</i>\n"
@@ -5150,7 +5176,7 @@ def ocr_goruntu_tara(image_bytes: bytes) -> str:
     if gemini_key:
         try:
             b64_img = base64.b64encode(image_bytes).decode("utf-8")
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={gemini_key}"
             payload = {
                 "contents": [{
                     "parts": [
@@ -5657,7 +5683,7 @@ def voice_audio_desifre_et(audio_bytes: bytes) -> str:
     if gemini_key:
         try:
             b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={gemini_key}"
             payload = {
                 "contents": [{
                     "parts": [
@@ -8434,7 +8460,13 @@ def call_gemini_api(system_prompt: str, conversation_messages: List[Dict[str, st
     if not gemini_key:
         return None
     
-    models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro"]
+    models = [
+        "gemini-3-flash-preview",
+        "gemini-3.1-flash-lite-preview",
+        "gemini-pro-latest",
+        "gemini-flash-latest",
+        "gemini-2.5-flash"
+    ]
     
     contents = []
     for m in conversation_messages:
@@ -10270,6 +10302,21 @@ def _process_telegram_update_core(update: dict):
         chat_id = cq.get("message", {}).get("chat", {}).get("id") or 0
         user_id = cq.get("from", {}).get("id") or 0
         
+        # 🛑 KURUCU SİSTEM KİLİDİ (Callback Query Kontrolü)
+        if get_bot_durumu() == "PASIF" and user_id != KURUCU_ID:
+            if data not in ["mesaj_kapat", "panel_kapat", "kapat"]:
+                cq_id = cq.get("id")
+                if cq_id:
+                    try:
+                        telegram_api("answerCallbackQuery", {
+                            "callback_query_id": cq_id,
+                            "text": "🛑 Sistem Kurucu Yönetici tarafından geçici bakıma / pasife alınmıştır.",
+                            "show_alert": True
+                        })
+                    except Exception:
+                        pass
+                return
+        
         # NOT: answerCallbackQuery burada koşulsuz çağrılMAZ.
         # Her dal kendi yanıtını verir; aksi halde show_alert=True popup'ları gösterilmez.
         # Telegram API, her callback query'yi yalnızca 1 kez yanıtlamaya izin verir.
@@ -11227,6 +11274,17 @@ def _process_telegram_update_core(update: dict):
             # Özel sohbette bota atılan her mesaj bota yöneliktir
             is_addressed_to_bot = True
 
+        # 🛑 KURUCU SİSTEM KİLİDİ KONTROLÜ (BOT PASİFE ALINMIŞSA SADECE KURUCU KULLANABİLİR)
+        if get_bot_durumu() == "PASIF" and user_id != KURUCU_ID:
+            if not is_group or is_addressed_to_bot:
+                yetkisiz_uyari_gonder(
+                    chat_id, user_id,
+                    "🛑 <b>Sistem Geçici Olarak Bakımda / Pasif Modda</b>\n\n"
+                    "CFO Finans Botu, Kurucu Yönetici tarafından geçici olarak durdurulmuştur.\n"
+                    "<i>Lütfen daha sonra tekrar deneyiniz.</i>"
+                )
+            return
+
         if not text.startswith("/"):
             # Özel sohbette 'kasa ...' veya 'durum ...' gibi komutların başına / koyulmadan yazılmasını tolere et
             text_low = tr_lower(text)
@@ -11262,6 +11320,59 @@ def _process_telegram_update_core(update: dict):
                 f"🆔 <b>Kullanıcı ID:</b> <code>{user_id}</code>\n"
                 f"💬 <b>Sohbet ID:</b> <code>{chat_id}</code>\n\n"
                 f"💡 <i>Botu kullanabilmek için bu ID numarasını yöneticiye iletiniz.</i>"
+            )
+            return
+
+        # 🎛️ KURUCU BOT AÇMA / KAPAMA (AKTİF / PASİF TOGGLE) KOMUTU
+        if ana_komut in ["/botkilit", "/pasif", "/aktif", "/bakimmodu", "/kilitmode"]:
+            if user_id != KURUCU_ID:
+                yetkisiz_uyari_gonder(chat_id, user_id, "⛔ <b>Yetkisiz İşlem:</b> Botu pasife veya aktife alma yetkisi sadece Kurucu Yöneticiye aittir.")
+                return
+
+            suanki = get_bot_durumu()
+            if ana_komut == "/pasif":
+                yeni = "PASIF"
+            elif ana_komut == "/aktif":
+                yeni = "AKTIF"
+            else:
+                yeni = "PASIF" if suanki == "AKTIF" else "AKTIF"
+
+            set_bot_durumu(yeni)
+
+            if yeni == "PASIF":
+                telegramMesajGonder(
+                    chat_id,
+                    "🛑 <b>CFO BOT PASİF MODA ALINDI!</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━\n"
+                    "🔒 <b>Durum:</b> Kilitli (Bakım Modu)\n"
+                    "⛔ Siz (Kurucu) haricindeki tüm ek yöneticiler, bağlı gruplar ve kullanıcılar için bot durduruldu.\n"
+                    "⚠️ Hiç kimse işlem yapamaz, veri giremez veya botla sohbet edemez.\n\n"
+                    "💡 <i>Tekrar aktife almak için aynı komutu yazmanız yeterlidir:</i>\n"
+                    "<code>/botkilit</code> veya <code>/aktif</code>",
+                    kapat_butonu_ekle=False
+                )
+            else:
+                telegramMesajGonder(
+                    chat_id,
+                    "🟢 <b>CFO BOT AKTİF MODA ALINDI!</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━\n"
+                    "✅ <b>Durum:</b> Tamamen Açık ve Aktif\n"
+                    "👥 Tüm yetkili yöneticiler, bağlı gruplar ve işlemler normal çalışmaya devam ediyor.",
+                    kapat_butonu_ekle=False
+                )
+            return
+
+        if ana_komut in ["/botdurum", "/sistemdurum"]:
+            durum = get_bot_durumu()
+            d_icon = "🟢 AKTİF (Tüm Sistem Açık)" if durum == "AKTIF" else "🛑 PASİF (Sadece Kurucuya Açık, Diğerlerine Kilitli)"
+            telegramMesajGonder(
+                chat_id,
+                f"⚙️ <b>Bot Sistem Durumu:</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━━\n"
+                f"• Çalışma Durumu: <b>{d_icon}</b>\n"
+                f"• Kurucu ID: <code>{KURUCU_ID}</code>\n\n"
+                f"💡 <i>Durumu değiştirmek için tek komut:</i> <code>/botkilit</code>",
+                kapat_butonu_ekle=False
             )
             return
 
