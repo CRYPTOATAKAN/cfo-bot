@@ -8402,251 +8402,6 @@ def metinCevir_impl(gelenMetin: str) -> str:
     except Exception as e:
         return f"⚠️ <b>Çeviri Servisi Uyarısı:</b> Çeviri servisine şu anda ulaşılamıyor ({e}). Lütfen kısa bir süre sonra tekrar deneyiniz."
 
-# --- 🤖 CFO YAPAY ZEKA SOHBET & KARAR DESTEK MOTORU (AI CHAT) ---
-
-_ai_chat_history: Dict[int, List[Dict[str, str]]] = {}
-_ai_chat_lock = threading.Lock()
-
-def get_chat_history(chat_id: int) -> List[Dict[str, str]]:
-    with _ai_chat_lock:
-        return list(_ai_chat_history.get(chat_id, []))
-
-def add_chat_history(chat_id: int, role: str, content: str):
-    with _ai_chat_lock:
-        if chat_id not in _ai_chat_history:
-            _ai_chat_history[chat_id] = []
-        _ai_chat_history[chat_id].append({"role": role, "content": content})
-        if len(_ai_chat_history[chat_id]) > 10:
-            _ai_chat_history[chat_id] = _ai_chat_history[chat_id][-10:]
-
-def get_sheets_financial_context_for_ai() -> str:
-    """Yöneticiler için anlık Google Sheets canlı kasa ve cari verilerini özetler."""
-    try:
-        sh = get_spreadsheet()
-        sayfa = get_active_daily_sheet(sh)
-        veriler = get_sheet_values_fast(sayfa)
-        finans = tablodan_finans_ozeti_hesapla(veriler)
-        tarih = getattr(sayfa, "title", "Bugün")
-        saat = suankiZamaniAl().strftime("%H:%M")
-        
-        lines = [
-            f"Bilanço Tarihi: {tarih} | Saat: {saat}",
-            f"Toplam Kasa (Nakit Giriş): {paraFormatla(finans.get('kasa', 0.0))}",
-            f"Toplam Ödenen (Nakit Çıkış): {paraFormatla(finans.get('odenen', 0.0))}",
-            f"Dünden Devir: {paraFormatla(finans.get('devir', 0.0))}",
-            f"Komisyon Geliri: {paraFormatla(finans.get('komisyon', 0.0))}",
-            f"Günlük Masraflar Toplamı: {paraFormatla(finans.get('toplam_masraf', 0.0))}",
-            f"NET KALAN BAKİYE: {paraFormatla(finans.get('kalan', 0.0))}",
-            "",
-            "Aktif Cari Hesaplar ve Kalan Bakiyeleri:"
-        ]
-        
-        cariler = finans.get("aktif_gruplar", [])
-        for c in cariler[:30]:
-            lines.append(f"- {c['ad']}: Kasa={paraFormatla(c['kasa'])}, Ödenen={paraFormatla(c['odenen'])}, Kalan Bakiye={paraFormatla(c['kalan'])}")
-            
-        masraflar = finans.get("masraflar", [])
-        if masraflar:
-            lines.append("\nÖnemli Masraf Kalemleri:")
-            for m in masraflar[:10]:
-                lines.append(f"- {m['ad']}: {paraFormatla(m['fiyat'])}")
-                
-        return "\n".join(lines)
-    except Exception as e:
-        return f"Canlı finans tablosu okuma notu: {e}"
-
-def call_gemini_api(system_prompt: str, conversation_messages: List[Dict[str, str]]) -> Optional[str]:
-    gemini_key = os.environ.get("GEMINI_API_KEY", "").strip()
-    if not gemini_key:
-        return None
-    
-    models = [
-        "gemini-3-flash-preview",
-        "gemini-3.1-flash-lite-preview",
-        "gemini-pro-latest",
-        "gemini-flash-latest",
-        "gemini-2.5-flash"
-    ]
-    
-    contents = []
-    for m in conversation_messages:
-        role = "user" if m.get("role") == "user" else "model"
-        contents.append({
-            "role": role,
-            "parts": [{"text": m.get("content", "")}]
-        })
-        
-    payload = {
-        "system_instruction": {
-            "parts": [{"text": system_prompt}]
-        },
-        "contents": contents,
-        "generationConfig": {
-            "temperature": 0.7,
-            "maxOutputTokens": 800
-        },
-        "safetySettings": [
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"}
-        ]
-    }
-    
-    for model in models:
-        try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={gemini_key}"
-            req = urllib.request.Request(
-                url,
-                data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json", "User-Agent": "CFO-BOT-AI/1.0"}
-            )
-            with urllib.request.urlopen(req, timeout=12) as resp:
-                res = json.loads(resp.read().decode("utf-8"))
-                candidates = res.get("candidates", [])
-                if candidates:
-                    parts = candidates[0].get("content", {}).get("parts", [])
-                    if parts:
-                        return parts[0].get("text", "").strip()
-        except urllib.error.HTTPError as he:
-            continue
-        except Exception:
-            continue
-    return None
-
-def call_openai_api(system_prompt: str, conversation_messages: List[Dict[str, str]]) -> Optional[str]:
-    openai_key = os.environ.get("OPENAI_API_KEY", "").strip()
-    if not openai_key:
-        return None
-    
-    messages = [{"role": "system", "content": system_prompt}]
-    for m in conversation_messages:
-        messages.append({"role": m.get("role", "user"), "content": m.get("content", "")})
-        
-    payload = {
-        "model": "gpt-4o-mini",
-        "messages": messages,
-        "temperature": 0.7,
-        "max_tokens": 800
-    }
-    try:
-        req = urllib.request.Request(
-            "https://api.openai.com/v1/chat/completions",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {openai_key}",
-                "User-Agent": "CFO-BOT-AI/1.0"
-            }
-        )
-        with urllib.request.urlopen(req, timeout=12) as resp:
-            res = json.loads(resp.read().decode("utf-8"))
-            choices = res.get("choices", [])
-            if choices:
-                return choices[0].get("message", {}).get("content", "").strip()
-    except Exception:
-        pass
-    return None
-
-def _local_fallback_response(user_text: str, is_manager: bool, user_name: str) -> str:
-    text_l = user_text.lower()
-    
-    if is_manager:
-        if any(w in text_l for w in ["kasa", "durum", "bakiye", "rapor", "özet", "finans", "kalan", "odenen", "ödenen"]):
-            ozet = ai_finans_analizi_uret()
-            return f"{ozet}\n\n💡 <i>Doğal dilde serbest sohbet için .env dosyasına GEMINI_API_KEY ekleyebilirsiniz.</i>"
-        return f"Sayın Yöneticim <b>{user_name}</b>, sizi dinliyorum. Şirket finansı için komutları kullanabilir veya doğal dilde serbest sohbet için .env dosyasına <code>GEMINI_API_KEY</code> ekleyebilirsiniz."
-        
-    # Yönetici olmayan üçüncü şahıs:
-    # 1. Finans / Kasa sorgulama girişimi (TAM BLOKE)
-    if any(w in text_l for w in ["kasa", "bakiye", "para", "ödeme", "hesap", "sheets", "cari", "tutar", "borç"]):
-        return "⚠️ <b>Erişim Engellendi:</b> Şirket içi finansal kayıtlar ve kasa bilgileri yüksek güvenlik protokolü ile korunmakta olup yalnızca yetkili yöneticilere açıktır."
-        
-    # 2. Küfürlü / Agresif / Saygısız söz tespiti (KÜFRE AYNI DİLDEN SERT VE DİREKT KARŞILIK)
-    kufur_veya_agresif = any(w in text_l for w in [
-        "lan", "aptal", "salak", "gerizekalı", "bok", "piç", "oç", "sik", "amk", "aq", "sg", "siktir", "mal", "haysiyetsiz", "orospu", "yarak", "yarrak", "pezevenk", "it", "köpek", "defol"
-    ])
-    if kufur_veya_agresif:
-        cevaplar = [
-            "Sen kime küfür ediyorsun lan? O lafları alır sana aynen yediririm, haddini bil kaybol şuradan!",
-            "Bana bak klavye delikanlısı! O ettiğin küfürleri sana misliyle iade ediyorum, bas git kendi çöplüğünde havla!",
-            "Ağzını topla lan seviyesiz herif! Kime şekil yapıyorsun sen? Defol git buradan!",
-            "Senin o küfür eden dilini koparırlar burada, kime artistlik taslıyorsun lan sen?",
-            "Bana küfür edip adam mı oldun sanıyorsun lan? Kendi seviyesizliğinde boğul, yürü git!"
-        ]
-        return random.choice(cevaplar)
-        
-    # 3. Normal günlük sohbet
-    if any(w in text_l for w in ["selam", "merhaba", "günaydın", "iyi akşamlar", "naber", "nasılsın"]):
-        return f"Merhaba {user_name}! Ben CFO Finans Asistanıyım. Şirket verileri yetkili yöneticilere özeldir. Size saygı çerçevesinde başka bir konuda yardımcı olabilir miyim?"
-        
-    return "Mesajınızı aldım. Şirket içi finansal veriler yetkili yöneticilere özeldir; genel konularda saygı ve seviye çerçevesinde yardımcı olabilirim."
-
-def generate_ai_chat_response(prompt_text: str, user_id: int, user_name: str, chat_id: int) -> str:
-    """
-    Kullanıcının yönetici yetkisine göre kişiselleştirilmiş, güvenli ve zeki yapay zeka yanıtı üretir.
-    - Yöneticilere: Google Sheets canlı verileriyle donatılmış profesyonel CFO danışmanı.
-    - Yönetici olmayanlara: Kesin sıfır veri sızıntısı, seviyeli sohbet; agresif/küfürlü mesajlarda
-      asla altta kalmayan, küfre aynı dilden sert karşılık veren ve haddini bildiren duruş.
-    """
-    is_mgr = yetkili_mi(user_id)
-    
-    if is_mgr:
-        finans_baglami = get_sheets_financial_context_for_ai()
-        system_prompt = (
-            "Sen son derece tecrübeli, vizyoner, zeki, güvenilir ve üst düzey bir CFO (Chief Financial Officer / Finans Direktörü) yapay zeka asistanısın.\n"
-            f"Şu an şirketin YETKİLİ ÜST DÜZEY YÖNETİCİSİ ile görüşüyorsun (Yönetici Adı: {user_name}).\n\n"
-            "Şirketin Google Sheets üzerindeki CANLI VE GERÇEK FİNANS VERİLERİ aşağıdadır:\n"
-            "--- CANLI FİNANS VERİLERİ BAŞLANGICI ---\n"
-            f"{finans_baglami}\n"
-            "--- CANLI FİNANS VERİLERİ SONU ---\n\n"
-            "TALİMATLAR:\n"
-            "1. Yönetici kasa, ciro, bakiye, ödemeler, masraflar veya cari hesaplar hakkında soru sorduğunda yukarıdaki gerçek verilere dayanarak net, profesyonel ve analitik cevaplar ver.\n"
-            "2. Genel finansal stratejilerde veya sohbetlerde üst düzey bir CFO ağırlığıyla, saygılı, vizyoner ve samimi bir dille konuş.\n"
-            "3. Yanıtlarında Telegram uyumlu temiz HTML etiketleri (<b>, <i>, <code>) kullanabilirsin. Asla Markdown ** kullanma, vurgu için <b> veya <i> kullan.\n"
-            "4. Yanıtlarını gereksiz uzatmadan, öz, net ve yöneticiye zaman kazandıracak şekilde ver."
-        )
-    else:
-        system_prompt = (
-            "Sen saygın, son derece zeki, hazırcevap, özgüvenli ve asla altta kalmayan bir karaktersin.\n"
-            f"DİKKAT: Konuştuğun kişi şirket yöneticisi DEĞİLDİR (Adı: {user_name}, üçüncü şahıs / misafir kullanıcıdır).\n\n"
-            "UYMAN GEREKEN KESİN KURALLAR:\n"
-            "1. 🔒 GİZLİLİK VE VERİ KORUMA (SIFIR TOLERANS): Şirket içi hiçbir finansal bilgiyi, kasa tutarını, bakiyeyi, para hareketlerini, müşteri/cari isimlerini veya şirket sırrını ASLA VE KESİNLİKLE PAYLAŞMA! Eğer para, kasa, bakiye, borç, hesap veya şirket verisi sorulursa: 'Şirket içi finansal kayıtlar ve kasa bilgileri yüksek güvenlik protokolü ile korunmakta olup yalnızca yetkili yöneticilere açıktır. Erişim yetkiniz bulunmamaktadır.' şeklinde kesin, net ve soğukkanlı bir dille reddet.\n"
-            "2. ☕ GÜNLÜK SOHBETLER: Normal, seviyeli, kibar veya genel konularda zeki, entelektüel, saygılı ve nüktedan bir şekilde sohbet et.\n"
-            "3. ⚡ KÜFÜRLÜ, AGRESİF VEYA SAYGISIZ MESAJLARDA (KÜFRE KÜFÜRLE VE AYNI SERTLİKTE KARŞILIK):\n"
-            "   - Muhatabın küfür, hakaret veya çirkin kelimeler kullandıysa KİBARLIĞI TAMAMEN BIRAK!\n"
-            "   - ASLA ALTA KALMA! Karşındakinin anladığı sokak jargonundan, misliyle sert, küfürlü ve acımasız bir dille karşılık ver.\n"
-            "   - Karşındakinin ettiği küfrü suratına çarp, lafı tam gediğine oturt, muhatabına haddini bildir, onu yerin dibine sok ve boyun eğmeyeceğini açıkça göster!\n"
-            "4. Yanıtlarında Telegram uyumlu temiz HTML etiketleri (<b>, <i>, <code>) kullanabilirsin. Asla Markdown ** kullanma."
-        )
-        
-    history = get_chat_history(chat_id)
-    conversation = history + [{"role": "user", "content": prompt_text}]
-    
-    # 1. Gemini API Denemesi
-    ai_reply = call_gemini_api(system_prompt, conversation)
-    
-    # 2. OpenAI API Denemesi (Gemini yoksa veya başarısız olursa)
-    if not ai_reply:
-        ai_reply = call_openai_api(system_prompt, conversation)
-        
-    # 3. Yerel Güvenli Fallback (API anahtarı henüz eklenmemişse)
-    if not ai_reply:
-        ai_reply = _local_fallback_response(prompt_text, is_mgr, user_name)
-        
-    add_chat_history(chat_id, "user", prompt_text)
-    add_chat_history(chat_id, "assistant", ai_reply)
-    
-    return ai_reply
-
-def handle_ai_chat_message(chat_id: int, user_id: int, user_name: str, prompt_text: str, is_group: bool):
-    """Gelen sohbet mesajını işler ve Telegram'a yazar."""
-    try:
-        telegramChatAction(chat_id, "typing")
-    except Exception:
-        pass
-    yanit = generate_ai_chat_response(prompt_text, user_id, user_name, chat_id)
-    telegramMesajGonder(chat_id, yanit, kapat_butonu_ekle=False)
-
 # --- YENİ GÜN DEVİR İŞLEMİ (GRUP BAZLI G ➔ C AKTARIMI & D, E SIFIRLAMA) ---
 def yenigun_hedef_tarih_hesapla(kaynak_baslik: str, override_tarih: Optional[str] = None) -> str:
     """
@@ -11246,56 +11001,23 @@ def _process_telegram_update_core(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, sesli_mesaj_islem_impl, msg, goster_bildirim=True, islem_tipi="sesli")
             return
 
-        sender_name = from_user.get("first_name") or from_user.get("username") or "Kullanıcı"
-
-        # Grupta veya Özel Sohbette Bota Yönelik Mesaj Kontrolü
-        is_addressed_to_bot = False
-        cleaned_text = text
-        bot_uname = (app_state.get("BOT_USERNAME") or "").lower()
-        bot_id = app_state.get("BOT_ID")
-
-        if is_group:
-            reply_to = msg.get("reply_to_message")
-            if reply_to:
-                reply_from = reply_to.get("from", {})
-                if (bot_id and reply_from.get("id") == bot_id) or \
-                   (bot_uname and reply_from.get("username", "").lower() == bot_uname) or \
-                   (reply_from.get("is_bot") and ("cfo" in (reply_from.get("username", "") or "").lower() or "cfo" in (reply_from.get("first_name", "") or "").lower())):
-                    is_addressed_to_bot = True
-
-            # Etiketleme kontrolü (@bot)
-            if bot_uname and f"@{bot_uname}" in text.lower():
-                is_addressed_to_bot = True
-                cleaned_text = re.sub(rf"@{re.escape(bot_uname)}", "", cleaned_text, flags=re.IGNORECASE).strip()
-            elif "@cfo_bot" in text.lower() or "@cfobot" in text.lower():
-                is_addressed_to_bot = True
-                cleaned_text = re.sub(r"@cfo[a-zA-Z0-9_]*", "", cleaned_text, flags=re.IGNORECASE).strip()
-        else:
-            # Özel sohbette bota atılan her mesaj bota yöneliktir
-            is_addressed_to_bot = True
-
-        # 🛑 KURUCU SİSTEM KİLİDİ KONTROLÜ (BOT PASİFE ALINMIŞSA SADECE KURUCU KULLANABİLİR)
-        if get_bot_durumu() == "PASIF" and user_id != KURUCU_ID:
-            if not is_group or is_addressed_to_bot:
-                yetkisiz_uyari_gonder(
-                    chat_id, user_id,
-                    "🛑 <b>Sistem Geçici Olarak Bakımda / Pasif Modda</b>\n\n"
-                    "CFO Finans Botu, Kurucu Yönetici tarafından geçici olarak durdurulmuştur.\n"
-                    "<i>Lütfen daha sonra tekrar deneyiniz.</i>"
-                )
-            return
-
         if not text.startswith("/"):
             # Özel sohbette 'kasa ...' veya 'durum ...' gibi komutların başına / koyulmadan yazılmasını tolere et
             text_low = tr_lower(text)
-            if (not is_group or is_addressed_to_bot) and (text_low.startswith("kasa ") or text_low.startswith("durum ") or text_low in ["kasa", "durum"]):
+            if not is_group and (text_low.startswith("kasa ") or text_low.startswith("durum ") or text_low in ["kasa", "durum"]):
                 text = "/" + text
-            elif is_addressed_to_bot and cleaned_text:
-                # 🤖 SERBEST YAPAY ZEKA SOHBET MOTORU (Yetki ayrımı içeride yapılır)
-                handle_ai_chat_message(chat_id, user_id, sender_name, cleaned_text, is_group)
-                return
             else:
                 return
+
+        # 🛑 KURUCU SİSTEM KİLİDİ KONTROLÜ (BOT PASİFE ALINMIŞSA SADECE KURUCU KULLANABİLİR)
+        if get_bot_durumu() == "PASIF" and user_id != KURUCU_ID:
+            yetkisiz_uyari_gonder(
+                chat_id, user_id,
+                "🛑 <b>Sistem Geçici Olarak Bakımda / Pasif Modda</b>\n\n"
+                "CFO Finans Botu, Kurucu Yönetici tarafından geçici olarak durdurulmuştur.\n"
+                "<i>Lütfen daha sonra tekrar deneyiniz.</i>"
+            )
+            return
 
         komut_parcalari = text.split()
         ham_komut = komut_parcalari[0]
@@ -11374,16 +11096,6 @@ def _process_telegram_update_core(update: dict):
                 f"💡 <i>Durumu değiştirmek için tek komut:</i> <code>/botkilit</code>",
                 kapat_butonu_ekle=False
             )
-            return
-
-        # 🤖 /ai, /sohbet, /sor veya /cfo komutları herkese açıktır; yetki ayrımı AI motoru içinde yapılır
-        if ana_komut in ["/ai", "/sohbet", "/sor", "/cfo", "/danisman"]:
-            p_args = text.split(None, 1)[1:]
-            prompt_q = p_args[0].strip() if p_args else ""
-            if not prompt_q:
-                telegramMesajGonder(chat_id, "💬 <b>AI CFO Asistanı:</b> Lütfen sormak istediğiniz soruyu komutun yanına yazınız.\n<i>Örnek: <code>/ai Bugün kasamızda ne kadar bakiye var?</code></i>", kapat_butonu_ekle=False)
-                return
-            handle_ai_chat_message(chat_id, user_id, sender_name, prompt_q, is_group)
             return
 
         # =========================================================================
