@@ -2661,6 +2661,89 @@ def hucreyeVeriYaz_impl(komut_metni: str, sutun_idx: int, isim: str, carp: int, 
             f"<i>Hatalı işlem mi? /gerial yazabilirsiniz.</i>"
         )
 
+# --- 📉 MASRAF VE GİDER FORMATLAMA VE YÖNETİMİ ---
+_FORMATLANMIS_MASRAF_SAYFALARI = set()
+
+def format_masraf_sutunu(sayfa, force: bool = False) -> bool:
+    """
+    Günlük Masraflar sütununu (J2:J42) Türkçe binlik noktalama formatına (#,##0) dönüştürür.
+    Böylece 100000 -> 100.000, 2500 -> 2.500 şeklinde noktalı olarak görüntülenir.
+    """
+    if not sayfa:
+        return False
+    
+    sheet_title = getattr(sayfa, "title", "")
+    if not force and sheet_title and sheet_title in _FORMATLANMIS_MASRAF_SAYFALARI:
+        return True
+
+    basarili = False
+
+    # 1. gspread format() fonksiyonu ile J2:J42 aralığını formatla
+    try:
+        if hasattr(sayfa, "format"):
+            sayfa.format("J2:J42", {
+                "numberFormat": {
+                    "type": "NUMBER",
+                    "pattern": "#,##0"
+                }
+            })
+            basarili = True
+    except Exception as e:
+        print(f"sayfa.format masraf uyarısı: {e}")
+
+    # 2. Eğer sayfa.format çalışmadıysa doğrudan Sheets API batch_update repeatCell dene
+    if not basarili:
+        try:
+            sh = getattr(sayfa, "spreadsheet", None) or get_spreadsheet()
+            sheet_id = getattr(sayfa, "id", None)
+            if sheet_id is None:
+                sheet_id = getattr(sayfa, "_properties", {}).get("sheetId")
+            
+            if sh and sheet_id is not None:
+                req = {
+                    "repeatCell": {
+                        "range": {
+                            "sheetId": int(sheet_id),
+                            "startRowIndex": 1,    # Satır 2 (0-indexed: index 1)
+                            "endRowIndex": 42,     # Satır 42 dahil (index 42 = Satır 43 Genel Toplam hariç)
+                            "startColumnIndex": 9, # Sütun J (0-indexed: A=0, ..., J=9)
+                            "endColumnIndex": 10   # Sütun J sonu
+                        },
+                        "cell": {
+                            "userEnteredFormat": {
+                                "numberFormat": {
+                                    "type": "NUMBER",
+                                    "pattern": "#,##0"
+                                }
+                            }
+                        },
+                        "fields": "userEnteredFormat.numberFormat"
+                    }
+                }
+                sh.batch_update({"requests": [req]})
+                basarili = True
+        except Exception as e2:
+            print(f"batch_update masraf format uyarısı: {e2}")
+
+    if basarili and sheet_title:
+        _FORMATLANMIS_MASRAF_SAYFALARI.add(sheet_title)
+        
+    return basarili
+
+def masraf_formatla_komutu_impl() -> str:
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    ok = format_masraf_sutunu(sayfa, force=True)
+    if ok:
+        return (
+            f"✅ <b>Masraf Sütunu Başarıyla Formatlandı!</b>\n━━━━━━━━━━━━━━━━━━━━\n"
+            f"📄 <b>Aktif Sayfa:</b> <code>{sayfa.title}</code>\n"
+            f"🔢 <b>Hücre Aralığı:</b> <code>J2:J42</code>\n"
+            f"🎯 <b>Format:</b> Binlik Noktalama (<code>#,##0</code>)\n\n"
+            f"<i>Google Sheets tablosundaki masraf rakamları anında binlik noktalama (Örn: 100.000 / 73.150 / 2.500) formatına dönüştürüldü.</i>"
+        )
+    return "⚠️ Masraf sütunu formatlanırken bir hata oluştu veya sayfa bulunamadı."
+
 def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
     parcalar = komut_metni.strip().split()[1:]
     masraf_ham, tutar = parse_grup_ve_tutar(parcalar)
@@ -2692,6 +2775,19 @@ def masrafVerisiYaz_impl(komut_metni: str, isim: str, carp: int) -> str:
         update_sheet_matrix_memory(sayfa.title, bos_satir, 10, tutar_yuvarlanmis)
         sayfa.update_cell(bos_satir, 9, masraf_ham.upper())
         sayfa.update_cell(bos_satir, 10, tutar_yuvarlanmis)
+        
+        # Masraf sütununun (J2:J42) noktalama formatını (#,##0) sağla
+        try:
+            format_masraf_sutunu(sayfa)
+            if bos_satir > 42 and hasattr(sayfa, "format"):
+                sayfa.format(f"J{bos_satir}", {
+                    "numberFormat": {
+                        "type": "NUMBER",
+                        "pattern": "#,##0"
+                    }
+                })
+        except Exception:
+            pass
         
         _islem_kaydet({
             "sayfa": sayfa.title, "satir": bos_satir, "sutun": 10,
@@ -3136,6 +3232,10 @@ def cfo_dashboard_raporu_uret() -> Tuple[str, dict]:
 def masrafRaporuUret_impl() -> str:
     sh = get_spreadsheet()
     sayfa = get_active_daily_sheet(sh)
+    try:
+        format_masraf_sutunu(sayfa)
+    except Exception:
+        pass
     veriler = get_sheet_values_fast(sayfa)
     masraflar = []
     toplam = 0.0
@@ -8870,6 +8970,12 @@ def yenigun_gerceklestir_impl(masraflari_sil: bool, hedef_tarih_override: Option
         empty_masraf = [['', ''] for _ in range(41)]
         yeni_sayfa.update('I2:J42', empty_masraf)
 
+    # 7.1 Masraf Sütununu (J2:J42) Türkçe Binlik Noktalama Formatına (#,##0) Ayarla
+    try:
+        format_masraf_sutunu(yeni_sayfa, force=True)
+    except Exception as fmt_err:
+        print(f"Yeni gün masraf formatlama uyarısı: {fmt_err}")
+
     # 8. G45 Hücresine Dünkü Kapanış Farkını İçeren Yeni Formülü Yaz
     # Türkçe Google Sheets yerel ayarına uygun olarak ondalık ayracı virgül (,) yapılır (Örn: =6979160,83+F43-J43)
     if abs(dunku_g45_val - round(dunku_g45_val)) < 0.00001:
@@ -11956,6 +12062,8 @@ def _process_telegram_update_core(update: dict):
             islemi_analiz_bildirimiyle_yap(chat_id, bakiye_risk_raporu_uret, "pozitif", goster_bildirim=True)
         elif ana_komut in ["/masraf", "/gider"]:
             islemi_analiz_bildirimiyle_yap(chat_id, masrafRaporuUret_impl)
+        elif ana_komut in ["/masrafformat", "/giderformat"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, masraf_formatla_komutu_impl)
         elif ana_komut == "/canlikur":
             islemi_analiz_bildirimiyle_yap(chat_id, canliKurSorgula_impl, goster_bildirim=True)
         elif ana_komut == "/kur":
