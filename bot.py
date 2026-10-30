@@ -2241,6 +2241,9 @@ def rehber_kategori_metni(kategori: str) -> str:
             "• <code>/hareketler [Cari]</code> : 📜 <i>Carinin bugünkü tüm ekleme, silme ve formül detaylarını döker.</i>\n"
             "• <code>/virman [Kaynak] [Hedef] [Tutar]</code> : 🔄 <i>İki cari arasında anında kasa transferi yapar.</i>\n"
             "• <code>/gerial</code> : <i>En son yapılan hatalı işlemi hafızadan geri alır.</i>\n"
+            "• <code>/gorev [Not]</code> : 📝 <i>Saatli operasyonel işlem notu ve hatırlatıcı ekler (Örn: /gorev AHMET 16:30 FAST 500k).</i>\n"
+            "• <code>/gorevler</code> : 📋 <i>Bekleyen tüm operasyonel görevleri listeler ve tek tıkla tamamlama sunar.</i>\n"
+            "• <code>/tamamla [No]</code> : ✅ <i>Belirtilen işlem notunu tamamlandı olarak işaretler.</i>\n"
             "• <code>/not [Metin]</code> : <i>Şirket hafızasına kalıcı not ekler (Örn: /not SACİD saat 18:00'de ödeme yapacak).</i>\n"
             "• <code>/notlar</code> : <i>Kaydedilmiş son şirket notlarını listeler.</i>"
         )
@@ -2267,6 +2270,7 @@ def rehber_kategori_metni(kategori: str) -> str:
             "📊 <b>GÜNLÜK DÖNGÜ VE RAPORLAR</b>\n"
             "━━━━━━━━━━━━━━━\n\n"
             "• <code>/ai</code> veya <code>/analiz</code> : 🤖 <i>Yapay zeka finans analisti, riskli cariler ve CFO karar destek özeti.</i>\n"
+            "• <code>/pozisyon</code> veya <code>/konsolide</code> : 🌐 <i>Şirket konsolide net varlık raporu (TL Kasa + TRC-20 Kripto Rezervi + Cari Alacak/Borç + Arbitraj).</i>\n"
             "• <code>/anomali</code> : 🚨 <i>Finansal anomali, negatif bakiye ve olağandışı hacim sıçrama analizi.</i>\n"
             "• <code>/indir [Cari]</code> veya <code>/csvekstre</code> : 📥 <i>Cari ekstresini veya günün bilançosunu UTF-8 Excel/CSV olarak indirir.</i>\n"
             "• <code>/hedef</code> veya <code>/kpi</code> : 🎯 <i>Canlı ciro hedefi doluluk oranı, ilerleme çubuğu ve kalan tutar.</i>\n"
@@ -8402,6 +8406,317 @@ def metinCevir_impl(gelenMetin: str) -> str:
     except Exception as e:
         return f"⚠️ <b>Çeviri Servisi Uyarısı:</b> Çeviri servisine şu anda ulaşılamıyor ({e}). Lütfen kısa bir süre sonra tekrar deneyiniz."
 
+# --- 📝 GÜN İÇİ OPERASYONEL GÖREVLER & HATIRLATICI MOTORU ---
+
+GOREVLER_DOSYASI = os.path.join(os.path.dirname(__file__), "operasyon_gorevleri.json")
+_gorevler_lock = threading.Lock()
+
+def _gorevleri_oku() -> List[dict]:
+    with _gorevler_lock:
+        if not os.path.exists(GOREVLER_DOSYASI):
+            return []
+        try:
+            with open(GOREVLER_DOSYASI, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+
+def _gorevleri_yaz(gorevler: List[dict]):
+    with _gorevler_lock:
+        try:
+            with open(GOREVLER_DOSYASI, "w", encoding="utf-8") as f:
+                json.dump(gorevler, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Görevler dosyasına yazılamadı: {e}")
+
+def gorev_ekle_impl(metin: str, olusturan: str) -> str:
+    metin = (metin or "").strip()
+    if not metin:
+        return (
+            "⚠️ <b>Boş Görev Eklenemez!</b>\n\n"
+            "💡 <b>Kullanım:</b> <code>/gorev [Açıklama / Hatırlatma]</code>\n"
+            "📌 <b>Örnek:</b> <code>/gorev AHMET Saat 16:30'da 750.000 TL FAST çıkılacak</code>\n"
+            "📌 <b>Örnek:</b> <code>/gorev MEHMET dekont bekleniyor</code>"
+        )
+    
+    gorevler = _gorevleri_oku()
+    yeni_id = (max([g.get("id", 0) for g in gorevler]) + 1) if gorevler else 1
+    
+    # Otomatik saat tespiti (Örn: 16:30, 14.15, 09:00)
+    saat_match = re.search(r'\b([01]?[0-9]|2[0-3])[:.]([0-5][0-9])\b', metin)
+    saat_etiketi = saat_match.group(0).replace(".", ":") if saat_match else None
+    
+    now_str = suankiZamaniAl().strftime("%d.%m.%Y %H:%M")
+    
+    gorev_obj = {
+        "id": yeni_id,
+        "metin": metin,
+        "saat": saat_etiketi,
+        "olusturan": olusturan or "Yönetici",
+        "olusturuldu": now_str,
+        "durum": "BEKLIYOR",
+        "tamamlayan": None,
+        "tamamlandi_tarih": None
+    }
+    gorevler.append(gorev_obj)
+    _gorevleri_yaz(gorevler)
+    
+    saat_bilgisi = f"⏰ <b>Hedef Vakit:</b> <code>{saat_etiketi}</code>\n" if saat_etiketi else ""
+    return (
+        f"📌 <b>OPERASYONEL GÖREV EKLENDİ (No: #{yeni_id})</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📝 <b>İşlem Notu:</b> <i>{sanitize_html(metin)}</i>\n"
+        f"{saat_bilgisi}"
+        f"👤 <b>Ekleyen:</b> {sanitize_html(olusturan)} | 🕒 <code>{now_str.split()[1]}</code>\n\n"
+        f"💡 <i>Görevi tamamlandığında listeden işaretleyebilir veya <code>/tamamla {yeni_id}</code> yazabilirsiniz.</i>"
+    )
+
+def gorev_tamamla_impl(gorev_id_raw: Any, tamamlayan: str) -> str:
+    try:
+        g_id = int(re.sub(r'[^0-9]', '', str(gorev_id_raw)))
+    except Exception:
+        return "⚠️ Lütfen tamamlanacak geçerli bir görev numarası giriniz. Örnek: <code>/tamamla 1</code>"
+        
+    gorevler = _gorevleri_oku()
+    hedef = None
+    for g in gorevler:
+        if g.get("id") == g_id:
+            hedef = g
+            break
+            
+    if not hedef:
+        return f"⚠️ <b>#{g_id}</b> numaralı görev bulunamadı."
+        
+    if hedef.get("durum") == "TAMAMLANDI":
+        return f"ℹ️ <b>#{g_id}</b> numaralı görev zaten daha önce <b>{hedef.get('tamamlayan', 'Yönetici')}</b> tarafından tamamlanmış."
+        
+    now_str = suankiZamaniAl().strftime("%d.%m.%Y %H:%M")
+    hedef["durum"] = "TAMAMLANDI"
+    hedef["tamamlayan"] = tamamlayan or "Yönetici"
+    hedef["tamamlandi_tarih"] = now_str
+    _gorevleri_yaz(gorevler)
+    
+    return (
+        f"✅ <b>GÖREV TAMAMLANDI! (No: #{g_id})</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📝 <i>{sanitize_html(hedef.get('metin', ''))}</i>\n"
+        f"👤 <b>Tamamlayan:</b> {sanitize_html(tamamlayan)} (<code>{now_str.split()[1]}</code>)\n"
+        f"🎉 <i>Kayıt başarıyla arşivlendi.</i>"
+    )
+
+def gorev_sil_impl(gorev_id_raw: Any) -> str:
+    try:
+        g_id = int(re.sub(r'[^0-9]', '', str(gorev_id_raw)))
+    except Exception:
+        return "⚠️ Lütfen silinecek geçerli bir görev numarası giriniz. Örnek: <code>/gorevsil 1</code>"
+        
+    gorevler = _gorevleri_oku()
+    yeni_liste = [g for g in gorevler if g.get("id") != g_id]
+    if len(yeni_liste) == len(gorevler):
+        return f"⚠️ <b>#{g_id}</b> numaralı görev bulunamadı."
+        
+    _gorevleri_yaz(yeni_liste)
+    return f"🗑️ <b>#{g_id}</b> numaralı görev listeden başarıyla silindi."
+
+def gorevler_temizle_impl() -> str:
+    gorevler = _gorevleri_oku()
+    aktifler = [g for g in gorevler if g.get("durum") != "TAMAMLANDI"]
+    silinen_sayi = len(gorevler) - len(aktifler)
+    _gorevleri_yaz(aktifler)
+    if silinen_sayi == 0:
+        return "ℹ️ Tamamlanmış temizlenecek eski görev bulunmuyor."
+    return f"🧹 <b>{silinen_sayi} adet</b> tamamlanmış görev listeden başarıyla temizlendi."
+
+def gorevler_raporu_uret() -> Tuple[str, Optional[dict]]:
+    gorevler = _gorevleri_oku()
+    if not gorevler:
+        bos_metin = (
+            "📌 <b>OPERASYONEL GÖREVLER & HATIRLATICI</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "📭 <i>Şu anda bekleyen veya kayıtlı hiçbir işlem notu bulunmuyor.</i>\n\n"
+            "💡 <b>Yeni görev eklemek için:</b>\n"
+            "<code>/gorev [Cari / İşlem Notu]</code>\n"
+            "<i>Örnek: <code>/gorev AHMET saat 16:30 FAST 500k çıkılacak</code></i>"
+        )
+        return bos_metin, None
+
+    bekleyenler = [g for g in gorevler if g.get("durum") != "TAMAMLANDI"]
+    tamamlananlar = [g for g in gorevler if g.get("durum") == "TAMAMLANDI"]
+    
+    # Saatli olanları saate göre sırala
+    def saat_anahtari(g):
+        s = g.get("saat")
+        return s if s else "99:99"
+    bekleyenler.sort(key=saat_anahtari)
+
+    tarih_str = suankiZamaniAl().strftime("%d.%m.%Y")
+    saat_str = suankiZamaniAl().strftime("%H:%M")
+
+    satirlar = [
+        "📋 <b>GÜN İÇİ OPERASYONEL GÖREV LİSTESİ</b>",
+        "━━━━━━━━━━━━━━━━━━━━",
+        f"📅 <b>Tarih:</b> {tarih_str} | ⏰ <code>{saat_str}</code>",
+        f"⏳ <b>Bekleyen:</b> <code>{len(bekleyenler)} Adet</code> | ✅ <b>Tamamlanan:</b> <code>{len(tamamlananlar)} Adet</code>",
+        "━━━━━━━━━━━━━━━━━━━━\n"
+    ]
+
+    if bekleyenler:
+        satirlar.append("⏳ <b>BEKLEYEN İŞLEM NOTLARI:</b>")
+        for g in bekleyenler:
+            g_id = g.get("id")
+            g_metin = sanitize_html(g.get("metin", ""))
+            g_saat = f" ⏰ <code>[{g.get('saat')}]</code>" if g.get("saat") else ""
+            g_ekleyen = sanitize_html(g.get("olusturan", "Yönetici"))
+            olusturuldu_saat = g.get("olusturuldu", "").split()[1] if " " in g.get("olusturuldu", "") else ""
+            satirlar.append(f"• <b>#{g_id}</b>{g_saat} : {g_metin}\n   └ 👤 <i>{g_ekleyen} • {olusturuldu_saat}</i>")
+        satirlar.append("")
+    else:
+        satirlar.append("🎉 <i>Bekleyen tüm operasyonel görevler tamamlandı! Harika iş.</i>\n")
+
+    if tamamlananlar:
+        satirlar.append("✅ <b>SON TAMAMLANANLAR:</b>")
+        for g in tamamlananlar[-4:]:
+            g_id = g.get("id")
+            g_metin = sanitize_html(g.get("metin", ""))
+            g_tamamlayan = sanitize_html(g.get("tamamlayan", "Yönetici"))
+            satirlar.append(f"• <s>#{g_id}: {g_metin}</s> (<i>{g_tamamlayan}</i>)")
+        satirlar.append("")
+
+    satirlar.append("━━━━━━━━━━━━━━━━━━━━")
+    satirlar.append("💡 <i>Görevi bitirmek için aşağıdaki butona dokunun veya <code>/tamamla [No]</code> yazın.</i>")
+
+    metin_cikti = "\n".join(satirlar)
+
+    inline_buttons = []
+    btn_row = []
+    for g in bekleyenler[:6]:
+        btn_row.append({"text": f"✅ #{g['id']} Tamamla", "callback_data": f"grv_ok_{g['id']}"})
+        if len(btn_row) == 2:
+            inline_buttons.append(btn_row)
+            btn_row = []
+    if btn_row:
+        inline_buttons.append(btn_row)
+
+    alt_row = [{"text": "🔄 Yenile", "callback_data": "grv_refresh"}]
+    if tamamlananlar:
+        alt_row.append({"text": "🧹 Tamamlananları Temizle", "callback_data": "grv_clean_done"})
+    inline_buttons.append(alt_row)
+
+    klavye = {"inline_keyboard": inline_buttons}
+    return metin_cikti, klavye
+
+# --- 🌐 KONSOLİDE NET VARLIK & ÇOKLU KASA MOTORU (/pozisyon) ---
+
+def konsolide_pozisyon_raporu_uret() -> Tuple[str, dict]:
+    """
+    Şirketin TL Kasa, TRC-20 Kripto (USDT & TRX), Cari Alacak/Borç dengesini ve
+    serbest piyasa döviz kurlarını konsolide ederek toplam sermaye ve net portföy değerini hesaplar.
+    """
+    # 1. Google Sheets Bilanço Verileri
+    sh = get_spreadsheet()
+    sayfa = get_active_daily_sheet(sh)
+    veriler = get_sheet_values_fast(sayfa)
+    finans = tablodan_finans_ozeti_hesapla(veriler)
+
+    tarih_str = getattr(sayfa, "title", "Bugün")
+    saat_str = suankiZamaniAl().strftime("%H:%M")
+
+    tl_kalan = finans.get("kalan", 0.0)
+    tl_kasa_giris = finans.get("kasa", 0.0)
+    tl_odenen_cikis = finans.get("odenen", 0.0)
+    tl_komisyon = finans.get("komisyon", 0.0)
+    tl_masraf = finans.get("toplam_masraf", 0.0)
+
+    # Cari Alacak & Borç Ayrımı
+    aktif_cariler = finans.get("aktif_gruplar", [])
+    toplam_alacak = sum(c["kalan"] for c in aktif_cariler if c["kalan"] > 0)
+    toplam_borc = sum(abs(c["kalan"]) for c in aktif_cariler if c["kalan"] < 0)
+    net_cari_farki = toplam_alacak - toplam_borc
+
+    # 2. Canlı Kripto Varlık Rezervi (TRC-20)
+    cuzdan = VARSAYILAN_TRC20_ADRES.strip() if VARSAYILAN_TRC20_ADRES else ""
+    trx_bal = 0.0
+    usdt_bal = 0.0
+    total_crypto_usd = 0.0
+    if cuzdan:
+        trx_bal, usdt_bal, total_crypto_usd = get_tron_balances(cuzdan)
+
+    # 3. Piyasa Kurları & Arbitraj
+    rates = fetch_all_market_rates_parallel()
+    harem = rates.get("harem") or {}
+    usd_alis, usd_satis = harem.get("usd", (48.20, 48.25))
+    eur_alis, eur_satis = harem.get("eur", (52.30, 52.45))
+    binance = rates.get("binance") or {}
+    usdt_kur = float(binance.get("last", usd_satis))
+
+    # Kripto TL ve USD Değerleri
+    usdt_tl = usdt_bal * usdt_kur
+    kripto_toplam_tl = total_crypto_usd * usdt_kur if total_crypto_usd > 0 else usdt_tl
+
+    # 4. Konsolide Toplamlar
+    # A) Anında Kullanılabilir Net Nakit Likidite (TL Kasa + Kripto Cüzdan)
+    toplam_nakit_likidite_tl = tl_kalan + kripto_toplam_tl
+    toplam_nakit_likidite_usd = (toplam_nakit_likidite_tl / usd_satis) if usd_satis > 0 else 0.0
+
+    # B) Genel Net Şirket Özkaynağı (Nakit Likidite + Net Cari Alacak Dengesi)
+    genel_ozkaynak_tl = toplam_nakit_likidite_tl + net_cari_farki
+    genel_ozkaynak_usd = (genel_ozkaynak_tl / usd_satis) if usd_satis > 0 else 0.0
+
+    # Arbitraj Analizi
+    arbitraj_fark = usdt_kur - usd_satis
+    if arbitraj_fark > 0.05:
+        arb_metin = f"🟢 USDT +{arbitraj_fark:.2f} ₺ Primli 🚀"
+    elif arbitraj_fark < -0.05:
+        arb_metin = f"🟡 Dolar Tahtası +{abs(arbitraj_fark):.2f} ₺ Primli"
+    else:
+        arb_metin = "⚖️ USDT / Dolar Başa Baş"
+
+    mesaj = (
+        f"🌐 <b>KONSOLİDE NET VARLIK &amp; PORTFÖY RAPORU</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📅 <b>Tarih:</b> {tarih_str} | ⏰ <code>{saat_str}</code>\n\n"
+        f"💰 <b>1. NAKİT &amp; KASA VARLIKLARI:</b>\n"
+        f"• 🇹🇷 <b>TL Kasa (Net Kalan):</b> <b>{paraFormatla(tl_kalan)}</b>\n"
+        f"   └ <i>Giriş: {paraFormatla(tl_kasa_giris)} | Çıkış: {paraFormatla(tl_odenen_cikis)}</i>\n"
+        f"• 🪙 <b>Kripto Rezervi (TRC-20):</b> <b>{format_sayi_yerel(usdt_bal)} USDT</b>\n"
+        f"   └ <i>TL Karşılığı: <b>{paraFormatla(usdt_tl)}</b> (1 USDT ≈ {format_sayi_yerel(usdt_kur)} ₺)</i>\n"
+        f"• ⚡ <b>TRX Rezervi:</b> <code>{format_sayi_yerel(trx_bal)} TRX</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"💵 <b>TOPLAM ANLIK LİKİDİTE (Kasa + Kripto):</b>\n"
+        f"🇹🇷 <b>{paraFormatla(toplam_nakit_likidite_tl)}</b>\n"
+        f"🇺🇸 <b>${format_sayi_yerel(toplam_nakit_likidite_usd)}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🏢 <b>2. CARİ ALACAK &amp; BORÇ POZİSYONU:</b>\n"
+        f"• 📥 <b>Piyasadan Alacaklar:</b> 🟢 <b>{paraFormatla(toplam_alacak)}</b>\n"
+        f"• 📤 <b>Piyasaya Borçlar:</b> 🔴 <b>{paraFormatla(toplam_borc)}</b>\n"
+        f"• ⚖️ <b>Net Cari Dengesi:</b> <b>{paraFormatla(net_cari_farki)}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"🏛️ <b>GENEL NET ŞİRKET ÖZKAYNAĞI (Sermaye + Cariler):</b>\n"
+        f"💎 <b>{paraFormatla(genel_ozkaynak_tl)}</b>\n"
+        f"💎 <b>${format_sayi_yerel(genel_ozkaynak_usd)}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"📊 <b>PİYASA &amp; ARBİTRAJ NOTU:</b>\n"
+        f"• Kapalıçarşı USD: <b>{f_tl(usd_satis)}</b> | Binance: <b>{f_tl(usdt_kur)}</b>\n"
+        f"• Durum: <b>{arb_metin}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"⚡ <i>Google Sheets + Canlı Blokzincir + Piyasa Tahtası Entegre Raporudur.</i>"
+    )
+
+    kesif_url = WEB_APP_URL if WEB_APP_URL else "https://t.me"
+    klavye = {
+        "inline_keyboard": [
+            [
+                {"text": "🔄 Canlı Yenile", "callback_data": "pozisyon_yenile"},
+                {"text": "📱 Canlı Web Dashboard ↗", "url": kesif_url}
+            ],
+            [
+                {"text": "🪙 Cüzdan Detayı (/t)", "callback_data": f"t_yenile_{cuzdan}" if cuzdan else "mesaj_kapat"},
+                {"text": "📋 Gün İçi Görevler (/gorevler)", "callback_data": "grv_refresh"}
+            ]
+        ]
+    }
+    return mesaj, klavye
+
 # --- YENİ GÜN DEVİR İŞLEMİ (GRUP BAZLI G ➔ C AKTARIMI & D, E SIFIRLAMA) ---
 def yenigun_hedef_tarih_hesapla(kaynak_baslik: str, override_tarih: Optional[str] = None) -> str:
     """
@@ -10119,6 +10434,72 @@ def _process_telegram_update_core(update: dict):
                 telegramMesajGonder(chat_id, rehber_kategori_metni(kat), rehber_kategori_klavyesi())
             return
 
+        # 📝 Operasyonel Görevler & Hatırlatıcı Callbacks
+        if data.startswith("grv_ok_"):
+            cq_id = cq.get("id")
+            g_id = data.replace("grv_ok_", "").strip()
+            from_name = cq.get("from", {}).get("first_name") or cq.get("from", {}).get("username") or "Yönetici"
+            res_txt = gorev_tamamla_impl(g_id, from_name)
+            if cq_id:
+                try:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": f"✅ #{g_id} Görevi Tamamlandı!"})
+                except Exception:
+                    pass
+            metin, klavye = gorevler_raporu_uret()
+            msg_id = cq.get("message", {}).get("message_id")
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+            else:
+                telegramMesajGonder(chat_id, metin, klavye)
+            return
+
+        if data == "grv_refresh":
+            cq_id = cq.get("id")
+            if cq_id:
+                try:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": "🔄 Görev listesi güncellendi."})
+                except Exception:
+                    pass
+            metin, klavye = gorevler_raporu_uret()
+            msg_id = cq.get("message", {}).get("message_id")
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+            else:
+                telegramMesajGonder(chat_id, metin, klavye)
+            return
+
+        if data == "grv_clean_done":
+            cq_id = cq.get("id")
+            res_txt = gorevler_temizle_impl()
+            if cq_id:
+                try:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": res_txt})
+                except Exception:
+                    pass
+            metin, klavye = gorevler_raporu_uret()
+            msg_id = cq.get("message", {}).get("message_id")
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+            else:
+                telegramMesajGonder(chat_id, metin, klavye)
+            return
+
+        # 🌐 Konsolide Pozisyon Callback
+        if data == "pozisyon_yenile":
+            cq_id = cq.get("id")
+            if cq_id:
+                try:
+                    telegram_api("answerCallbackQuery", {"callback_query_id": cq_id, "text": "🔄 Canlı net pozisyon güncelleniyor..."})
+                except Exception:
+                    pass
+            metin, klavye = konsolide_pozisyon_raporu_uret()
+            msg_id = cq.get("message", {}).get("message_id")
+            if msg_id:
+                telegramMesajDuzenle(chat_id, msg_id, metin, klavye)
+            else:
+                telegramMesajGonder(chat_id, metin, klavye)
+            return
+
         if data == "cariekle_rehber":
             cq_id = cq.get("id")
             if cq_id:
@@ -11159,6 +11540,53 @@ def _process_telegram_update_core(update: dict):
                 f"Bu işlem <b>{gecen_sn:.1f} saniye önce</b> zaten işlendi. Çift işlem riskine karşı koruma sağlandı.\n\n"
                 f"💡 <i>Aynı işlemi tekrar kasıtlı olarak yapmak istiyorsanız lütfen birkaç saniye bekleyip yeniden gönderiniz.</i>"
             )
+            return
+
+        # 🌐 /pozisyon veya /konsolide veya /netvarlik (Konsolide Net Portföy ve Çoklu Kasa)
+        if ana_komut in ["/pozisyon", "/konsolide", "/netvarlik", "/kasapozisyon"]:
+            islemi_analiz_bildirimiyle_yap(chat_id, konsolide_pozisyon_raporu_uret, goster_bildirim=True, islem_tipi="analiz")
+            return
+
+        # 📝 /gorev veya /islemnotu veya /hatirlat (Yeni Operasyonel Görev Ekleme)
+        if ana_komut in ["/gorev", "/islemnotu", "/hatirlat"]:
+            args = komut_parcalari[1:]
+            g_metin = " ".join(args).strip()
+            from_name = from_user.get("first_name") or from_user.get("username") or "Yönetici"
+            yanit = gorev_ekle_impl(g_metin, from_name)
+            telegramMesajGonder(chat_id, yanit)
+            return
+
+        # 📋 /gorevler veya /islemnotlari veya /tasks (Günlük Bekleyen Görevler Listesi)
+        if ana_komut in ["/gorevler", "/islemnotlari", "/tasks"]:
+            metin, klavye = gorevler_raporu_uret()
+            telegramMesajGonder(chat_id, metin, klavye)
+            return
+
+        # ✅ /tamamla veya /yapildi (Görevi Tamamlama)
+        if ana_komut in ["/tamamla", "/yapildi"]:
+            args = komut_parcalari[1:]
+            if not args:
+                telegramMesajGonder(chat_id, "⚠️ Lütfen tamamlanacak görev numarasını belirtin. Örnek: <code>/tamamla 1</code>")
+                return
+            from_name = from_user.get("first_name") or from_user.get("username") or "Yönetici"
+            yanit = gorev_tamamla_impl(args[0], from_name)
+            telegramMesajGonder(chat_id, yanit)
+            return
+
+        # 🗑️ /gorevsil veya /silgorev (Görevi Kalıcı Silme)
+        if ana_komut in ["/gorevsil", "/silgorev"]:
+            args = komut_parcalari[1:]
+            if not args:
+                telegramMesajGonder(chat_id, "⚠️ Lütfen silinecek görev numarasını belirtin. Örnek: <code>/gorevsil 1</code>")
+                return
+            yanit = gorev_sil_impl(args[0])
+            telegramMesajGonder(chat_id, yanit)
+            return
+
+        # 🧹 /gorevtemizle (Tamamlanan Görevleri Temizleme)
+        if ana_komut in ["/gorevtemizle", "/temizlegorev"]:
+            yanit = gorevler_temizle_impl()
+            telegramMesajGonder(chat_id, yanit)
             return
 
         # /t veya /rezerv veya /varlik (TRC-20 Canlı Rezerv & Varlık Raporu)
