@@ -8817,8 +8817,31 @@ def yenigun_gerceklestir_impl(masraflari_sil: bool, hedef_tarih_override: Option
         except Exception:
             pass
 
-    # 5. Gerçek tam finans sayfasını yeni gün adıyla kopyala
-    yeni_sayfa = kaynak_sayfa.duplicate(new_sheet_name=hedef_yeni_tarih)
+    # 5. Gerçek tam finans sayfasını yeni gün adıyla kopyala (Sayfaların EN SONUNA yerleştir)
+    tum_ws = sh.worksheets()
+    hedef_index = len(tum_ws)
+    try:
+        yeni_sayfa = kaynak_sayfa.duplicate(new_sheet_name=hedef_yeni_tarih, insert_sheet_index=hedef_index)
+    except Exception as dup_err:
+        print(f"duplicate insert_sheet_index denemesi ({dup_err}), standart kopyalama deneniyor...")
+        yeni_sayfa = kaynak_sayfa.duplicate(new_sheet_name=hedef_yeni_tarih)
+    
+    # Kronolojik tarih sıralamasının korunması için sayfayı en sona taşı
+    try:
+        guncel_ws_sayisi = len(sh.worksheets())
+        if hasattr(yeni_sayfa, "update_index"):
+            yeni_sayfa.update_index(guncel_ws_sayisi - 1)
+        else:
+            sh.batch_update({
+                "requests": [{
+                    "updateSheetProperties": {
+                        "properties": {"sheetId": getattr(yeni_sayfa, "id", getattr(yeni_sayfa, "_properties", {}).get("sheetId")), "index": guncel_ws_sayisi - 1},
+                        "fields": "index"
+                    }
+                }]
+            })
+    except Exception as idx_err:
+        print(f"Sayfa index güncelleme uyarısı: {idx_err}")
     
     # 6. GRUP BAZLI DEVİR AKTARIMI VE SIFIRLAMA MATRİSİ: C2:E42 (Devir = G sütunu, Kasa = 0, Ödenen = 0)
     matrix_c_e = []
