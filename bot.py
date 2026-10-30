@@ -10415,9 +10415,21 @@ def _process_telegram_update_core(update: dict):
         # Telegram API, her callback query'yi yalnızca 1 kez yanıtlamaya izin verir.
         _cq_answered = False
         
-        # 1. Herkes tarafından kullanılabilen temel arayüz işlemleri (Mesaj kapatma ve Rehber inceleme)
+        # 1. Mesaj kapatma (SADECE YÖNETİCİLER KAPATABİLİR)
         if data in ["mesaj_kapat", "panel_kapat", "kapat"]:
             cq_id = cq.get("id")
+            if not yetkili_mi(user_id):
+                if cq_id:
+                    try:
+                        telegram_api("answerCallbackQuery", {
+                            "callback_query_id": cq_id,
+                            "text": "⛔ Yetkisiz İşlem: Bu mesaja sadece yetkili şirket yöneticileri müdahale edebilir.",
+                            "show_alert": True
+                        })
+                    except Exception:
+                        pass
+                return
+
             if cq_id:
                 try:
                     telegram_api("answerCallbackQuery", {"callback_query_id": cq_id})
@@ -10460,6 +10472,17 @@ def _process_telegram_update_core(update: dict):
         # 📝 Operasyonel Görevler & Hatırlatıcı Callbacks
         if data.startswith("grv_ok_"):
             cq_id = cq.get("id")
+            if not yetkili_mi(user_id):
+                if cq_id:
+                    try:
+                        telegram_api("answerCallbackQuery", {
+                            "callback_query_id": cq_id,
+                            "text": "⛔ Yetkisiz İşlem: Görev tamamlama yetkisi sadece şirket yöneticilerine aittir.",
+                            "show_alert": True
+                        })
+                    except Exception:
+                        pass
+                return
             g_id = data.replace("grv_ok_", "").strip()
             from_name = cq.get("from", {}).get("first_name") or cq.get("from", {}).get("username") or "Yönetici"
             res_txt = gorev_tamamla_impl(g_id, from_name)
@@ -10493,6 +10516,17 @@ def _process_telegram_update_core(update: dict):
 
         if data == "grv_clean_done":
             cq_id = cq.get("id")
+            if not yetkili_mi(user_id):
+                if cq_id:
+                    try:
+                        telegram_api("answerCallbackQuery", {
+                            "callback_query_id": cq_id,
+                            "text": "⛔ Yetkisiz İşlem: Görev listesini temizleme yetkisi sadece şirket yöneticilerine aittir.",
+                            "show_alert": True
+                        })
+                    except Exception:
+                        pass
+                return
             res_txt = gorevler_temizle_impl()
             if cq_id:
                 try:
@@ -10585,6 +10619,17 @@ def _process_telegram_update_core(update: dict):
         if data.startswith("dknt_"):
             cq_id = cq.get("id", "")
             msg_id = cq.get("message", {}).get("message_id")
+            if not yetkili_mi(user_id):
+                if cq_id:
+                    try:
+                        telegram_api("answerCallbackQuery", {
+                            "callback_query_id": cq_id,
+                            "text": "⛔ Yetkisiz İşlem: Dekont onaylama ve kasaya işleme yetkisi sadece şirket yöneticilerine aittir.",
+                            "show_alert": True
+                        })
+                    except Exception:
+                        pass
+                return
 
             # A) Kasaya Ekle Onayı
             if data.startswith("dknt_k_"):
@@ -10742,6 +10787,17 @@ def _process_telegram_update_core(update: dict):
         if data.startswith("voc_"):
             cq_id = cq.get("id", "")
             msg_id = cq.get("message", {}).get("message_id")
+            if not yetkili_mi(user_id):
+                if cq_id:
+                    try:
+                        telegram_api("answerCallbackQuery", {
+                            "callback_query_id": cq_id,
+                            "text": "⛔ Yetkisiz İşlem: Sesli işlem onaylama yetkisi sadece şirket yöneticilerine aittir.",
+                            "show_alert": True
+                        })
+                    except Exception:
+                        pass
+                return
 
             # A) Sesli İşlemi Onayla ve Yaz
             if data.startswith("voc_ok_"):
@@ -10884,6 +10940,17 @@ def _process_telegram_update_core(update: dict):
         if data.startswith("rsk_"):
             cq_id = cq.get("id", "")
             msg_id = cq.get("message", {}).get("message_id")
+            if not yetkili_mi(user_id):
+                if cq_id:
+                    try:
+                        telegram_api("answerCallbackQuery", {
+                            "callback_query_id": cq_id,
+                            "text": "⛔ Yetkisiz İşlem: Kara liste ve risk yönetimi sadece şirket yöneticilerine aittir.",
+                            "show_alert": True
+                        })
+                    except Exception:
+                        pass
+                return
 
             # A) Risk Kaydı Sil
             if data.startswith("rsk_del_"):
@@ -11211,6 +11278,18 @@ def _process_telegram_update_core(update: dict):
             grup = data.replace("rapor_", "")
             islemi_analiz_bildirimiyle_yap(chat_id, grup_kasa_analiz_fisi_uret, grup)
         elif data.startswith("ibanbosta_"):
+            if not yetkili_mi(user_id):
+                cq_id = cq.get("id", "")
+                if cq_id:
+                    try:
+                        telegram_api("answerCallbackQuery", {
+                            "callback_query_id": cq_id,
+                            "text": "⛔ Yetkisiz İşlem: İBAN boşa çıkarma yetkisi sadece şirket yöneticilerine aittir.",
+                            "show_alert": True
+                        })
+                    except Exception:
+                        pass
+                return
             try:
                 telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", ""), "text": "🔓 İBAN boşa çıkarılıyor..."})
             except Exception:
@@ -11226,6 +11305,18 @@ def _process_telegram_update_core(update: dict):
             else:
                 telegramMesajGonder(chat_id, f"⚠️ {h_ad}")
         elif data.startswith("grup_iban_sil_"):
+            if not yetkili_mi(user_id):
+                cq_id = cq.get("id", "")
+                if cq_id:
+                    try:
+                        telegram_api("answerCallbackQuery", {
+                            "callback_query_id": cq_id,
+                            "text": "⛔ Yetkisiz İşlem: İBAN kaldırma/silme yetkisi sadece şirket yöneticilerine aittir.",
+                            "show_alert": True
+                        })
+                    except Exception:
+                        pass
+                return
             try:
                 telegram_api("answerCallbackQuery", {"callback_query_id": cq.get("id", ""), "text": "🔓 İBAN kaldırılıyor..."})
             except Exception:
